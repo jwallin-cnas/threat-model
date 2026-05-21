@@ -9,7 +9,9 @@
  *      to commit back into their repo
  */
 
-const STORAGE_KEY = 'threatmodel_targets_v2';
+const STORAGE_KEY             = 'threatmodel_targets_v2';
+const EMPLACEMENT_STORAGE_KEY = 'threatmodel_emplacements_v1';
+const EMPLACEMENT_MAG_KEY     = 'threatmodel_empl_mag_v1';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
@@ -23,8 +25,14 @@ let appDefaultDefenses = {};  // default defense assignments from data/defaults.
 
 let selectedTargetId   = null;
 let attackManifest     = [];   // [{platformId, count}]
-let perTargetMagStates = {};   // targetId → { systemId: magazineRemaining }
+let perTargetMagStates = {};   // targetId → { defId: magazineRemaining }
 let _manifestUnchanged = false; // true once a sim has run; reset whenever manifest/target/defenses change
+
+// ── Emplacement state ─────────────────────────────────────────────────────────
+let appEmplacements     = [];  // global list loaded from data/emplacements.json
+let emplacementMagState = {};  // global: emplacementId → remaining interceptors
+let _emplEditId         = null; // ID being edited in the management panel (null = new)
+let _minimapEmplCircles = [];   // Leaflet layers for emplacement coverage circles
 
 // ── Magazine state helpers (all scoped to the active target) ──────────────────
 
@@ -61,12 +69,13 @@ let _minimapMarker = null;        // Leaflet circleMarker instance
 
 async function loadData() {
   // Fetch all data files in parallel
-  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes] = await Promise.allSettled([
+  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes, emplRes] = await Promise.allSettled([
     fetch('data/data.json').then(r => r.json()),
     fetch('data/targets.json').then(r => r.json()),
     fetch('data/defenses.json').then(r => r.json()),
     fetch('data/attacks.json').then(r => r.json()),
-    fetch('data/defaults.json').then(r => r.json())
+    fetch('data/defaults.json').then(r => r.json()),
+    fetch('data/emplacements.json').then(r => r.json())
   ]);
 
   // Scenario targets (data.json) — merged with localStorage overrides below
@@ -104,6 +113,18 @@ async function loadData() {
   } else {
     console.warn('Could not load data/defaults.json:', defaultsRes.reason);
   }
+
+  // Emplacements (emplacements.json) — merged with localStorage overrides
+  if (emplRes.status === 'fulfilled') {
+    appEmplacements = emplRes.value.emplacements || [];
+  } else {
+    console.warn('Could not load data/emplacements.json:', emplRes.reason);
+  }
+  const storedEmplacements = loadEmplacementsFromStorage();
+  if (storedEmplacements) appEmplacements = storedEmplacements;
+
+  // Emplacement magazine state (localStorage)
+  emplacementMagState = loadEmplacementMagState();
 
   // Keep data.json targets available for backward compatibility
   appTargets = baseline;
@@ -144,6 +165,30 @@ function saveToStorage() {
   } catch (e) {
     showToast('Storage error — could not save.', true);
   }
+}
+
+function saveEmplacementsToStorage() {
+  try { localStorage.setItem(EMPLACEMENT_STORAGE_KEY, JSON.stringify(appEmplacements)); }
+  catch (e) { showToast('Storage error — could not save emplacements.', true); }
+}
+
+function loadEmplacementsFromStorage() {
+  try {
+    const raw = localStorage.getItem(EMPLACEMENT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveEmplacementMagStateToStorage() {
+  try { localStorage.setItem(EMPLACEMENT_MAG_KEY, JSON.stringify(emplacementMagState)); }
+  catch (e) { /* silently swallow — non-critical */ }
+}
+
+function loadEmplacementMagState() {
+  try {
+    const raw = localStorage.getItem(EMPLACEMENT_MAG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
 }
 
 function exportData() {
@@ -229,6 +274,47 @@ function mergeLoadedData() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Geographic helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Haversine great-circle distance between two lat/lon points, in kilometres.
+ * Accurate to well under 1 km for the distances involved here.
+ */
+function haversine(lat1, lon1, lat2, lon2) {
+  const R     = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat  = toRad(lat2 - lat1);
+  const dLon  = toRad(lon2 - lon1);
+  const a     = Math.sin(dLat / 2) ** 2
+              + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Return all emplacements whose system range_km reaches the given target,
+ * each annotated with distanceKm (rounded to nearest km).
+ */
+function getEmplacementsInRange(target) {
+  if (!target || !Array.isArray(target.location) || target.location[0] == null) return [];
+  const [tlat, tlon] = target.location;
+  const result = [];
+  for (const emp of appEmplacements) {
+    const catalog = DEFENSE_CATALOG[emp.system];
+    if (!catalog) continue;
+    if (!Array.isArray(emp.location) || emp.location.length < 2) continue;
+    const [elat, elon] = emp.location;
+    const dist = haversine(tlat, tlon, elat, elon);
+    if (dist <= catalog.range_km) {
+      result.push({ ...emp, distanceKm: Math.round(dist) });
+    }
+  }
+  // Sort nearest first
+  result.sort((a, b) => a.distanceKm - b.distanceKm);
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Target helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -308,6 +394,10 @@ function updateMinimap(target) {
   // Show container before Leaflet queries its size
   container.classList.remove('hidden');
 
+  // Remove stale emplacement circles from a previous target selection
+  for (const layer of _minimapEmplCircles) layer.remove();
+  _minimapEmplCircles = [];
+
   if (!_minimap) {
     // First initialisation — create the map instance
     _minimap = L.map('target-minimap', {
@@ -340,6 +430,36 @@ function updateMinimap(target) {
     _minimap.invalidateSize();
     _minimap.setView([lat, lon], zoom);
     _minimapMarker.setLatLng([lat, lon]);
+  }
+
+  // Draw coverage circles for emplacements in range of this target
+  const inRange = getEmplacementsInRange(target);
+  for (const emp of inRange) {
+    const catalog = DEFENSE_CATALOG[emp.system];
+    if (!catalog) continue;
+    const [elat, elon] = emp.location;
+
+    const circle = L.circle([elat, elon], {
+      radius:      catalog.range_km * 1000,
+      color:       '#58a6ff',
+      fillColor:   '#58a6ff',
+      fillOpacity: 0.04,
+      weight:      1,
+      opacity:     0.4,
+      dashArray:   '5 5'
+    }).addTo(_minimap);
+
+    const dot = L.circleMarker([elat, elon], {
+      radius:      4,
+      fillColor:   '#58a6ff',
+      color:       '#ffffff',
+      weight:      1.5,
+      opacity:     1,
+      fillOpacity: 1
+    }).bindTooltip(emp.name || catalog.name, { permanent: false, direction: 'top' })
+      .addTo(_minimap);
+
+    _minimapEmplCircles.push(circle, dot);
   }
 }
 
@@ -405,6 +525,91 @@ function renderDefenseLayers(targetId) {
   for (const def of sorted) {
     container.appendChild(buildDefenseCard(def, targetId));
   }
+
+  renderAreaDefenses(targetId);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rendering — Area defenses (in-range emplacements)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderAreaDefenses(targetId) {
+  const container  = document.getElementById('area-defenses-list');
+  const countBadge = document.getElementById('area-defense-count');
+  if (!container) return;
+
+  if (!targetId) {
+    container.innerHTML = '<p class="empty-state">Select a target to view area defenses</p>';
+    if (countBadge) countBadge.textContent = '0 in range';
+    return;
+  }
+
+  const target  = getTarget(targetId);
+  const inRange = getEmplacementsInRange(target);
+
+  if (countBadge) countBadge.textContent = `${inRange.length} in range`;
+
+  if (inRange.length === 0) {
+    container.innerHTML = '<p class="empty-state">No emplacements within range of this target.</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  for (const emp of inRange) {
+    container.appendChild(buildEmplacementCard(emp));
+  }
+}
+
+function buildEmplacementCard(emp) {
+  const catalog  = DEFENSE_CATALOG[emp.system];
+  const tier     = catalog?.tier ?? 0;
+  const color    = TIER_COLORS[tier] || '#888';
+  const label    = TIER_LABELS[tier] || 'Unknown';
+  const fullMag  = (catalog?.magazinePerBattery || 0) * emp.quantity;
+  const remaining = emplacementMagState[emp.id];
+  const hasSim   = remaining !== undefined && fullMag > 0;
+
+  let magHtml = '';
+  if (fullMag > 0) {
+    if (hasSim) {
+      const expended  = fullMag - remaining;
+      const usedClass = expended > 0 ? ' mag-used' : '';
+      magHtml = `
+        <div class="defense-card-mag">
+          <span class="defense-magazine${usedClass}">${remaining} / ${fullMag} interceptors</span>
+          <span class="mag-expended">${expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+        </div>`;
+    } else {
+      magHtml = `
+        <div class="defense-card-mag">
+          <span class="defense-magazine">${fullMag} interceptors</span>
+        </div>`;
+    }
+  }
+
+  const effectList = (catalog?.effectiveAgainst || [])
+    .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
+    .join('');
+
+  const card = document.createElement('div');
+  card.className = 'defense-card empl-card';
+  card.style.setProperty('--tier-color', color);
+
+  card.innerHTML = `
+    <div class="defense-card-header">
+      <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
+      <span class="empl-distance">${emp.distanceKm} km away</span>
+    </div>
+    <div class="defense-card-body">
+      <span class="defense-name">${catalog?.name || emp.system}</span>
+      <span class="defense-quantity">${emp.quantity} batter${emp.quantity !== 1 ? 'ies' : 'y'}</span>
+    </div>
+    ${emp.name ? `<div class="defense-notes">${emp.name}</div>` : ''}
+    ${magHtml}
+    <div class="defense-threats">${effectList}</div>
+  `;
+
+  return card;
 }
 
 function buildDefenseCard(def, targetId) {
@@ -415,13 +620,13 @@ function buildDefenseCard(def, targetId) {
 
   // Magazine display
   const initialMag   = (catalog?.magazinePerBattery || 0) * def.quantity;
-  const simRemaining = getMagState()[def.system];
+  const simRemaining = getMagState()[def.id];
   const hasSim       = simRemaining !== undefined && initialMag > 0;
 
   let magHtml = '';
   if (initialMag > 0) {
-    const ea      = `class="mag-count-editable" data-system="${def.system}" data-max="${initialMag}"`;
-    const resetBtn = `<button class="btn-icon btn-reset-sys-loadout" data-system="${def.system}" title="Reset to full loadout">↺</button>`;
+    const ea      = `class="mag-count-editable" data-defense-id="${def.id}" data-max="${initialMag}"`;
+    const resetBtn = `<button class="btn-icon btn-reset-sys-loadout" data-defense-id="${def.id}" title="Reset to full loadout">↺</button>`;
     if (hasSim) {
       const expended = initialMag - simRemaining;
       const usedClass = expended > 0 ? ' mag-used' : '';
@@ -468,7 +673,7 @@ function buildDefenseCard(def, targetId) {
 
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
     btn.addEventListener('click', () => {
-      deleteMagEntry(btn.dataset.system);
+      deleteMagEntry(btn.dataset.defenseId);
       _manifestUnchanged = false;
       document.getElementById('simulation-results').classList.add('hidden');
       if (selectedTargetId) renderDefenseLayers(selectedTargetId);
@@ -522,9 +727,7 @@ function addDefense(targetId, systemId, quantity, notes) {
   target.defenses.push(newDef);
   saveToStorage();
 
-  // Only evict the newly added system from the magazine state so that existing
-  // systems retain any depletion already recorded by a prior simulation run.
-  deleteMagEntry(systemId);
+  // New defense entry has a fresh unique id — no magazine state to evict.
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
   renderDefenseLayers(targetId);
@@ -567,18 +770,212 @@ function removeDefense(targetId, defenseId) {
   const target = getTarget(targetId);
   if (!target) return;
 
-  // Capture the system ID before filtering so we can evict only its magazine entry.
-  const removedSystemId = (target.defenses || []).find(d => d.id === defenseId)?.system;
-
   target.defenses = (target.defenses || []).filter(d => d.id !== defenseId);
   saveToStorage();
 
-  // Only evict the removed system from the magazine state so that existing
-  // systems retain any depletion already recorded by a prior simulation run.
-  if (removedSystemId) deleteMagEntry(removedSystemId);
+  // Evict only this defense's magazine entry (keyed by def.id) so other
+  // systems retain any depletion recorded by prior simulation runs.
+  deleteMagEntry(defenseId);
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
   renderDefenseLayers(targetId);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Emplacement CRUD
+// ─────────────────────────────────────────────────────────────────────────────
+
+function addEmplacement(data) {
+  const emp = {
+    id:       `empl_${Date.now()}`,
+    name:     data.name || '',
+    system:   data.system,
+    location: [parseFloat(data.lat), parseFloat(data.lon)],
+    quantity: data.quantity || 1,
+    notes:    data.notes || ''
+  };
+  appEmplacements.push(emp);
+  saveEmplacementsToStorage();
+  return emp;
+}
+
+function updateEmplacement(id, data) {
+  const idx = appEmplacements.findIndex(e => e.id === id);
+  if (idx === -1) return;
+  appEmplacements[idx] = {
+    ...appEmplacements[idx],
+    name:     data.name || '',
+    system:   data.system,
+    location: [parseFloat(data.lat), parseFloat(data.lon)],
+    quantity: data.quantity || 1,
+    notes:    data.notes || ''
+  };
+  // Clear magazine state for edited emplacement (range or system may have changed)
+  delete emplacementMagState[id];
+  saveEmplacementsToStorage();
+  saveEmplacementMagStateToStorage();
+}
+
+function removeEmplacement(id) {
+  appEmplacements = appEmplacements.filter(e => e.id !== id);
+  delete emplacementMagState[id];
+  saveEmplacementsToStorage();
+  saveEmplacementMagStateToStorage();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Emplacement management panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+function openEmplacementPanel() {
+  _emplEditId = null;
+  document.getElementById('empl-panel').classList.remove('hidden');
+  renderEmplacementList();
+  document.getElementById('empl-form').classList.add('hidden');
+}
+
+function closeEmplacementPanel() {
+  document.getElementById('empl-panel').classList.add('hidden');
+  // Refresh area defenses in case anything changed
+  if (selectedTargetId) {
+    renderDefenseLayers(selectedTargetId);
+    updateMinimap(getTarget(selectedTargetId));
+  }
+}
+
+function renderEmplacementList() {
+  const container = document.getElementById('empl-list');
+  if (!container) return;
+
+  if (appEmplacements.length === 0) {
+    container.innerHTML = '<p class="empty-state">No emplacements defined yet.</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  for (const emp of appEmplacements) {
+    container.appendChild(buildEmplacementRow(emp));
+  }
+}
+
+function buildEmplacementRow(emp) {
+  const catalog = DEFENSE_CATALOG[emp.system];
+  const [lat, lon] = emp.location || [];
+  const coordStr = lat != null
+    ? `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`
+    : 'No location';
+
+  const row = document.createElement('div');
+  row.className = 'empl-row';
+  row.innerHTML = `
+    <div class="empl-row-info">
+      <div class="empl-row-name">${emp.name || catalog?.name || emp.system}</div>
+      <div class="empl-row-meta">
+        ${catalog?.name || emp.system} · ${emp.quantity} batt. · ${coordStr}
+        ${catalog ? ` · ${catalog.range_km} km range` : ''}
+      </div>
+    </div>
+    <div class="empl-row-actions">
+      <button class="btn btn-secondary btn-sm btn-edit-empl" data-id="${emp.id}">Edit</button>
+      <button class="btn-icon btn-remove-empl" data-id="${emp.id}" title="Remove">✕</button>
+    </div>
+  `;
+
+  row.querySelector('.btn-edit-empl').addEventListener('click', () => openEmplForm(emp.id));
+  row.querySelector('.btn-remove-empl').addEventListener('click', () => {
+    removeEmplacement(emp.id);
+    renderEmplacementList();
+  });
+
+  return row;
+}
+
+function populateEmplSystemSelect() {
+  const sel = document.getElementById('empl-system');
+  sel.innerHTML = '<option value="">— Select System —</option>';
+  const systems = Object.values(DEFENSE_CATALOG).sort((a, b) => a.name.localeCompare(b.name));
+  for (const sys of systems) {
+    const opt = document.createElement('option');
+    opt.value = sys.id;
+    opt.textContent = `${sys.name} (${sys.range_km} km range)`;
+    sel.appendChild(opt);
+  }
+}
+
+function updateEmplMagInfo() {
+  const systemId   = document.getElementById('empl-system').value;
+  const qty        = Math.max(1, parseInt(document.getElementById('empl-quantity').value) || 1);
+  const infoDiv    = document.getElementById('empl-mag-info');
+  const catalog    = systemId ? DEFENSE_CATALOG[systemId] : null;
+  const perBattery = catalog?.magazinePerBattery || 0;
+
+  if (!systemId || perBattery === 0) { infoDiv.classList.add('hidden'); return; }
+  const total = perBattery * qty;
+  infoDiv.classList.remove('hidden');
+  infoDiv.textContent =
+    `${perBattery} interceptors/battery × ${qty} batter${qty !== 1 ? 'ies' : 'y'} = ${total} total · ${catalog.range_km} km coverage radius`;
+}
+
+function openEmplForm(editId = null) {
+  _emplEditId = editId;
+  populateEmplSystemSelect();
+
+  const titleEl = document.getElementById('empl-form-title');
+  titleEl.textContent = editId ? 'Edit Emplacement' : 'Add Emplacement';
+
+  // Populate fields if editing
+  if (editId) {
+    const emp = appEmplacements.find(e => e.id === editId);
+    if (emp) {
+      document.getElementById('empl-name').value     = emp.name || '';
+      document.getElementById('empl-system').value   = emp.system || '';
+      document.getElementById('empl-lat').value      = emp.location?.[0] ?? '';
+      document.getElementById('empl-lon').value      = emp.location?.[1] ?? '';
+      document.getElementById('empl-quantity').value = emp.quantity || 1;
+      document.getElementById('empl-notes').value    = emp.notes || '';
+    }
+  } else {
+    document.getElementById('empl-name').value     = '';
+    document.getElementById('empl-system').value   = '';
+    document.getElementById('empl-lat').value      = '';
+    document.getElementById('empl-lon').value      = '';
+    document.getElementById('empl-quantity').value = 1;
+    document.getElementById('empl-notes').value    = '';
+  }
+
+  updateEmplMagInfo();
+  document.getElementById('empl-form').classList.remove('hidden');
+  document.getElementById('empl-name').focus();
+}
+
+function saveEmplForm() {
+  const system = document.getElementById('empl-system').value;
+  const lat    = parseFloat(document.getElementById('empl-lat').value);
+  const lon    = parseFloat(document.getElementById('empl-lon').value);
+  const qty    = parseInt(document.getElementById('empl-quantity').value) || 1;
+
+  if (!system)      { showToast('Please select a system.', true); return; }
+  if (isNaN(lat) || lat < -90  || lat > 90)  { showToast('Invalid latitude (must be −90 to 90).', true); return; }
+  if (isNaN(lon) || lon < -180 || lon > 180) { showToast('Invalid longitude (must be −180 to 180).', true); return; }
+
+  const data = {
+    name:     document.getElementById('empl-name').value.trim(),
+    system,
+    lat,
+    lon,
+    quantity: Math.max(1, qty),
+    notes:    document.getElementById('empl-notes').value.trim()
+  };
+
+  if (_emplEditId) {
+    updateEmplacement(_emplEditId, data);
+  } else {
+    addEmplacement(data);
+  }
+
+  _emplEditId = null;
+  document.getElementById('empl-form').classList.add('hidden');
+  renderEmplacementList();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -731,7 +1128,9 @@ function extractMagazineState(results) {
   const state = {};
   for (const group of results.byThreatType) {
     for (const eng of group.engagements) {
-      state[eng.systemId] = eng.magazineRemaining;
+      // Keyed by defId so multiple instances of the same system type are tracked
+      // independently. The last write per defId is the lowest (final) remaining count.
+      state[eng.defId] = eng.magazineRemaining;
     }
   }
   return state;
@@ -764,8 +1163,8 @@ function updateDefenseMagazineInfo() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function activateMagazineEdit(span) {
-  const systemId   = span.dataset.system;
-  const maxVal     = parseInt(span.dataset.max, 10);
+  const defId  = span.dataset.defenseId;
+  const maxVal = parseInt(span.dataset.max, 10);
   const currentVal = parseInt(span.textContent, 10);
 
   // Replace the span with a compact inline input
@@ -813,7 +1212,7 @@ function activateMagazineEdit(span) {
     }
 
     // Valid — persist the override, reset dirty flag, and rebuild the cards
-    setMagEntry(systemId, val);
+    setMagEntry(defId, val);
     _manifestUnchanged = false;
     if (selectedTargetId) renderDefenseLayers(selectedTargetId);
   });
@@ -840,16 +1239,53 @@ async function simulate() {
   }
 
   try {
-    const target   = getTarget(selectedTargetId);
-    const defenses = target?.defenses || [];
+    const target            = getTarget(selectedTargetId);
+    const perTargetDefenses = target?.defenses || [];
 
-    // Pass persisted magazine state so interceptors carry over between runs.
-    // getMagState() returns {} on first run (or after a reset), which causes
-    // runSimulation to start from the full battery loadout.
-    const results = runSimulation(attackManifest, defenses, getMagState());
+    // Find emplacements whose range covers this target
+    const inRangeEmplacements = getEmplacementsInRange(target);
 
-    // Persist the updated magazine state and mark the manifest as unchanged
-    setMagState(extractMagazineState(results));
+    // Convert emplacement records to the same shape runSimulation expects.
+    // Each emplacement's unique id becomes the defense entry id, ensuring its
+    // magazine is tracked separately from any same-system per-target battery.
+    const emplacementDefs = inRangeEmplacements.map(emp => ({
+      id:       emp.id,
+      system:   emp.system,
+      quantity: emp.quantity,
+      notes:    emp.notes || ''
+    }));
+
+    const allDefenses = [...perTargetDefenses, ...emplacementDefs];
+
+    // Build combined initial magazine state:
+    //   per-target defenses → getMagState()  (keyed by def.id)
+    //   emplacements        → emplacementMagState (global, keyed by emplacement id)
+    const emplMagSnapshot = {};
+    for (const emp of inRangeEmplacements) {
+      const catalog = DEFENSE_CATALOG[emp.system];
+      const fullMag = (catalog?.magazinePerBattery || 0) * emp.quantity;
+      emplMagSnapshot[emp.id] = emplacementMagState[emp.id] ?? fullMag;
+    }
+    const combinedMagState = { ...getMagState(), ...emplMagSnapshot };
+
+    const results = runSimulation(attackManifest, allDefenses, combinedMagState);
+
+    // Extract updated magazine states and split back into per-target vs emplacement
+    const newMagState    = extractMagazineState(results);
+    const targetDefIdSet = new Set(perTargetDefenses.map(d => d.id));
+    const emplIdSet      = new Set(inRangeEmplacements.map(e => e.id));
+
+    const newTargetMag = {};
+    for (const [id, remaining] of Object.entries(newMagState)) {
+      if (targetDefIdSet.has(id)) newTargetMag[id] = remaining;
+    }
+    setMagState(newTargetMag);
+
+    for (const [id, remaining] of Object.entries(newMagState)) {
+      if (emplIdSet.has(id)) emplacementMagState[id] = remaining;
+    }
+    saveEmplacementMagStateToStorage();
+
     _manifestUnchanged = true;
     renderDefenseLayers(selectedTargetId);
 
@@ -1228,10 +1664,36 @@ function wireEvents() {
   // Reset to default
   document.getElementById('btn-reset').addEventListener('click', resetData);
 
-  // Modal — ESC key dismisses (resolves with false)
+  // ── Emplacement panel ──────────────────────────────────────────────────────
+  document.getElementById('btn-manage-emplacements').addEventListener('click', openEmplacementPanel);
+  document.getElementById('btn-close-empl-panel').addEventListener('click', closeEmplacementPanel);
+
+  document.getElementById('btn-add-empl').addEventListener('click', () => openEmplForm(null));
+  document.getElementById('btn-cancel-empl').addEventListener('click', () => {
+    document.getElementById('empl-form').classList.add('hidden');
+    _emplEditId = null;
+  });
+  document.getElementById('btn-save-empl').addEventListener('click', saveEmplForm);
+
+  document.getElementById('empl-system').addEventListener('change', updateEmplMagInfo);
+  document.getElementById('empl-quantity').addEventListener('input', updateEmplMagInfo);
+
+  document.getElementById('btn-reset-empl-mag').addEventListener('click', () => {
+    emplacementMagState = {};
+    saveEmplacementMagStateToStorage();
+    renderEmplacementList();
+    if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+    showToast('Emplacement magazines reset to full loadout.');
+  });
+
+  // ── Modal — ESC key dismisses ─────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !document.getElementById('modal-overlay').classList.contains('hidden')) {
-      _resolveModal(false);
+    if (e.key === 'Escape') {
+      if (!document.getElementById('empl-panel').classList.contains('hidden')) {
+        closeEmplacementPanel();
+      } else if (!document.getElementById('modal-overlay').classList.contains('hidden')) {
+        _resolveModal(false);
+      }
     }
   });
 }

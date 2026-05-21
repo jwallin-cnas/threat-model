@@ -19,8 +19,8 @@
 /**
  * Apply one system's engagement against a single threat type.
  *
- * @param {number} count   - number of incoming threats of this type
- * @param {number} pk      - probability of kill per engagement attempt (0–1)
+ * @param {number} count    - number of incoming threats of this type
+ * @param {number} pk       - probability of kill per engagement attempt (0–1)
  * @param {number} magazine - interceptors currently available
  * @param {number} [shots=2] - interceptors expended per target attempt
  * @returns {{ killed, survived, magazineRemaining, isPlaceholder, note }}
@@ -30,8 +30,29 @@
  *   pk = 0  → treated as a placeholder; magazine is NOT consumed so that
  *              downstream systems are not incorrectly starved of interceptors
  *              during the configuration phase.
+ *   shots = 0 → directed-energy / EW with effectively unlimited shots;
+ *               magazine counter is not decremented.
  */
 function applyEngagement(count, pk, magazine, shots = 2) {
+
+  // Directed-energy / EW — unlimited shots, no magazine tracking
+  if (shots === 0) {
+    if (pk === 0) {
+      return {
+        killed: 0, survived: count,
+        magazineRemaining: magazine,
+        isPlaceholder: true,
+        note: 'PLACEHOLDER — Pk not set'
+      };
+    }
+    return {
+      killed:            Math.round(count * pk),
+      survived:          count - Math.round(count * pk),
+      magazineRemaining: magazine,
+      isPlaceholder:     false,
+      note:              null
+    };
+  }
 
   if (magazine <= 0) {
     return {
@@ -69,31 +90,32 @@ function applyEngagement(count, pk, magazine, shots = 2) {
 // ─────────────────────────────────────────────────────────────────────────────
 // ENGAGEMENT_PRIORITY
 // Systems are applied in this sequence. Any system not assigned to the
-// current target is skipped automatically. Reorder to change engagement
-// sequence across all scenarios.
+// current target (directly or via an in-range emplacement) is skipped
+// automatically. Reorder to change the engagement sequence.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ENGAGEMENT_PRIORITY = [
   'aegis_sm3',           // 1  — longest-range BMD (SM-3), outermost layer
   'thaad',               // 2  — upper-tier area defense
   'arrow',               // 3  — Arrow 2/3 exo/endo intercept
-  'patriot',             // 4  — PAC-3 MSE area defense
-  'davids_sling',        // 5  — medium-long range
-  'cheongung2',          // 6  — medium range
-  'aegis_sm2',           // 7  — SM-2 area defense
-  'aegis_sm6',           // 8  — SM-6 dual-role
-  'iron_dome',           // 9  — short-range saturation defense
-  'nasams',              // 10 — SHORAD/MSHORAD
-  'ifpc2',               // 11 — indirect fire protection
-  'pantsirs1e',          // 12 — gun-missile combination
-  'fslids',              // 13 — drone-only point defense
-  'merops',              // 14 — electronic attack suite
-  'iron_beam',           // 15 — high-energy laser (directed energy)
-  'containerized_laser', // 16 — containerized high-energy laser
-  'm_shorad',            // 17 — short-range kinetic (Stinger/Hellfire)
-  'phalanx_cram',           // 18 — close-in gun (C-RAM)
-  'high_powered_microwave', // 19 — HPM directed energy
-  'tactical_jammer',        // 20 — RF jamming, innermost layer
+  'dca',                 // 4  — Defensive Counter-Air (100 km CAP bubble)
+  'patriot',             // 5  — PAC-3 MSE area defense
+  'davids_sling',        // 6  — medium-long range
+  'cheongung2',          // 7  — medium range
+  'aegis_sm2',           // 8  — SM-2 area defense
+  'aegis_sm6',           // 9  — SM-6 dual-role
+  'iron_dome',           // 10 — short-range saturation defense
+  'nasams',              // 11 — SHORAD/MSHORAD
+  'ifpc2',               // 12 — indirect fire protection
+  'pantsirs1e',          // 13 — gun-missile combination
+  'fslids',              // 14 — drone-only point defense
+  'merops',              // 15 — electronic attack suite
+  'iron_beam',           // 16 — high-energy laser (directed energy)
+  'containerized_laser', // 17 — containerized high-energy laser
+  'm_shorad',            // 18 — short-range kinetic (Stinger/Hellfire)
+  'phalanx_cram',           // 19 — close-in gun (C-RAM)
+  'high_powered_microwave', // 20 — HPM directed energy
+  'tactical_jammer',        // 21 — RF jamming, innermost layer
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +134,13 @@ const THREAT_PRIORITY = ['ballistic_missile', 'cruise_missile', 'drone'];
  * Run a full layered-defence simulation.
  *
  * @param {Array<{platformId:string, count:number}>} attackManifest
- * @param {Array<{system:string, quantity:number, id:string, notes:string}>} defenses
+ * @param {Array<{id:string, system:string, quantity:number, notes:string}>} defenses
+ *   Each entry must have a unique `id`. Per-target defenses and emplacement-
+ *   derived defenses are passed together; the caller is responsible for
+ *   building the combined list.
+ * @param {Object} [initialMagazineState={}]
+ *   Keyed by def.id (not system type). Allows the caller to pass persisted
+ *   magazine levels from prior simulation runs.
  * @returns {{ totalIn, totalOut, initialThreats, finalThreats, byThreatType }}
  *
  * byThreatType: Array<{
@@ -120,10 +148,10 @@ const THREAT_PRIORITY = ['ballistic_missile', 'cruise_missile', 'drone'];
  *   initialCount: number,
  *   finalCount:   number,
  *   engagements:  Array<{
- *     systemId, systemName, quantity, notes,
+ *     defId, systemId, systemName, quantity, notes,
  *     threatType, threatsIn, killed, survived,
- *     pk, shotsPerEngagement, magazineRemaining,
- *     isPlaceholder, note
+ *     pk, shotsPerEngagement, magazineAtStart, magazineRemaining,
+ *     interceptorsUsed, isPlaceholder, note
  *   }>
  * }>
  */
@@ -137,19 +165,19 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}) {
     threatCounts[platform.type] = (threatCounts[platform.type] || 0) + entry.count;
   }
 
-  // ── Index deployed defenses; initialise live magazine per instance ────────
-  // If initialMagazineState has a value for this system, start from there
-  // (persisting depletion across successive simulation runs). Otherwise start
-  // from the full battery loadout — which is the case on first run or after a
-  // target / defence change that clears lastSimMagazineState.
+  // ── Index deployed defenses by def.id ────────────────────────────────────
+  // Keyed by def.id (not def.system) so multiple instances of the same system
+  // type coexist — e.g., a per-target Patriot battery plus an emplacement-
+  // based Patriot covering the same target both operate independently with
+  // their own magazines.
   const deployed = {};
   for (const def of defenses) {
     const catalog = DEFENSE_CATALOG[def.system];
     if (!catalog) continue;
     const fullMag = (catalog.magazinePerBattery || 0) * def.quantity;
-    deployed[def.system] = {
+    deployed[def.id] = {
       def,
-      magazineRemaining: initialMagazineState[def.system] ?? fullMag
+      magazineRemaining: initialMagazineState[def.id] ?? fullMag
     };
   }
 
@@ -167,22 +195,30 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}) {
     const engagements = [];
 
     for (const systemId of ENGAGEMENT_PRIORITY) {
-      const entry = deployed[systemId];
-      if (!entry) continue;  // system not assigned to this target
+      if (remaining <= 0) break;
 
-      // Ask the engagement function for this system's parameters
+      // Find ALL deployed entries for this system type.
+      // Typically one, but may be several when emplacements are involved.
+      const entries = Object.values(deployed).filter(e => e.def.system === systemId);
+      if (entries.length === 0) continue;
+
       const engFn = (typeof ENGAGEMENT_FUNCTIONS !== 'undefined')
         ? ENGAGEMENT_FUNCTIONS[systemId]
         : undefined;
+      if (!engFn) continue;
 
-      if (!engFn) continue;  // no engagement function defined for this system
+      // Evaluate engagement parameters for each entry upfront so that each
+      // battery gets an independent Math.random() draw before any killing occurs.
+      const entryParams = entries.map(entry => ({
+        entry,
+        params: engFn(threatType, entry.def.quantity, entry.magazineRemaining)
+      }));
 
-      const params = engFn(threatType, entry.def.quantity, entry.magazineRemaining);
-
-      // System deployed at target but cannot engage this threat type —
-      // record it so the UI can show the gap; no interceptors consumed.
-      if (!params) {
+      // Record "Cannot engage" for entries whose engFn returned null.
+      for (const { entry, params } of entryParams) {
+        if (params !== null) continue;
         engagements.push({
+          defId:              entry.def.id,
           systemId,
           systemName:         DEFENSE_CATALOG[systemId]?.name || systemId,
           quantity:           entry.def.quantity,
@@ -199,39 +235,45 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}) {
           isPlaceholder:      false,
           note:               'Cannot engage'
         });
-        continue;
       }
 
-      if (remaining <= 0) break;
+      // Process entries that can engage, in order.
+      // Each fires at whatever survived the previous entry's salvo.
+      for (const { entry, params } of entryParams) {
+        if (!params) continue;
+        if (remaining <= 0) break;
 
-      const pk    = params.pk    ?? 0;
-      const shots = params.shotsPerEngagement ?? 2;
+        const pk    = params.pk    ?? 0;
+        const shots = params.shotsPerEngagement ?? 2;
 
-      const magazineBefore    = entry.magazineRemaining;
-      const result            = applyEngagement(remaining, pk, magazineBefore, shots);
+        const magazineBefore    = entry.magazineRemaining;
+        const result            = applyEngagement(remaining, pk, magazineBefore, shots);
 
-      // Persist magazine consumption across all threat-type passes
-      entry.magazineRemaining = result.magazineRemaining;
+        // Persist magazine depletion — carries across threat-type passes and
+        // across successive simulation runs (via initialMagazineState).
+        entry.magazineRemaining = result.magazineRemaining;
 
-      engagements.push({
-        systemId,
-        systemName:         DEFENSE_CATALOG[systemId]?.name || systemId,
-        quantity:           entry.def.quantity,
-        notes:              entry.def.notes || '',
-        threatType,
-        threatsIn:          remaining,
-        killed:             result.killed,
-        survived:           result.survived,
-        pk,
-        shotsPerEngagement: shots,
-        magazineAtStart:    magazineBefore,
-        interceptorsUsed:   magazineBefore - entry.magazineRemaining,
-        magazineRemaining:  entry.magazineRemaining,
-        isPlaceholder:      result.isPlaceholder,
-        note:               result.note
-      });
+        engagements.push({
+          defId:              entry.def.id,
+          systemId,
+          systemName:         DEFENSE_CATALOG[systemId]?.name || systemId,
+          quantity:           entry.def.quantity,
+          notes:              entry.def.notes || '',
+          threatType,
+          threatsIn:          remaining,
+          killed:             result.killed,
+          survived:           result.survived,
+          pk,
+          shotsPerEngagement: shots,
+          magazineAtStart:    magazineBefore,
+          interceptorsUsed:   magazineBefore - entry.magazineRemaining,
+          magazineRemaining:  entry.magazineRemaining,
+          isPlaceholder:      result.isPlaceholder,
+          note:               result.note
+        });
 
-      remaining = result.survived;
+        remaining = result.survived;
+      }
     }
 
     totalOut += remaining;
