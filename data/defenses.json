@@ -1,0 +1,256 @@
+{
+  "$schema": "./schemas/defenses.schema.json",
+  "systems": [
+    {
+      "id": "thaad",
+      "name": "Terminal High-Altitude Area Defense (THAAD)",
+      "range_km": 200,
+      "armament": {
+        "type": "missile",
+        "name": "THAAD Interceptor",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 48
+      },
+      "threats": ["ballistic_missile"]
+    },
+    {
+      "id": "arrow",
+      "name": "Arrow 2/3",
+      "range_km": 200,
+      "armament": {
+        "type": "missile",
+        "name": "Arrow Interceptor",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 24
+      },
+      "threats": ["ballistic_missile"]
+    },
+    {
+      "id": "aegis_sm3",
+      "name": "Aegis BMD",
+      "range_km": 800,
+      "armament": {
+        "type": "missile",
+        "name": "Standard Missile 3 (SM-3)",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 12
+      },
+      "threats": ["ballistic_missile"]
+    },
+    {
+      "id": "patriot",
+      "name": "Patriot",
+      "range_km": 70,
+      "armament": {
+        "type": "missile",
+        "name": "Patriot Advanced Capability 3 Missile Segment Enhancement (PAC-3 MSE)",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 12
+      },
+      "threats": ["ballistic_missile", "cruise_missile", "drone"]
+    },
+    {
+      "id": "davids_sling",
+      "name": "David's Sling",
+      "range_km": 75,
+      "armament": {
+        "type": "missile",
+        "name": "David's Sling Interceptor",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 72
+      },
+      "threats": ["ballistic_missile", "cruise_missile", "drone"]
+    },
+    {
+      "id": "cheongung2",
+      "name": "Cheongung II",
+      "range_km": 40,
+      "armament": {
+        "type": "missile",
+        "name": "Cheongung II Interceptor",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 32
+      },
+      "threats": ["ballistic_missile", "cruise_missile", "drone"]
+    },
+    {
+      "id": "aegis_sm2",
+      "name": "Aegis BMD",
+      "range_km": 120,
+      "armament": {
+        "type": "missile",
+        "name": "Standard Missile 2 (SM-2)",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 24
+      },
+      "threats": ["ballistic_missile"]
+    },
+    {
+      "id": "aegis_sm6",
+      "name": "Aegis BMD",
+      "range_km": 240,
+      "armament": {
+        "type": "missile",
+        "name": "Standard Missile 6 (SM-6)",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 24
+      },
+      "threats": ["ballistic_missile"]
+    },
+    {
+      "id": "iron_dome",
+      "name": "Iron Dome",
+      "range_km": 70,
+      "armament": {
+        "type": "missile",
+        "name": "Tamir",
+        "payload_kg": 24,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 60
+      },
+      "threats": ["ballistic_missile", "drone"]
+    },
+    {
+      "id": "nasams",
+      "name": "National Advanced Surface-to-Air Missile System (NASAMS)",
+      "range_km": 35,
+      "armament": {
+        "type": "missile",
+        "name": "AIM-120 AMRAAM",
+        "payload_kg": 20,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 60
+      },
+      "threats": ["ballistic_missile", "drone"]
+    },
+    {
+      "id": "ifpc2",
+      "name": "Indirect Fire Protection Capability 2 (IFPC-2)",
+      "range_km": 15,
+      "armament": {
+        "type": "missile",
+        "name": "AIM-9X Sidewinder",
+        "payload_kg": 9.4,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 36
+      },
+      "threats": ["ballistic_missile", "drone"]
+    },
+    { "id": "pantsirs1e",
+      "name": "Pantsir-S1E",
+      "range_km": 20,
+      "armament": {
+        "type": "missile",
+        "name": "57E6 Missile",
+        "payload_kg": 20,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 12
+      },
+      "threats": ["ballistic_missile", "drone"]
+    },
+    { "id": "fslids",
+      "name": "Fixed-Site Low, Slow, Small Unmanned Aircraft Integrated Defeat System (FS-LIDS)",
+      "range_km": 15,
+      "armament": {
+        "type": "missile",
+        "name": "Coyote UAS",
+        "payload_kg": 1.8,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 16
+      },
+      "threats": ["drone"]
+    },
+    { "id": "m_shorad",
+      "name": "M-SHORAD",
+      "range_km": 8,
+      "armament": {
+        "type": "missile",
+        "name": "Stinger / Hellfire",
+        "payload_kg": 0,
+        "kill_modality": "hit-to-kill",
+        "standard_loadout": 8
+      },
+      "threats": ["drone", "cruise_missile"]
+    },
+    { "id": "phalanx_cram",
+      "name": "Phalanx C-RAM",
+      "range_km": 2,
+      "armament": {
+        "type": "gun",
+        "name": "20mm M61A1 Vulcan",
+        "payload_kg": 0.1,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 1550
+      },
+      "threats": ["drone", "cruise_missile"]
+    },
+    { "id": "tactical_jammer",
+      "name": "Tactical Jammer",
+      "range_km": 10,
+      "armament": {
+        "type": "electronic",
+        "name": "RF Jamming Suite",
+        "payload_kg": 0,
+        "kill_modality": "electronic_warfare",
+        "standard_loadout": 999
+      },
+      "threats": ["drone"]
+    },
+    { "id": "merops",
+      "name": "Merops",
+      "range_km": 5,
+      "armament": {
+        "type": "electronic",
+        "name": "Electronic Attack Suite",
+        "payload_kg": 0,
+        "kill_modality": "electronic_warfare",
+        "standard_loadout": 999
+      },
+      "threats": ["drone"]
+    },
+    { "id": "high_powered_microwave",
+      "name": "High-Powered Microwave (HPM)",
+      "range_km": 1,
+      "armament": {
+        "type": "directed_energy",
+        "name": "HPM Emitter",
+        "payload_kg": 0,
+        "kill_modality": "directed_energy",
+        "standard_loadout": 999
+      },
+      "threats": ["drone"]
+    },
+    { "id": "containerized_laser",
+      "name": "Containerized Laser",
+      "range_km": 5,
+      "armament": {
+        "type": "directed_energy",
+        "name": "High-Energy Laser",
+        "payload_kg": 0,
+        "kill_modality": "directed_energy",
+        "standard_loadout": 999
+      },
+      "threats": ["drone", "cruise_missile"]
+    },
+    { "id": "iron_beam",
+      "name": "Iron Beam",
+      "range_km": 7,
+      "armament": {
+        "type": "directed_energy",
+        "name": "High-Energy Laser",
+        "payload_kg": 0,
+        "kill_modality": "directed_energy",
+        "standard_loadout": 999
+      },
+      "threats": ["drone", "cruise_missile"]
+    }
+  ]
+}

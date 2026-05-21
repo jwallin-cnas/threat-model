@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data/schemas/attacks.schema.json",
+  "title": "Attack System Catalog Schema",
+  "description": "Validates the attacks.json file defining available attack platforms.",
+  "type": "object",
+  "required": ["systems"],
+  "additionalProperties": false,
+  "properties": {
+
+    "$schema": { "type": "string" },
+
+    "systems": {
+      "type": "array",
+      "description": "List of all available attack systems.",
+      "items": { "$ref": "#/definitions/AttackSystem" }
+    }
+  },
+
+  "definitions": {
+
+    "AttackSystem": {
+      "type": "object",
+      "required": ["id", "name", "type", "payload_kg", "range_km", "salvo_sizes"],
+      "additionalProperties": false,
+      "properties": {
+
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Unique identifier. Lowercase letters, digits, and underscores; must start with a letter."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full display name of the attack system."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["ballistic_missile", "cruise_missile", "drone"],
+          "description": "Category of attack system."
+        },
+        "payload_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Warhead mass in kilograms. Must be greater than zero."
+        },
+        "range_km": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum range in kilometers. Must be greater than zero."
+        },
+        "salvo_sizes": {
+          "type": "array",
+          "description": "Salvo sizes available for this system. Each value must be 2, 10, or 50.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "enum": [2, 10, 50]
+          }
+        }
+      }
+    }
+  }
+}

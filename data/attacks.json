@@ -1,0 +1,167 @@
+{
+  "$schema": "./schemas/attacks.schema.json",
+  "systems": [
+
+    {
+      "id": "arash_2",
+      "name": "Arash-2",
+      "type": "drone",
+      "payload_kg": 100,
+      "range_km": 1000,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "dji_fpv",
+      "name": "DJI FPV UAV",
+      "type": "drone",
+      "payload_kg": 1,
+      "range_km": 10,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "geran_2",
+      "name": "Geran-2",
+      "type": "drone",
+      "payload_kg": 40,
+      "range_km": 2500,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "samad_3",
+      "name": "Samad-3",
+      "type": "drone",
+      "payload_kg": 18,
+      "range_km": 1500,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "shahed_101",
+      "name": "Shahed-101",
+      "type": "drone",
+      "payload_kg": 5,
+      "range_km": 500,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "shahed_129",
+      "name": "Shahed-129",
+      "type": "drone",
+      "payload_kg": 16,
+      "range_km": 400,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "shahed_136",
+      "name": "Shahed-136",
+      "type": "drone",
+      "payload_kg": 40,
+      "range_km": 2000,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "shahed_238",
+      "name": "Shahed-238 (Geran-3)",
+      "type": "drone",
+      "payload_kg": 50,
+      "range_km": 2500,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "abu_mahdi",
+      "name": "Abu Mahdi",
+      "type": "cruise_missile",
+      "payload_kg": 170,
+      "range_km": 1000,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "fateh_110",
+      "name": "Fateh-110",
+      "type": "ballistic_missile",
+      "payload_kg": 450,
+      "range_km": 300,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "ghadr",
+      "name": "Ghadr",
+      "type": "ballistic_missile",
+      "payload_kg": 750,
+      "range_km": 1600,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "haj_qasem",
+      "name": "Haj Qasem",
+      "type": "ballistic_missile",
+      "payload_kg": 500,
+      "range_km": 1400,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "khalij_e_fars",
+      "name": "Khalij-e Fars",
+      "type": "ballistic_missile",
+      "payload_kg": 650,
+      "range_km": 300,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "khorramshahr",
+      "name": "Khorramshahr",
+      "type": "ballistic_missile",
+      "payload_kg": 1800,
+      "range_km": 3000,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "paveh_quds",
+      "name": "Paveh / Quds-351 / Quds-2",
+      "type": "cruise_missile",
+      "payload_kg": 45,
+      "range_km": 1350,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "qaem_1",
+      "name": "Qaem-1 / Borkan-H2",
+      "type": "ballistic_missile",
+      "payload_kg": 985,
+      "range_km": 800,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "shahab_3",
+      "name": "Shahab-3",
+      "type": "ballistic_missile",
+      "payload_kg": 1000,
+      "range_km": 1000,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "soumar",
+      "name": "Soumar",
+      "type": "cruise_missile",
+      "payload_kg": 45,
+      "range_km": 1000,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "zulfagher",
+      "name": "Zulfagher",
+      "type": "ballistic_missile",
+      "payload_kg": 450,
+      "range_km": 700,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "zulfagher_e_basir",
+      "name": "Zulfagher-e Basir",
+      "type": "ballistic_missile",
+      "payload_kg": 500,
+      "range_km": 700,
+      "salvo_sizes": [2, 10, 50]
+    }
+
+  ]
+}

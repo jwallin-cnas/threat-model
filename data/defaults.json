@@ -1,0 +1,177 @@
+{
+  "version": "1.0",
+
+  "_instructions": {
+    "description": "Default defensive system assignments per target. Edit the 'defaults' object below to configure which systems are pre-assigned to each target when the app loads or 'Reset to Default' is clicked. Entries here are overridden by any user modifications stored in localStorage; resetting clears localStorage and restores these defaults.",
+    "format": {
+      "id":       "Stable unique string for this entry, e.g. manama_d1, manama_d2. Never reuse IDs across targets.",
+      "system":   "System ID from defenses.json (see available_systems below).",
+      "quantity": "Number of batteries / systems (integer ≥ 1).",
+      "notes":    "Optional free-text annotation. Use empty string for none."
+    },
+    "available_systems": [
+      "aegis_sm3",
+      "aegis_sm6",
+      "aegis_sm2",
+      "thaad",
+      "arrow",
+      "davids_sling",
+      "patriot",
+      "iron_dome",
+      "cheongung2",
+      "nasams",
+      "ifpc2",
+      "pantsirs1e",
+      "fslids",
+      "m_shorad",
+      "phalanx_cram",
+      "tactical_jammer",
+      "merops",
+      "high_powered_microwave",
+      "containerized_laser",
+      "iron_beam"
+    ],
+    "target_ids": [
+      "manama",                       "us_fifth_fleet",             "isa_ab",
+      "baghdad",                      "basra",                      "mosul",
+      "erbil_ab",                     "al_asad_ab",                 "rumaila_oil_field",
+      "lanaz_refinery",
+      "tel_aviv",                     "haifa",                      "jerusalem",
+      "beer_sheva",                   "tel_nof_ab",                 "ramat_david_ab",
+      "hatzerim_ab",                  "nevatim_ab",
+      "amman",                        "muwaffaq_al_salti_ab",       "king_faisal_ab",
+      "kuwait_city",                  "shuaiba_port",               "burgan_oil_field",
+      "camp_buehring",                "ali_al_salem_ab",            "ahmed_al_jaber_ab",
+      "camp_arifjan",                 "mohammed_al_ahmed_naval_base",
+      "muscat",                       "masirah_ab",                 "thumrait_ab",
+      "port_of_salalah",              "duqm_port",
+      "doha",                         "hamad_port",                 "camp_as_sayliyah",
+      "al_udeid_ab",                  "ras_laffan_lng",
+      "riyadh",                       "dammam",                     "jeddah",
+      "prince_sultan_ab",             "aramco_persian_gulf_corridor","aramco_riyadh",
+      "aramco_red_sea_corridor",
+      "ruwais_refinery",              "upper_zakum_oil_field",      "murban_bab_hashah",
+      "fujairah_port",                "dubai",                      "abu_dhabi",
+      "al_dhafra_ab",                 "jebel_ali_port"
+    ]
+  },
+
+  "defaults": {
+
+    "jebel_ali_port": [
+      { "id": "jebel_ali_port_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "al_dhafra_ab": [
+      { "id": "al_dhafra_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" },
+      { "id": "al_dhafra_ab_d2", "system": "cheongung2",  "quantity": 1, "notes": "" }
+    ],
+
+    "abu_dhabi": [
+      { "id": "abu_dhabi_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    ],
+
+    "ruwais_refinery": [
+      { "id": "ruwais_refinery_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    ],
+
+    "prince_sultan_ab": [
+      { "id": "prince_sultan_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "king_khalid_ab": [
+      { "id": "king_khalid_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "aramco_persian_gulf_corridor": [
+      { "id": "aramco_persian_gulf_corridor_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "aramco_riyadh": [
+      { "id": "aramco_riyadh_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "aramco_red_sea_corridor": [
+      { "id": "aramco_red_sea_corridor_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "riyadh" : [
+      { "id": "riyadh_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    ],
+
+    "jeddah" : [
+      { "id": "jeddah_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    ],
+
+    "ali_al_salem_ab" : [
+      { "id": "ali_al_salem_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "camp_arifjan" : [
+      { "id": "camp_arifjan_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "thumrait_ab" : [
+      { "id": "thumrait_ab_d1", "system": "nasams",  "quantity": 1, "notes": "" }
+    ],
+
+    "camp_as_sayliyah" : [
+      { "id": "camp_as_sayliyah_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "al_udeid_ab" : [
+      { "id": "al_udeid_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" },
+      { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "" }
+    ],
+
+    "muscat" : [
+      { "id": "muscat_d1", "system": "nasams",  "quantity": 1, "notes": "" }
+    ],
+
+    "tel_nof_ab" : [
+      { "id": "tel_nof_ab_d1", "system": "davids_sling",  "quantity": 1, "notes": "" }
+    ],
+
+    "ramat_david_ab" : [
+      { "id": "ramat_david_ab_d1", "system": "arrow",  "quantity": 1, "notes": "" }
+    ],
+
+    "hatzerim_ab" : [
+      { "id": "hatzerim_ab_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    ],
+
+    "nevatim_ab" : [
+      { "id": "nevatim_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" },
+      { "id": "nevatim_ab_d2", "system": "arrow",  "quantity": 1, "notes": "" }
+    ],
+
+    "tel_aviv" : [
+      { "id": "tel_aviv_d1", "system": "arrow",  "quantity": 1, "notes": "" },
+      { "id": "tel_aviv_d2", "system": "iron_dome",  "quantity": 1, "notes": "" }
+    ],
+
+    "haifa" : [
+      { "id": "haifa_d1", "system": "arrow",  "quantity": 1, "notes": "" },
+      { "id": "haifa_d2", "system": "iron_dome",  "quantity": 1, "notes": "" }
+    ],  
+
+    "jerusalem" : [
+      { "id": "jerusalem_d1", "system": "arrow",  "quantity": 1, "notes": "" }
+    ],
+
+    "beer_sheva" : [
+      { "id": "beer_sheva_d1", "system": "davids_sling",  "quantity": 1, "notes": "" },
+      { "id": "beer_sheva_d2", "system": "iron_dome",  "quantity": 1, "notes": "" }      
+    ],
+
+    "isa_ab" : [
+      { "id": "isa_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "muwaffaq_al_salti_ab" : [
+      { "id": "muwaffaq_al_salti_ab_d1", "system": "thaad",  "quantity": 1, "notes": "" },
+      { "id": "muwaffaq_al_salti_ab_d2", "system": "patriot",  "quantity": 1, "notes": "" }
+    ]
+
+  }
+}

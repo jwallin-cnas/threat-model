@@ -1,0 +1,227 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data/schemas/schema.json",
+  "title": "Strike Assessment Tool — Data Schema",
+  "description": "Validates targets and their layered defense systems for the Strike Assessment Tool.",
+  "type": "object",
+  "required": ["version", "targets"],
+  "additionalProperties": false,
+  "properties": {
+
+    "$schema": { "type": "string" },
+
+    "version": {
+      "type": "string",
+      "description": "Schema version string (e.g. \"1.0\")."
+    },
+
+    "targets": {
+      "type": "array",
+      "description": "List of potential targets, each with its own defense layers.",
+      "items": { "$ref": "#/definitions/Target" }
+    }
+  },
+
+  "definitions": {
+
+    "Target": {
+      "type": "object",
+      "required": ["id", "name", "country", "defenses"],
+      "additionalProperties": false,
+      "properties": {
+
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Unique slug identifier (lowercase letters, digits, underscores)."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name of the target."
+        },
+        "country": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Country in which the target is located."
+        },
+        "region": {
+          "type": "string",
+          "description": "Sub-national region, province, or city."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Nuclear Facility",
+            "Military Air Base",
+            "Military HQ",
+            "Naval Facility",
+            "Critical Infrastructure",
+            "Command and Control",
+            "Logistics Hub",
+            "Other"
+          ],
+          "description": "Target category used for filtering and display."
+        },
+        "coordinates": {
+          "$ref": "#/definitions/Coordinates"
+        },
+        "description": {
+          "type": "string",
+          "description": "Free-text description of the target and its strategic significance."
+        },
+        "defenses": {
+          "type": "array",
+          "description": "Ordered list of defensive systems assigned to this target.",
+          "items": { "$ref": "#/definitions/Defense" }
+        }
+      }
+    },
+
+    "Defense": {
+      "type": "object",
+      "required": ["id", "system", "quantity"],
+      "additionalProperties": false,
+      "properties": {
+
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier for this defense entry within its target."
+        },
+        "system": {
+          "type": "string",
+          "description": "Defense system identifier. Must match a key in DEFENSE_CATALOG (catalog.js).",
+          "enum": [
+            "arrow_3",
+            "thaad",
+            "arrow_2",
+            "david_sling",
+            "patriot_pac3",
+            "patriot_pac2",
+            "s400",
+            "s300",
+            "bavar_373",
+            "iron_dome",
+            "hawk",
+            "crotale",
+            "buk_m2",
+            "khordad_15",
+            "pantsir_s1",
+            "tor_m2",
+            "avenger",
+            "phalanx_ciws"
+          ]
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Number of batteries or systems deployed."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional free-text notes (readiness, deployment posture, etc.)."
+        }
+      }
+    },
+
+    "DefenseSystem": {
+      "type": "object",
+      "required": ["id", "name", "range_km", "armament", "threats"],
+      "additionalProperties": false,
+      "properties": {
+
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Unique identifier. Lowercase letters, digits, and underscores; must start with a letter."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full display name of the system."
+        },
+        "range_km": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum engagement range in kilometers."
+        },
+        "armament": {
+          "$ref": "#/definitions/Armament"
+        },
+        "threats": {
+          "type": "array",
+          "description": "Threat types this system is designed to engage.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["ballistic_missile", "cruise_missile", "drone"]
+          }
+        }
+      }
+    },
+
+    "Armament": {
+      "type": "object",
+      "required": ["type", "name", "payload_kg", "kill_modality", "standard_loadout"],
+      "additionalProperties": false,
+      "properties": {
+
+        "type": {
+          "type": "string",
+          "enum": ["missile", "gun", "laser", "microwave"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the specific interceptor, round, or weapon."
+        },
+        "payload_kg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Warhead or projectile mass in kilograms. Use 0 for directed-energy weapons."
+        },
+        "kill_modality": {
+          "type": "string",
+          "enum": ["hit-to-kill", "fragmentation", "kinetic", "directed-energy"],
+          "description": "How the weapon destroys its target. Constrained by armament type (see if/then/else)."
+        },
+        "standard_loadout": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total rounds or missiles available per battery. For directed-energy, represents engagement capacity before resupply or maintenance."
+        }
+      },
+
+      "if":   { "properties": { "type": { "const": "missile" } }, "required": ["type"] },
+      "then": { "properties": { "kill_modality": { "enum": ["hit-to-kill", "fragmentation"] } } },
+      "else": {
+        "if":   { "properties": { "type": { "const": "gun" } }, "required": ["type"] },
+        "then": { "properties": { "kill_modality": { "enum": ["kinetic"] } } },
+        "else": { "properties": { "kill_modality": { "enum": ["directed-energy"] } } }
+      }
+    },
+
+    "Coordinates": {
+      "type": "object",
+      "required": ["lat", "lon"],
+      "additionalProperties": false,
+      "properties": {
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90,
+          "description": "Latitude in decimal degrees."
+        },
+        "lon": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Longitude in decimal degrees."
+        }
+      }
+    }
+  }
+}

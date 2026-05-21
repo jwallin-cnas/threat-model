@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strike Assessment Tool — Layered Air Defense Adjudicator</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <div class="header-title">
+        <h1>Strike Assessment Tool</h1>
+        <p class="header-sub">Layered Air Defense Adjudicator — Middle East</p>
+      </div>
+      <div class="header-controls">
+        <button id="btn-export" class="btn btn-secondary">Export JSON</button>
+        <button id="btn-reset"  class="btn btn-danger">Reset to Default</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-grid">
+
+    <!-- ── Left Panel: Target Selection & Defenses ───────────────────── -->
+    <section class="panel" id="panel-target">
+
+      <div class="panel-header">
+        <h2>Target &amp; Defenses</h2>
+      </div>
+
+      <!-- Target dropdown -->
+      <div class="form-group">
+        <label for="target-select">Target</label>
+        <select id="target-select">
+          <option value="">— Select Target —</option>
+        </select>
+      </div>
+
+      <!-- Mini-map (shown on target selection) -->
+      <div id="target-minimap" class="target-minimap hidden"></div>
+
+      <!-- Target info card (populated on selection) -->
+      <div id="target-info" class="target-info hidden">
+        <div class="info-grid">
+          <span class="info-label">Country</span>
+          <span id="info-country"        class="info-value"></span>
+          <span class="info-label">Coords</span>
+          <span id="info-coords"         class="info-value"></span>
+          <span class="info-label">Infrastructure</span>
+          <span id="info-infrastructure" class="info-value"></span>
+        </div>
+      </div>
+
+      <!-- Defense layers header -->
+      <div class="section-header section-header--stacked">
+        <div class="section-header-title">
+          <h3>Defensive Layers</h3>
+          <span id="defense-count" class="badge">0 systems</span>
+        </div>
+        <div class="section-header-right">
+          <button id="btn-reset-loadouts" class="btn btn-secondary btn-sm" disabled>Reset All Loadouts</button>
+          <button id="btn-reset-target-default" class="btn btn-secondary btn-sm" disabled>Reset to Default</button>
+        </div>
+      </div>
+
+      <!-- Rendered defense cards -->
+      <div id="defense-layers" class="defense-layers">
+        <p class="empty-state">Select a target to view its defenses</p>
+      </div>
+
+      <!-- Add defense button -->
+      <div class="defense-controls">
+        <button id="btn-add-defense" class="btn btn-primary" disabled>
+          + Add Defense System
+        </button>
+      </div>
+
+      <!-- Add defense inline form (hidden by default) -->
+      <div id="add-defense-form" class="add-defense-form hidden">
+        <h4>Add Defense System</h4>
+
+        <div class="form-group">
+          <label for="defense-system-select">System</label>
+          <select id="defense-system-select">
+            <option value="">— Select System —</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="defense-quantity">Quantity (batteries / systems)</label>
+          <input type="number" id="defense-quantity" min="1" max="20" value="1">
+        </div>
+
+        <div id="defense-magazine-info" class="defense-magazine-info hidden"></div>
+
+        <div class="form-group">
+          <label for="defense-notes">Notes (optional)</label>
+          <input type="text" id="defense-notes" placeholder="e.g., Forward deployed, degraded readiness">
+        </div>
+
+        <div class="form-row">
+          <button id="btn-confirm-add-defense" class="btn btn-primary">Add System</button>
+          <button id="btn-cancel-add-defense"  class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+
+    </section><!-- /panel-target -->
+
+    <!-- ── Right Panel: Attack Builder & Simulation ───────────────────── -->
+    <section class="panel" id="panel-attack">
+
+      <div class="panel-header">
+        <h2>Attack Configuration &amp; Simulation</h2>
+      </div>
+
+      <!-- Platform picker -->
+      <div class="attack-builder">
+        <div class="form-row">
+          <div class="form-group flex-grow">
+            <label for="platform-select">Platform</label>
+            <select id="platform-select">
+              <option value="">— Select Platform —</option>
+            </select>
+          </div>
+          <div class="form-group quantity-field">
+            <label for="attack-quantity">Salvo</label>
+            <select id="attack-quantity" disabled>
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <button id="btn-add-platform" class="btn btn-primary">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attack manifest -->
+      <div class="section-header">
+        <h3>Attack Manifest</h3>
+        <button id="btn-clear-attack" class="btn btn-danger btn-sm">Clear All</button>
+      </div>
+
+      <div id="attack-manifest" class="attack-manifest">
+        <p class="empty-state">No platforms added to attack</p>
+      </div>
+
+      <!-- Simulate button -->
+      <div class="simulate-controls">
+        <button id="btn-simulate" class="btn btn-simulate" disabled>
+          ▶ Simulate Attack
+        </button>
+      </div>
+
+      <!-- Simulation results (hidden until first run) -->
+      <div id="simulation-results" class="simulation-results hidden">
+
+        <div class="section-header">
+          <h3>Simulation Results</h3>
+          <button id="btn-clear-results" class="btn btn-secondary btn-sm">Clear</button>
+        </div>
+
+        <!-- Summary banner -->
+        <div id="results-summary" class="results-summary"></div>
+
+        <!-- Per-layer engagement cards -->
+        <div id="results-layers" class="results-layers"></div>
+
+        <!-- Final penetrator count -->
+        <div id="results-final" class="results-final"></div>
+
+      </div><!-- /simulation-results -->
+
+    </section><!-- /panel-attack -->
+
+  </main>
+
+  <div class="storage-notice">
+    ⚠ Changes persist in browser <code>localStorage</code>.
+    Use <strong>Export JSON</strong> to download and commit an updated <code>data.json</code> to your repo.
+    <strong>Reset to Default</strong> clears local storage and reverts to the committed dataset.
+  </div>
+
+  <!-- Modal overlay — controlled by showModal() / _resolveModal() in app.js -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal" id="modal-dialog">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title"></span>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Scripts — load in dependency order -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/engagement.js"></script>
+  <script src="js/simulate.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

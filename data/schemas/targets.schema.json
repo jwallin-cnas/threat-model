@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data/schemas/targets.schema.json",
+  "title": "Target Catalog Schema",
+  "description": "Validates the targets.json file defining potential strike targets.",
+  "type": "object",
+  "required": ["targets"],
+  "additionalProperties": false,
+  "properties": {
+
+    "$schema": { "type": "string" },
+
+    "targets": {
+      "type": "array",
+      "description": "List of potential strike targets.",
+      "items": { "$ref": "#/definitions/Target" }
+    }
+  },
+
+  "definitions": {
+
+    "Target": {
+      "type": "object",
+      "required": ["id", "name", "country", "location", "infrastructure"],
+      "additionalProperties": false,
+      "properties": {
+
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Unique identifier. Lowercase letters, digits, and underscores; must start with a letter."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full display name of the target."
+        },
+        "country": {
+          "type": "string",
+          "enum": [
+            "Bahrain",
+            "Iraq",
+            "Israel",
+            "Jordan",
+            "Kuwait",
+            "Lebanon",
+            "Oman",
+            "Qatar",
+            "Saudi Arabia",
+            "United Arab Emirates",
+            "United States"
+          ],
+          "description": "Country in which the target is located."
+        },
+        "location": {
+          "type": "array",
+          "description": "Geographic coordinates as [latitude, longitude].",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": [
+            {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90,
+              "description": "Latitude in decimal degrees."
+            },
+            {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180,
+              "description": "Longitude in decimal degrees."
+            }
+          ]
+        },
+        "infrastructure": {
+          "type": "array",
+          "description": "Infrastructure types present at this target.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["base", "data center", "city", "oil infrastructure"]
+          }
+        },
+        "damage": {
+          "type": "array",
+          "description": "Log of damage events against this target. May be empty.",
+          "items": { "$ref": "#/definitions/DamageEvent" }
+        }
+      }
+    },
+
+    "DamageEvent": {
+      "type": "object",
+      "required": ["threat", "volume"],
+      "additionalProperties": false,
+      "properties": {
+
+        "threat": {
+          "type": "string",
+          "enum": ["ballistic_missile", "cruise_missile", "drone"],
+          "description": "Type of threat that caused the damage."
+        },
+        "volume": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of threats that successfully struck the target."
+        }
+      }
+    }
+  }
+}

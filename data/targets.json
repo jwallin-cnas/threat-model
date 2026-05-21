@@ -1,0 +1,383 @@
+{
+  "$schema": "./schemas/targets.schema.json",
+  "targets": [
+    {
+      "id": "manama",
+      "name": "Manama",
+      "country": "Bahrain",
+      "location": [26.2285, 50.586],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "us_fifth_fleet",
+      "name": "U.S. Fifth Fleet",
+      "country": "Bahrain",
+      "location": [26.19952986, 50.61548938],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "isa_ab",
+      "name": "Isa Air Base",
+      "country": "Bahrain",
+      "location": [25.91548072, 50.59295265],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "baghdad",
+      "name": "Baghdad",
+      "country": "Iraq",
+      "location": [33.3152, 44.3661],
+      "infrastructure": ["city"]
+    },
+    {
+      "id": "basra",
+      "name": "Basra",
+      "country": "Iraq",
+      "location": [30.5089, 47.7831],
+      "infrastructure": ["city"]
+    },
+    {
+      "id": "mosul",
+      "name": "Mosul",
+      "country": "Iraq",
+      "location": [36.345, 43.145],
+      "infrastructure": ["city"]
+    },
+    {
+      "id": "erbil_ab",
+      "name": "Erbil Air Base",
+      "country": "Iraq",
+      "location": [36.23823543, 43.96068516],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "al_asad_ab",
+      "name": "Al Asad Air Base",
+      "country": "Iraq",
+      "location": [33.79425264, 42.44431419],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "rumaila_oil_field",
+      "name": "Rumaila Oil Field",
+      "country": "Iraq",
+      "location": [30.23025547, 47.41122807],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "lanaz_refinery",
+      "name": "Lanaz Refinery",
+      "country": "Iraq",
+      "location": [36.13493761, 43.79078471],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "tel_aviv",
+      "name": "Tel Aviv",
+      "country": "Israel",
+      "location": [32.0853, 34.7818],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "haifa",
+      "name": "Haifa",
+      "country": "Israel",
+      "location": [32.79474407, 35.05223254],
+      "infrastructure": ["city", "data center", "base", "oil infrastructure"]
+    },
+    {
+      "id": "jerusalem",
+      "name": "Jerusalem",
+      "country": "Israel",
+      "location": [31.7683, 35.2137],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "beer_sheva",
+      "name": "Be'er Sheva",
+      "country": "Israel",
+      "location": [31.2518, 34.7913],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "tel_nof_ab",
+      "name": "Tel Nof Air Base",
+      "country": "Israel",
+      "location": [31.8395, 34.8218],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "ramat_david_ab",
+      "name": "Ramat David Air Base",
+      "country": "Israel",
+      "location": [32.6651, 35.1795],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "hatzerim_ab",
+      "name": "Hatzerim Air Base",
+      "country": "Israel",
+      "location": [31.2333, 34.6575],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "nevatim_ab",
+      "name": "Nevatim Air Base",
+      "country": "Israel",
+      "location": [31.2083, 35.0123],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "amman",
+      "name": "Amman",
+      "country": "Jordan",
+      "location": [31.9454, 35.9284],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "muwaffaq_al_salti_ab",
+      "name": "Muwaffaq al-Salti Air Base",
+      "country": "Jordan",
+      "location": [31.82910753, 36.78898628],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "king_faisal_ab",
+      "name": "King Faisal Air Base",
+      "country": "Jordan",
+      "location": [30.34285368, 36.1477502],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "kuwait_city",
+      "name": "Kuwait City",
+      "country": "Kuwait",
+      "location": [29.3759, 47.9774],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "shuaiba_port",
+      "name": "Shuaiba Port",
+      "country": "Kuwait",
+      "location": [29.04483391, 48.15689214],
+      "infrastructure": ["base", "oil infrastructure"]
+    },
+    {
+      "id": "burgan_oil_field",
+      "name": "Burgan Oil Field",
+      "country": "Kuwait",
+      "location": [29.00258329, 47.96160272],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "camp_buehring",
+      "name": "Camp Buehring",
+      "country": "Kuwait",
+      "location": [29.69835267, 47.43120998],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "ali_al_salem_ab",
+      "name": "Ali Al Salem Air Base",
+      "country": "Kuwait",
+      "location": [29.3421109, 47.51994172],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "ahmed_al_jaber_ab",
+      "name": "Ahmed Al Jaber Air Base",
+      "country": "Kuwait",
+      "location": [28.93318149, 47.7940318],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "camp_arifjan",
+      "name": "Camp Arifjan",
+      "country": "Kuwait",
+      "location": [28.87948195, 48.15996542],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "mohammed_al_ahmed_naval_base",
+      "name": "Mohammed Al Ahmed Naval Base",
+      "country": "Kuwait",
+      "location": [28.86368091, 48.27884925],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "muscat",
+      "name": "Muscat",
+      "country": "Oman",
+      "location": [23.588, 58.3829],
+      "infrastructure": ["city", "data center", "base"]
+    },
+    {
+      "id": "masirah_ab",
+      "name": "Masirah Air Base",
+      "country": "Oman",
+      "location": [20.66966872, 58.89084979],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "thumrait_ab",
+      "name": "Thumrait Air Base",
+      "country": "Oman",
+      "location": [17.66501783, 54.02750313],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "port_of_salalah",
+      "name": "Port of Salalah",
+      "country": "Oman",
+      "location": [16.94166176, 53.99438089],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "duqm_port",
+      "name": "Duqm Port",
+      "country": "Oman",
+      "location": [19.66483133, 57.72653262],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "doha",
+      "name": "Doha",
+      "country": "Qatar",
+      "location": [25.2854, 51.531],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "hamad_port",
+      "name": "Hamad Port",
+      "country": "Qatar",
+      "location": [25.02338332, 51.60033033],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "camp_as_sayliyah",
+      "name": "Camp As Sayliyah",
+      "country": "Qatar",
+      "location": [25.19124561, 51.41249263],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "al_udeid_ab",
+      "name": "Al Udeid Air Base",
+      "country": "Qatar",
+      "location": [25.11643503, 51.31281726],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "ras_laffan_lng",
+      "name": "Ras Laffan LNG Facility",
+      "country": "Qatar",
+      "location": [25.91925475, 51.59895284],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "riyadh",
+      "name": "Riyadh",
+      "country": "Saudi Arabia",
+      "location": [24.7136, 46.6753],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "dammam",
+      "name": "Dammam",
+      "country": "Saudi Arabia",
+      "location": [26.4207, 50.0888],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "jeddah",
+      "name": "Jeddah",
+      "country": "Saudi Arabia",
+      "location": [21.4858, 39.1925],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "prince_sultan_ab",
+      "name": "Prince Sultan Air Base",
+      "country": "Saudi Arabia",
+      "location": [24.06256084, 47.55846999],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "aramco_persian_gulf_corridor",
+      "name": "ARAMCO — Persian Gulf Corridor",
+      "country": "Saudi Arabia",
+      "location": [26.69805083, 50.09474],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "aramco_riyadh",
+      "name": "ARAMCO — Riyadh",
+      "country": "Saudi Arabia",
+      "location": [25.26668386, 48.17376507],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "aramco_red_sea_corridor",
+      "name": "ARAMCO — Red Sea Corridor",
+      "country": "Saudi Arabia",
+      "location": [23.95737737, 38.28850036],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "ruwais_refinery",
+      "name": "Ruwais Refinery",
+      "country": "United Arab Emirates",
+      "location": [24.1227, 52.67743],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "upper_zakum_oil_field",
+      "name": "Upper Zakum Oil Field",
+      "country": "United Arab Emirates",
+      "location": [24.90172235, 53.71691391],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "murban_bab_hashah",
+      "name": "Murban, Bab and Hashah Oil and Gas Facilities",
+      "country": "United Arab Emirates",
+      "location": [23.84133807, 53.64544002],
+      "infrastructure": ["oil infrastructure"]
+    },
+    {
+      "id": "fujairah_port",
+      "name": "Fujairah Port",
+      "country": "United Arab Emirates",
+      "location": [25.17915074, 56.3629455],
+      "infrastructure": ["base", "oil infrastructure"]
+    },
+    {
+      "id": "dubai",
+      "name": "Dubai",
+      "country": "United Arab Emirates",
+      "location": [25.2048, 55.2708],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "abu_dhabi",
+      "name": "Abu Dhabi",
+      "country": "United Arab Emirates",
+      "location": [24.4539, 54.3773],
+      "infrastructure": ["city", "data center"]
+    },
+    {
+      "id": "al_dhafra_ab",
+      "name": "Al Dhafra Air Base",
+      "country": "United Arab Emirates",
+      "location": [24.2296637, 54.55248631],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "jebel_ali_port",
+      "name": "Jebel Ali Port",
+      "country": "United Arab Emirates",
+      "location": [25.02197708, 55.0365012],
+      "infrastructure": ["base"]
+    }
+  ]
+}
