@@ -251,6 +251,7 @@ function mergeLoadedData() {
       tierLabel:          TIER_LABELS[tier] || 'Unknown',
       type:               'SAM',
       country:            '',
+      range_km:           sys.range_km || 0,
       effectiveAgainst:   sys.threats || [],
       magazinePerBattery: sys.armament?.standard_loadout || 0,
       description:        `Range: ${sys.range_km} km`

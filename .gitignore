@@ -10,3 +10,6 @@
 # Local environment overrides (never commit secrets)
 .env
 .env.local
+
+# Internal documentation (not for repo)
+CODEGUIDE.md
