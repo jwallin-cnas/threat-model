@@ -220,7 +220,7 @@ const ENGAGEMENT_FUNCTIONS = {
   // ── Tactical Jammer (tactical_jammer) ─────────────────────────────────────
   tactical_jammer: function(threatType) {
     if (!['drone'].includes(threatType)) return null;
-    const pks  = { low: 0.70, medium: 0.85, high: 1.0 };
+    const pks  = { low: 0.3, medium: 0.4, high: 0.5 };
     const roll = Math.random();
     const pk   = roll >= 0.67 ? pks.high : roll >= 0.33 ? pks.medium : pks.low;
     const shots = 0;
@@ -232,7 +232,7 @@ const ENGAGEMENT_FUNCTIONS = {
   // ── Merops (merops) ───────────────────────────────────────────────────────
   merops: function(threatType) {
     if (!['drone'].includes(threatType)) return null;
-    const pks  = { low: 0.70, medium: 0.85, high: 1.0 };
+    const pks  = { low: 0.40, medium: 0.50, high: 0.60 };
     const roll = Math.random();
     const pk   = roll >= 0.67 ? pks.high : roll >= 0.33 ? pks.medium : pks.low;
     const shots = 2;
@@ -244,7 +244,7 @@ const ENGAGEMENT_FUNCTIONS = {
   // ── High-Powered Microwave (high_powered_microwave) ───────────────────────
   high_powered_microwave: function(threatType) {
     if (!['drone'].includes(threatType)) return null;
-    const pks  = { low: 0.3, medium: 0.4, high: 0.5 };
+    const pks  = { low: 0.4, medium: 0.5, high: 0.6 };
     const roll = Math.random();
     const pk   = roll >= 0.67 ? pks.high : roll >= 0.33 ? pks.medium : pks.low;
     const shots = 0;
@@ -256,7 +256,7 @@ const ENGAGEMENT_FUNCTIONS = {
   // ── Containerized Laser (containerized_laser) ─────────────────────────────
   containerized_laser: function(threatType) {
     if (!['drone'].includes(threatType)) return null;
-    const pks  = { low: 0.3, medium: 0.4, high: 0.5 };
+    const pks  = { low: 0.2, medium: 0.3, high: 0.4 };
     const roll = Math.random();
     const pk   = roll >= 0.67 ? pks.high : roll >= 0.33 ? pks.medium : pks.low;
     const shots = 0;
@@ -268,7 +268,7 @@ const ENGAGEMENT_FUNCTIONS = {
   // ── Iron Beam (iron_beam) ─────────────────────────────────────────────────
   iron_beam: function(threatType) {
     if (!['drone'].includes(threatType)) return null;
-    const pks  = { low: 0.3, medium: 0.4, high: 0.5 };
+    const pks  = { low: 0.2, medium: 0.3, high: 0.4 };
     const roll = Math.random();
     const pk   = roll >= 0.67 ? pks.high : roll >= 0.33 ? pks.medium : pks.low;
     const shots = 0;
