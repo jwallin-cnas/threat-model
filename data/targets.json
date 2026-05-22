@@ -289,6 +289,13 @@
       "infrastructure": ["city", "data center"]
     },
     {
+      "id": "king_khalid_ab",
+      "name": "King Khalid AB",
+      "country": "Saudi Arabia",
+      "location": [18.2998847138706, 42.7970824816137],
+      "infrastructure": ["base"]
+    },
+    {
       "id": "jeddah",
       "name": "Jeddah",
       "country": "Saudi Arabia",

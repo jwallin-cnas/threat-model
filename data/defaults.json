@@ -39,7 +39,7 @@
       "tel_aviv",                     "haifa",                      "jerusalem",
       "beer_sheva",                   "tel_nof_ab",                 "ramat_david_ab",
       "hatzerim_ab",                  "nevatim_ab",
-      "amman",                        "muwaffaq_al_salti_ab",       "king_faisal_ab",
+      "amman",                        "muwaffaq_al_salti_ab",       "king_faisal_ab", "king_khalid_ab",
       "kuwait_city",                  "shuaiba_port",               "burgan_oil_field",
       "camp_buehring",                "ali_al_salem_ab",            "ahmed_al_jaber_ab",
       "camp_arifjan",                 "mohammed_al_ahmed_naval_base",
@@ -74,10 +74,6 @@
 
     "us_fifth_fleet": [
       { "id": "us_fifth_fleet_d1", "system": "patriot",  "quantity": 2, "notes": "" }
-    ],
-
-    "amman": [
-      { "id": "amman_d1", "system": "thaad",  "quantity": 1, "notes": "" }
     ],
 
     "jebel_ali_port": [
