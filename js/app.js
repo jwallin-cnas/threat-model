@@ -897,8 +897,15 @@ function renderAttackManifest() {
 
   simBtn.disabled = !selectedTargetId;
 
+  const THREAT_ORDER = { ballistic_missile: 0, cruise_missile: 1, drone: 2 };
+  const sortedManifest = [...attackManifest].sort((a, b) => {
+    const ta = PLATFORM_CATALOG[a.platformId]?.type ?? '';
+    const tb = PLATFORM_CATALOG[b.platformId]?.type ?? '';
+    return (THREAT_ORDER[ta] ?? 99) - (THREAT_ORDER[tb] ?? 99);
+  });
+
   container.innerHTML = '';
-  for (const entry of attackManifest) {
+  for (const entry of sortedManifest) {
     const platform = PLATFORM_CATALOG[entry.platformId];
     if (!platform) continue;
 
