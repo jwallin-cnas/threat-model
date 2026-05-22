@@ -5,6 +5,7 @@
       "id": "thaad",
       "name": "Terminal High-Altitude Area Defense (THAAD)",
       "range_km": 200,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "THAAD Interceptor",
@@ -18,6 +19,7 @@
       "id": "arrow",
       "name": "Arrow 2/3",
       "range_km": 200,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Arrow Interceptor",
@@ -31,6 +33,7 @@
       "id": "aegis_sm3",
       "name": "Aegis BMD",
       "range_km": 800,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Standard Missile 3 (SM-3)",
@@ -44,6 +47,7 @@
       "id": "patriot",
       "name": "Patriot",
       "range_km": 70,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Patriot Advanced Capability 3 Missile Segment Enhancement (PAC-3 MSE)",
@@ -57,6 +61,7 @@
       "id": "davids_sling",
       "name": "David's Sling",
       "range_km": 75,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "David's Sling Interceptor",
@@ -70,6 +75,7 @@
       "id": "cheongung2",
       "name": "Cheongung II",
       "range_km": 40,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Cheongung II Interceptor",
@@ -83,6 +89,7 @@
       "id": "aegis_sm2",
       "name": "Aegis BMD",
       "range_km": 120,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Standard Missile 2 (SM-2)",
@@ -96,6 +103,7 @@
       "id": "aegis_sm6",
       "name": "Aegis BMD",
       "range_km": 240,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Standard Missile 6 (SM-6)",
@@ -109,6 +117,7 @@
       "id": "iron_dome",
       "name": "Iron Dome",
       "range_km": 70,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Tamir",
@@ -122,6 +131,7 @@
       "id": "nasams",
       "name": "National Advanced Surface-to-Air Missile System (NASAMS)",
       "range_km": 35,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "AIM-120 AMRAAM",
@@ -135,6 +145,7 @@
       "id": "ifpc2",
       "name": "Indirect Fire Protection Capability 2 (IFPC-2)",
       "range_km": 15,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "AIM-9X Sidewinder",
@@ -144,9 +155,11 @@
       },
       "threats": ["ballistic_missile", "drone"]
     },
-    { "id": "pantsirs1e",
+    {
+      "id": "pantsirs1e",
       "name": "Pantsir-S1E",
       "range_km": 20,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "57E6 Missile",
@@ -156,9 +169,11 @@
       },
       "threats": ["ballistic_missile", "drone"]
     },
-    { "id": "fslids",
+    {
+      "id": "fslids",
       "name": "Fixed-Site Low, Slow, Small Unmanned Aircraft Integrated Defeat System (FS-LIDS)",
       "range_km": 15,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Coyote UAS",
@@ -168,9 +183,11 @@
       },
       "threats": ["drone"]
     },
-    { "id": "m_shorad",
+    {
+      "id": "m_shorad",
       "name": "M-SHORAD",
       "range_km": 8,
+      "batteries": 1,
       "armament": {
         "type": "missile",
         "name": "Stinger / Hellfire",
@@ -180,9 +197,11 @@
       },
       "threats": ["drone", "cruise_missile"]
     },
-    { "id": "phalanx_cram",
+    {
+      "id": "phalanx_cram",
       "name": "Phalanx C-RAM",
       "range_km": 2,
+      "batteries": 1,
       "armament": {
         "type": "gun",
         "name": "20mm M61A1 Vulcan",
@@ -192,9 +211,11 @@
       },
       "threats": ["drone", "cruise_missile"]
     },
-    { "id": "tactical_jammer",
+    {
+      "id": "tactical_jammer",
       "name": "Tactical Jammer",
       "range_km": 10,
+      "batteries": 1,
       "armament": {
         "type": "electronic",
         "name": "RF Jamming Suite",
@@ -204,9 +225,11 @@
       },
       "threats": ["drone"]
     },
-    { "id": "merops",
+    {
+      "id": "merops",
       "name": "Merops",
       "range_km": 5,
+      "batteries": 1,
       "armament": {
         "type": "electronic",
         "name": "Electronic Attack Suite",
@@ -216,9 +239,11 @@
       },
       "threats": ["drone"]
     },
-    { "id": "high_powered_microwave",
+    {
+      "id": "high_powered_microwave",
       "name": "High-Powered Microwave (HPM)",
       "range_km": 1,
+      "batteries": 1,
       "armament": {
         "type": "directed_energy",
         "name": "HPM Emitter",
@@ -228,9 +253,11 @@
       },
       "threats": ["drone"]
     },
-    { "id": "containerized_laser",
+    {
+      "id": "containerized_laser",
       "name": "Containerized Laser",
       "range_km": 5,
+      "batteries": 1,
       "armament": {
         "type": "directed_energy",
         "name": "High-Energy Laser",
@@ -240,9 +267,11 @@
       },
       "threats": ["drone", "cruise_missile"]
     },
-    { "id": "iron_beam",
+    {
+      "id": "iron_beam",
       "name": "Iron Beam",
       "range_km": 7,
+      "batteries": 1,
       "armament": {
         "type": "directed_energy",
         "name": "High-Energy Laser",
@@ -252,9 +281,11 @@
       },
       "threats": ["drone", "cruise_missile"]
     },
-    { "id": "dca",
+    {
+      "id": "dca",
       "name": "Defensive Counter-Air (DCA)",
       "range_km": 100,
+      "batteries": 1,
       "armament": {
         "type": "aircraft",
         "name": "Fighter CAP",
