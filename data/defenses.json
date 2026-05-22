@@ -47,7 +47,7 @@
       "id": "patriot",
       "name": "Patriot",
       "range_km": 70,
-      "batteries": 1,
+      "batteries": 3,
       "armament": {
         "type": "missile",
         "name": "Patriot Advanced Capability 3 Missile Segment Enhancement (PAC-3 MSE)",
