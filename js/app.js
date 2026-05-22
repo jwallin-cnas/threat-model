@@ -1291,13 +1291,33 @@ function rerenderWithOverrides() {
       : baseResults;
   }
 
-  // Sync globalMagState to match displayResults:
-  //   • Start from preSimMagState so any system that didn't fire in the
-  //     adjusted scenario is restored to its pre-simulation level.
-  //   • Overlay with the post-fire levels extracted from displayResults
-  //     so systems that did fire reflect their actual expenditure.
-  const adjustedMag = { ...preSimMagState, ...extractMagazineState(displayResults) };
-  Object.assign(globalMagState, adjustedMag);
+  // Sync globalMagState to match displayResults.
+  //
+  // We cannot simply spread preSimMagState as the base because it only
+  // contains keys for systems that had already been used before this
+  // simulation — systems at full magazine have no entry at all, so their
+  // depleted value from the original run would remain in globalMagState
+  // untouched (the THAAD-disengage restoration bug).
+  //
+  // Correct algorithm:
+  //   1. For every system that fired in the ORIGINAL sim but is absent from
+  //      the adjusted results (disengaged / no longer needed):
+  //        • If a pre-sim entry exists, restore to that value.
+  //        • Otherwise delete the key so the card shows "full magazine".
+  //   2. Apply the actual post-fire levels from the adjusted results.
+  const firedInDisplay  = extractMagazineState(displayResults);
+  const firedInOriginal = extractMagazineState(lastSimResults);
+
+  for (const defId of Object.keys(firedInOriginal)) {
+    if (!(defId in firedInDisplay)) {
+      if (defId in preSimMagState) {
+        globalMagState[defId] = preSimMagState[defId];
+      } else {
+        delete globalMagState[defId];   // was at full magazine before the sim
+      }
+    }
+  }
+  Object.assign(globalMagState, firedInDisplay);
   saveMagStateToStorage();
 
   document.getElementById('override-notice')?.classList.toggle('hidden', !hasOv);
