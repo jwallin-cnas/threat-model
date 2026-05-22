@@ -1291,11 +1291,22 @@ function rerenderWithOverrides() {
       : baseResults;
   }
 
+  // Sync globalMagState to match displayResults:
+  //   • Start from preSimMagState so any system that didn't fire in the
+  //     adjusted scenario is restored to its pre-simulation level.
+  //   • Overlay with the post-fire levels extracted from displayResults
+  //     so systems that did fire reflect their actual expenditure.
+  const adjustedMag = { ...preSimMagState, ...extractMagazineState(displayResults) };
+  Object.assign(globalMagState, adjustedMag);
+  saveMagStateToStorage();
+
   document.getElementById('override-notice')?.classList.toggle('hidden', !hasOv);
   // Always show original inbound totals in the summary header
   renderResultsSummary(lastSimResults, lastSimTarget);
   renderResultsLayers(displayResults.byThreatType);
   renderResultsFinal(displayResults);
+  // Refresh defense cards so magazine counters reflect the adjusted state
+  if (selectedTargetId) renderDefenseLayers(selectedTargetId);
 }
 
 /**
