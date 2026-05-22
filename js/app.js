@@ -591,6 +591,9 @@ function buildCrossTargetDefenseCard(def, targetId) {
   card.className = `defense-card cross-target-card${isDisabled ? ' defense-card--disabled' : ''}`;
   card.style.setProperty('--tier-color', color);
 
+  // Battery edit targets the SOURCE target (where the defense is placed)
+  const qAttr = `class="qty-count-editable" data-defense-id="${def.id}" data-target-id="${def._placedAtTargetId}" data-system="${def.system}"`;
+
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
@@ -604,7 +607,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
     </div>
     <div class="defense-card-body">
       <span class="defense-name">${catalog?.name || def.system}</span>
-      <span class="defense-quantity">${def.quantity} batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
+      <span class="defense-quantity"><span ${qAttr}>${def.quantity}</span> batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
     </div>
     ${magHtml}
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
@@ -613,6 +616,10 @@ function buildCrossTargetDefenseCard(def, targetId) {
 
   card.querySelectorAll('.mag-count-editable').forEach(span => {
     span.addEventListener('click', () => activateMagazineEdit(span));
+  });
+
+  card.querySelectorAll('.qty-count-editable').forEach(span => {
+    span.addEventListener('click', () => activateBatteryEdit(span));
   });
 
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
@@ -675,6 +682,8 @@ function buildDefenseCard(def, targetId) {
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 
+  const qAttr = `class="qty-count-editable" data-defense-id="${def.id}" data-target-id="${targetId}" data-system="${def.system}"`;
+
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
@@ -688,7 +697,7 @@ function buildDefenseCard(def, targetId) {
     </div>
     <div class="defense-card-body">
       <span class="defense-name">${catalog?.name || def.system}</span>
-      <span class="defense-quantity">${def.quantity} batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
+      <span class="defense-quantity"><span ${qAttr}>${def.quantity}</span> batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
     </div>
     ${magHtml}
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
@@ -697,6 +706,10 @@ function buildDefenseCard(def, targetId) {
 
   card.querySelectorAll('.mag-count-editable').forEach(span => {
     span.addEventListener('click', () => activateMagazineEdit(span));
+  });
+
+  card.querySelectorAll('.qty-count-editable').forEach(span => {
+    span.addEventListener('click', () => activateBatteryEdit(span));
   });
 
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
@@ -1099,6 +1112,77 @@ function activateMagazineEdit(span) {
     setMagEntry(defId, val);
     saveMagStateToStorage();
     _manifestUnchanged = false;
+    if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+  });
+}
+
+/**
+ * Inline-edit the battery count on a defense card.
+ * Decreasing the count caps the magazine to newQty × magazinePerBattery;
+ * increasing it leaves the current magazine untouched.
+ */
+function activateBatteryEdit(span) {
+  const defId    = span.dataset.defenseId;
+  const targetId = span.dataset.targetId;
+  const systemId = span.dataset.system;
+  const currentQty = parseInt(span.textContent, 10);
+
+  const input = document.createElement('input');
+  input.type      = 'number';
+  input.className = 'qty-count-input';
+  input.value     = currentQty;
+  input.min       = 1;
+  input.max       = 20;
+
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let cancelled = false;
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { cancelled = true; input.blur(); }
+  });
+
+  input.addEventListener('blur', () => {
+    if (cancelled) { input.replaceWith(span); return; }
+
+    const val = parseInt(input.value.trim(), 10);
+
+    if (isNaN(val) || val < 1) {
+      showToast('Invalid — must be at least 1 battery.', true);
+      input.replaceWith(span);
+      return;
+    }
+
+    // Find and update the defense entry on its owning target
+    const target = getTarget(targetId);
+    if (!target) { input.replaceWith(span); return; }
+    const def = (target.defenses || []).find(d => d.id === defId);
+    if (!def) { input.replaceWith(span); return; }
+
+    def.quantity = val;
+    saveToStorage();
+
+    // Clamp magazine: if reducing batteries makes the current interceptor
+    // count exceed the new capacity, reduce it to the new maximum.
+    const catalog    = DEFENSE_CATALOG[systemId];
+    const perBattery = catalog?.magazinePerBattery || 0;
+    if (perBattery > 0) {
+      const newMaxMag  = val * perBattery;
+      const currentMag = globalMagState[defId];
+      if (currentMag !== undefined && currentMag > newMaxMag) {
+        setMagEntry(defId, newMaxMag);
+        saveMagStateToStorage();
+      }
+      // If no magazine entry exists the card shows "full" — after quantity
+      // changes the full value is automatically derived from def.quantity,
+      // so no entry is needed.
+    }
+
+    _manifestUnchanged = false;
+    document.getElementById('simulation-results').classList.add('hidden');
     if (selectedTargetId) renderDefenseLayers(selectedTargetId);
   });
 }

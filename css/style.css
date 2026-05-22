@@ -533,6 +533,33 @@ select option, select optgroup {
 .mag-count-input::-webkit-inner-spin-button,
 .mag-count-input::-webkit-outer-spin-button { -webkit-appearance: none; }
 
+/* Editable battery / quantity count on defense cards */
+.qty-count-editable {
+  cursor: text;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.qty-count-editable:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.qty-count-input {
+  width: 3ch;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: inherit;
+  padding: 0;
+  outline: none;
+  vertical-align: baseline;
+  -moz-appearance: textfield;
+}
+.qty-count-input::-webkit-inner-spin-button,
+.qty-count-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
 .defense-controls {
   margin-top: 10px;
   display: flex;
