@@ -133,7 +133,11 @@ async function loadData() {
   // These are overridden below if the user has a localStorage entry for that target.
   for (const t of appTargetCatalog) {
     const raw = appDefaultDefenses[t.id];
-    t.defenses = Array.isArray(raw) ? raw.map(d => ({ ...d })) : [];
+    t.defenses = Array.isArray(raw) ? raw.map(d => {
+      const sysData = appDefenseSystems.find(s => s.id === d.system);
+      const qty     = sysData?.batteries ?? d.quantity ?? 1;
+      return { ...d, quantity: qty };
+    }) : [];
   }
 
   // Merge localStorage overrides into appTargetCatalog.
@@ -230,6 +234,7 @@ function mergeLoadedData() {
       type:               'SAM',
       country:            '',
       range_km:           sys.range_km || 0,
+      defaultBatteries:   sys.batteries || 1,
       effectiveAgainst:   sys.threats || [],
       magazinePerBattery: sys.armament?.standard_loadout || 0,
       description:        `Range: ${sys.range_km} km`
@@ -1694,8 +1699,12 @@ function wireEvents() {
     }
   });
 
-  // Magazine info — update when system or quantity changes
-  document.getElementById('defense-system-select').addEventListener('change', updateDefenseMagazineInfo);
+  // Magazine info — update when system or quantity changes; also seed quantity from defaultBatteries
+  document.getElementById('defense-system-select').addEventListener('change', e => {
+    const catalog = DEFENSE_CATALOG[e.target.value];
+    if (catalog) document.getElementById('defense-quantity').value = catalog.defaultBatteries;
+    updateDefenseMagazineInfo();
+  });
   document.getElementById('defense-quantity').addEventListener('input', updateDefenseMagazineInfo);
 
   // Confirm add defense
