@@ -30,6 +30,8 @@ let _manifestUnchanged = false; // true once a sim has run; reset whenever manif
 // ── Manual override state ─────────────────────────────────────────────────────
 let lastSimResults  = null;   // stored after each simulation run for override re-walks
 let lastSimTarget   = null;   // stored alongside lastSimResults
+let lastSimDefenses = [];     // allDefenses passed to the last runSimulation call
+let preSimMagState  = {};     // snapshot of globalMagState before the last simulation depleted it
 let manualOverrides = {};     // { [threatType]: { [defId]: { survived:number, disengaged:bool } } }
 
 // ── Minimap state ─────────────────────────────────────────────────────────────
@@ -1066,7 +1068,10 @@ async function simulate() {
 
     const allDefenses = [...perTargetDefenses, ...crossDefs];
 
-    // globalMagState is flat and keyed by def.id — pass directly as initial state.
+    // Snapshot magazine state before depletion so disengage overrides can
+    // re-run the simulation from the same starting point.
+    const preSimSnap = { ...globalMagState };
+
     const results = runSimulation(attackManifest, allDefenses, globalMagState);
 
     // Merge updated magazine levels back into globalMagState.
@@ -1076,8 +1081,10 @@ async function simulate() {
     saveMagStateToStorage();
 
     _manifestUnchanged = true;
-    lastSimResults = results;
-    lastSimTarget  = target;
+    lastSimResults  = results;
+    lastSimTarget   = target;
+    lastSimDefenses = allDefenses;
+    preSimMagState  = preSimSnap;
     renderDefenseLayers(selectedTargetId);
 
     renderSimulationResults(results, target);
@@ -1233,16 +1240,50 @@ function clearAllOverrides() {
 /** Re-render results panel applying current manualOverrides (or original if none). */
 function rerenderWithOverrides() {
   if (!lastSimResults) return;
+
   const hasOv = Object.keys(manualOverrides).length > 0;
-  const display = hasOv
-    ? computeAdjustedResults(lastSimResults, manualOverrides)
-    : lastSimResults;
+  let displayResults = lastSimResults;
+
+  if (hasOv) {
+    // Split overrides into two buckets:
+    //   disengagedDefIds  — systems to remove from the defense list entirely,
+    //                       then re-run so downstream systems actually engage
+    //   killOverrides     — layer-level kill-count adjustments applied as a
+    //                       re-walk on top of whatever base results we have
+    const disengagedDefIds = new Set();
+    const killOverrides    = {};
+
+    for (const [tt, ttOvs] of Object.entries(manualOverrides)) {
+      for (const [defId, ov] of Object.entries(ttOvs)) {
+        if (ov.disengaged) {
+          disengagedDefIds.add(defId);
+        } else {
+          if (!killOverrides[tt]) killOverrides[tt] = {};
+          killOverrides[tt][defId] = ov;
+        }
+      }
+    }
+
+    // ── Disengage: re-run without the excluded systems ────────────────────────
+    // Use a copy of preSimMagState so globalMagState (the live state after the
+    // actual last sim) is not affected by this what-if display run.
+    let baseResults = lastSimResults;
+    if (disengagedDefIds.size > 0) {
+      const filteredDefenses = lastSimDefenses.filter(d => !disengagedDefIds.has(d.id));
+      baseResults = runSimulation(attackManifest, filteredDefenses, { ...preSimMagState });
+    }
+
+    // ── Kill-count overrides: re-walk on top of base results ─────────────────
+    displayResults = Object.keys(killOverrides).length > 0
+      ? computeAdjustedResults(baseResults, killOverrides)
+      : baseResults;
+  }
 
   document.getElementById('override-notice')?.classList.toggle('hidden', !hasOv);
-  // Always show original inbound totals in the summary
+  // Always show original inbound totals in the summary header
   renderResultsSummary(lastSimResults, lastSimTarget);
-  renderResultsLayers(display.byThreatType);
-  renderResultsFinal(display);
+  renderResultsLayers(displayResults.byThreatType);
+  renderResultsFinal(displayResults);
 }
 
 /**
