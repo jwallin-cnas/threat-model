@@ -291,7 +291,7 @@
         "name": "Fighter CAP",
         "payload_kg": 0,
         "kill_modality": "hit-to-kill",
-        "standard_loadout": 24
+        "standard_loadout": 18
       },
       "threats": ["ballistic_missile", "cruise_missile", "drone"]
     }
