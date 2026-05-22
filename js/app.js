@@ -539,7 +539,7 @@ function renderDefenseLayers(targetId) {
 
   // Cross-target defenses — defenses on other targets whose range covers this target
   for (const def of crossDefenses) {
-    container.appendChild(buildCrossTargetDefenseCard(def));
+    container.appendChild(buildCrossTargetDefenseCard(def, targetId));
   }
 }
 
@@ -549,11 +549,13 @@ function renderDefenseLayers(targetId) {
 // currently-viewed target. Magazine is shared via globalMagState[def.id].
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildCrossTargetDefenseCard(def) {
-  const catalog = DEFENSE_CATALOG[def.system];
-  const tier    = catalog?.tier ?? 0;
-  const color   = TIER_COLORS[tier] || '#888';
-  const label   = TIER_LABELS[tier] || 'Unknown';
+function buildCrossTargetDefenseCard(def, targetId) {
+  const catalog     = DEFENSE_CATALOG[def.system];
+  const tier        = catalog?.tier ?? 0;
+  const color       = TIER_COLORS[tier] || '#888';
+  const label       = TIER_LABELS[tier] || 'Unknown';
+  const coveredTarget = getTarget(targetId);
+  const isDisabled  = (coveredTarget?.disabledCoverageDefIds || []).includes(def.id);
 
   const initialMag   = (catalog?.magazinePerBattery || 0) * def.quantity;
   const simRemaining = globalMagState[def.id];
@@ -586,13 +588,19 @@ function buildCrossTargetDefenseCard(def) {
     .join('');
 
   const card = document.createElement('div');
-  card.className = 'defense-card cross-target-card';
+  card.className = `defense-card cross-target-card${isDisabled ? ' defense-card--disabled' : ''}`;
   card.style.setProperty('--tier-color', color);
 
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
       <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}">📍 ${def._placedAtTargetName} · ${def._distanceKm} km</span>
+      <div class="defense-card-actions">
+        ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
+        <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
+          data-target="${targetId}" data-defense="${def.id}"
+          title="${isDisabled ? 'Re-enable for simulation' : 'Exclude from simulation'}">⊘</button>
+      </div>
     </div>
     <div class="defense-card-body">
       <span class="defense-name">${catalog?.name || def.system}</span>
@@ -615,6 +623,10 @@ function buildCrossTargetDefenseCard(def) {
       document.getElementById('simulation-results').classList.add('hidden');
       if (selectedTargetId) renderDefenseLayers(selectedTargetId);
     });
+  });
+
+  card.querySelector('.btn-toggle-defense').addEventListener('click', (e) => {
+    toggleCrossTargetDefenseDisabled(e.currentTarget.dataset.target, e.currentTarget.dataset.defense);
   });
 
   return card;
@@ -653,8 +665,10 @@ function buildDefenseCard(def, targetId) {
     }
   }
 
+  const isDisabled = !!def.disabled;
+
   const card = document.createElement('div');
-  card.className = 'defense-card';
+  card.className = `defense-card${isDisabled ? ' defense-card--disabled' : ''}`;
   card.style.setProperty('--tier-color', color);
 
   const effectList = (catalog?.effectiveAgainst || [])
@@ -664,7 +678,13 @@ function buildDefenseCard(def, targetId) {
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
-      <button class="btn-icon btn-remove-defense" data-target="${targetId}" data-defense="${def.id}" title="Remove">✕</button>
+      <div class="defense-card-actions">
+        ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
+        <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
+          data-target="${targetId}" data-defense="${def.id}"
+          title="${isDisabled ? 'Re-enable for simulation' : 'Exclude from simulation'}">⊘</button>
+        <button class="btn-icon btn-remove-defense" data-target="${targetId}" data-defense="${def.id}" title="Remove">✕</button>
+      </div>
     </div>
     <div class="defense-card-body">
       <span class="defense-name">${catalog?.name || def.system}</span>
@@ -687,6 +707,10 @@ function buildDefenseCard(def, targetId) {
       document.getElementById('simulation-results').classList.add('hidden');
       if (selectedTargetId) renderDefenseLayers(selectedTargetId);
     });
+  });
+
+  card.querySelector('.btn-toggle-defense').addEventListener('click', (e) => {
+    toggleOwnDefenseDisabled(e.currentTarget.dataset.target, e.currentTarget.dataset.defense);
   });
 
   card.querySelector('.btn-remove-defense').addEventListener('click', (e) => {
@@ -792,6 +816,44 @@ function removeDefense(targetId, defenseId) {
   renderDefenseLayers(targetId);
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Defense enable / disable (pre-simulation exclusion)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Toggle a target's own defense in/out of the simulation without removing it. */
+function toggleOwnDefenseDisabled(targetId, defId) {
+  const target = getTarget(targetId);
+  if (!target) return;
+  const def = (target.defenses || []).find(d => d.id === defId);
+  if (!def) return;
+  def.disabled = !def.disabled;
+  saveToStorage();
+  _manifestUnchanged = false;
+  document.getElementById('simulation-results').classList.add('hidden');
+  renderDefenseLayers(targetId);
+}
+
+/**
+ * Toggle whether a cross-target (coverage) defense is excluded from this
+ * target's simulation. The disabled flag lives on the covered target so the
+ * source target's defense entry is never mutated.
+ */
+function toggleCrossTargetDefenseDisabled(targetId, defId) {
+  const target = getTarget(targetId);
+  if (!target) return;
+  target.disabledCoverageDefIds = target.disabledCoverageDefIds || [];
+  const idx = target.disabledCoverageDefIds.indexOf(defId);
+  if (idx >= 0) {
+    target.disabledCoverageDefIds.splice(idx, 1);
+  } else {
+    target.disabledCoverageDefIds.push(defId);
+  }
+  saveToStorage();
+  _manifestUnchanged = false;
+  document.getElementById('simulation-results').classList.add('hidden');
+  renderDefenseLayers(targetId);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rendering — Platform select (attack builder)
@@ -1067,16 +1129,20 @@ async function simulate() {
 
   try {
     const target            = getTarget(selectedTargetId);
-    const perTargetDefenses = target?.defenses || [];
 
-    // Include defenses from other targets whose range_km covers this target.
-    // Their def.id keys into globalMagState, so magazine is shared automatically.
-    const crossDefs = getCrossTargetDefenses(selectedTargetId).map(d => ({
-      id:       d.id,
-      system:   d.system,
-      quantity: d.quantity,
-      notes:    d.notes || ''
-    }));
+    // Own defenses — exclude any the user has marked as disabled pre-simulation
+    const perTargetDefenses = (target?.defenses || []).filter(d => !d.disabled);
+
+    // Cross-target defenses — exclude any disabled for this covered target
+    const disabledCoverage = new Set(target?.disabledCoverageDefIds || []);
+    const crossDefs = getCrossTargetDefenses(selectedTargetId)
+      .filter(d => !disabledCoverage.has(d.id))
+      .map(d => ({
+        id:       d.id,
+        system:   d.system,
+        quantity: d.quantity,
+        notes:    d.notes || ''
+      }));
 
     const allDefenses = [...perTargetDefenses, ...crossDefs];
 
@@ -1258,17 +1324,19 @@ function rerenderWithOverrides() {
 
   if (hasOv) {
     // Split overrides into two buckets:
-    //   disengagedDefIds  — systems to remove from the defense list entirely,
-    //                       then re-run so downstream systems actually engage
-    //   killOverrides     — layer-level kill-count adjustments applied as a
-    //                       re-walk on top of whatever base results we have
-    const disengagedDefIds = new Set();
-    const killOverrides    = {};
+    //   disengagedByThreatType — per-threat-type map of defIds to skip so that
+    //     disengaging a system for drones does not affect its BM engagement.
+    //     A fresh simulation is re-run with the exclusions passed as the 4th arg.
+    //   killOverrides — layer-level kill-count adjustments applied as a
+    //     re-walk on top of whatever base results we have.
+    const disengagedByThreatType = {};
+    const killOverrides          = {};
 
     for (const [tt, ttOvs] of Object.entries(manualOverrides)) {
       for (const [defId, ov] of Object.entries(ttOvs)) {
         if (ov.disengaged) {
-          disengagedDefIds.add(defId);
+          if (!disengagedByThreatType[tt]) disengagedByThreatType[tt] = [];
+          disengagedByThreatType[tt].push(defId);
         } else {
           if (!killOverrides[tt]) killOverrides[tt] = {};
           killOverrides[tt][defId] = ov;
@@ -1276,13 +1344,15 @@ function rerenderWithOverrides() {
       }
     }
 
-    // ── Disengage: re-run without the excluded systems ────────────────────────
-    // Use a copy of preSimMagState so globalMagState (the live state after the
-    // actual last sim) is not affected by this what-if display run.
+    // ── Disengage: re-run with per-threat-type exclusions ────────────────────
+    // Pass the full lastSimDefenses list plus an exclusion map so systems are
+    // only skipped for the specific threat type(s) they were disengaged from.
+    // Use a copy of preSimMagState so globalMagState is not mutated.
     let baseResults = lastSimResults;
-    if (disengagedDefIds.size > 0) {
-      const filteredDefenses = lastSimDefenses.filter(d => !disengagedDefIds.has(d.id));
-      baseResults = runSimulation(attackManifest, filteredDefenses, { ...preSimMagState });
+    if (Object.keys(disengagedByThreatType).length > 0) {
+      baseResults = runSimulation(
+        attackManifest, lastSimDefenses, { ...preSimMagState }, disengagedByThreatType
+      );
     }
 
     // ── Kill-count overrides: re-walk on top of base results ─────────────────

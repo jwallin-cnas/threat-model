@@ -155,7 +155,7 @@ const THREAT_PRIORITY = ['ballistic_missile', 'cruise_missile', 'drone'];
  *   }>
  * }>
  */
-function runSimulation(attackManifest, defenses, initialMagazineState = {}) {
+function runSimulation(attackManifest, defenses, initialMagazineState = {}, excludedByThreatType = {}) {
 
   // ── Aggregate attack by threat type ──────────────────────────────────────
   const threatCounts = {};
@@ -190,6 +190,9 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}) {
     const initialCount = threatCounts[threatType] || 0;
     if (initialCount === 0) continue;
 
+    // defIds explicitly excluded for this threat type (post-sim disengage overrides)
+    const excludedIds = new Set(excludedByThreatType[threatType] || []);
+
     totalIn += initialCount;
     let remaining = initialCount;
     const engagements = [];
@@ -197,9 +200,10 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}) {
     for (const systemId of ENGAGEMENT_PRIORITY) {
       if (remaining <= 0) break;
 
-      // Find ALL deployed entries for this system type.
-      // Typically one, but may be several when emplacements are involved.
-      const entries = Object.values(deployed).filter(e => e.def.system === systemId);
+      // Find ALL deployed entries for this system type, minus any excluded for
+      // this specific threat type (per-threat-type disengage overrides).
+      const entries = Object.values(deployed)
+        .filter(e => e.def.system === systemId && !excludedIds.has(e.def.id));
       if (entries.length === 0) continue;
 
       const engFn = (typeof ENGAGEMENT_FUNCTIONS !== 'undefined')

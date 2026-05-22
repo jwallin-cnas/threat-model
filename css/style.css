@@ -408,6 +408,38 @@ select option, select optgroup {
 
 .defense-card:hover { border-color: var(--border); }
 
+/* Pre-simulation disabled / excluded state */
+.defense-card--disabled {
+  opacity: 0.45;
+  border-left-color: var(--border-soft) !important;
+}
+.defense-card--disabled .defense-name { text-decoration: line-through; }
+
+.disabled-sim-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.defense-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ⊘ exclude toggle — sits alongside ✕ remove in .defense-card-actions */
+.btn-toggle-defense { color: var(--text-dim); }
+.btn-toggle-defense:hover { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.btn-toggle-defense.is-disabled { color: var(--success, #4ade80); }
+.btn-toggle-defense.is-disabled:hover { color: var(--success, #4ade80); background: color-mix(in srgb, var(--success, #4ade80) 12%, transparent); }
+
 .defense-card-header {
   display: flex;
   justify-content: space-between;
