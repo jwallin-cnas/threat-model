@@ -58,13 +58,41 @@
 
   "defaults": {
 
+    "doha": [
+      { "id": "doha_d1", "system": "patriot",  "quantity": 3, "notes": "" },
+      { "id": "doha_d2", "system": "nasams",  "quantity": 1, "notes": "" }
+    ],
+
+    "ras_laffan_lng": [
+      { "id": "ras_laffan_d1", "system": "merops",  "quantity": 2, "notes": "" }
+    ],
+
+    "hamad_port": [
+      { "id": "doha_d1", "system": "patriot",  "quantity": 3, "notes": "" },
+      { "id": "doha_d2", "system": "merops",  "quantity": 4, "notes": "" }
+    ],
+
+    "us_fifth_fleet": [
+      { "id": "us_fifth_fleet_d1", "system": "patriot",  "quantity": 2, "notes": "" }
+    ],
+
+    "amman": [
+      { "id": "amman_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    ],
+
     "jebel_ali_port": [
-      { "id": "jebel_ali_port_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "jebel_ali_port_d1", "system": "patriot",  "quantity": 2, "notes": "" },
+      { "id": "jebel_ali_port_d2", "system": "cheongung2",  "quantity": 1, "notes": "" },
+      { "id": "jebel_ali_port_d3", "system": "merops",  "quantity": 9, "notes": "" }
     ],
 
     "al_dhafra_ab": [
-      { "id": "al_dhafra_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" },
+      { "id": "al_dhafra_ab_d1", "system": "patriot",  "quantity": 2, "notes": "" },
       { "id": "al_dhafra_ab_d2", "system": "cheongung2",  "quantity": 1, "notes": "" }
+    ],
+
+    "dubai": [
+      { "id": "dubai_d1", "system": "patriot",  "quantity": 1, "notes": "" }
     ],
 
     "abu_dhabi": [
@@ -72,27 +100,40 @@
     ],
 
     "ruwais_refinery": [
-      { "id": "ruwais_refinery_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+      { "id": "ruwais_refinery_d1", "system": "thaad",  "quantity": 1, "notes": "" },
+      { "id": "ruwais_refinery_d2", "system": "patriot",  "quantity": 1, "notes": "" }
+    ],
+
+    "fujairah_port": [
+      { "id": "fujairah_port_d1", "system": "patriot",  "quantity": 2, "notes": "" },
+      { "id": "fujairaj_port_d2", "system": "fs-lids",  "quantity": 1, "notes": "" }
     ],
 
     "prince_sultan_ab": [
-      { "id": "prince_sultan_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "prince_sultan_ab_d1", "system": "patriot",  "quantity": 2, "notes": "" },
+      { "id": "prince_sultan_ab_d2", "system": "fs-lids",  "quantity": 1, "notes": "" },
+      { "id": "prince_sultan_ab_d3", "system": "merops",  "quantity": 1, "notes": "" }
     ],
 
     "king_khalid_ab": [
-      { "id": "king_khalid_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "king_khalid_ab_d1", "system": "patriot",  "quantity": 2, "notes": "" },
+      { "id": "king_khalid_ab_d2", "system": "merops",  "quantity": 1, "notes": "" }
     ],
 
     "aramco_persian_gulf_corridor": [
-      { "id": "aramco_persian_gulf_corridor_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "aramco_persian_gulf_corridor_d1", "system": "patriot",  "quantity": 4, "notes": "" }
     ],
 
     "aramco_riyadh": [
-      { "id": "aramco_riyadh_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "aramco_riyadh_d1", "system": "patriot",  "quantity": 2, "notes": "" }
+    ],
+
+    "dammam": [
+      { "id": "dammam_d1", "system": "patriot",  "quantity": 1, "notes": "" }
     ],
 
     "aramco_red_sea_corridor": [
-      { "id": "aramco_red_sea_corridor_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "aramco_red_sea_corridor_d1", "system": "patriot",  "quantity": 2, "notes": "" }
     ],
 
     "riyadh" : [
@@ -120,8 +161,9 @@
     ],
 
     "al_udeid_ab" : [
-      { "id": "al_udeid_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" },
-      { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "" }
+      { "id": "al_udeid_ab_d1", "system": "patriot",  "quantity": 4, "notes": "" },
+      { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "" },
+      { "id": "al_udeid_ab_d3", "system": "fs-lids",  "quantity": 1, "notes": "" }
     ],
 
     "muscat" : [
@@ -141,8 +183,7 @@
     ],
 
     "nevatim_ab" : [
-      { "id": "nevatim_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" },
-      { "id": "nevatim_ab_d2", "system": "arrow",  "quantity": 1, "notes": "" }
+      { "id": "nevatim_ab_d1", "system": "arrow",  "quantity": 1, "notes": "" }
     ],
 
     "tel_aviv" : [
@@ -152,7 +193,8 @@
 
     "haifa" : [
       { "id": "haifa_d1", "system": "arrow",  "quantity": 1, "notes": "" },
-      { "id": "haifa_d2", "system": "iron_dome",  "quantity": 1, "notes": "" }
+      { "id": "haifa_d2", "system": "iron_dome",  "quantity": 1, "notes": "" },
+      { "id": "haifa_d3", "system": "iron_beam",  "quantity": 1, "notes": "" }
     ],  
 
     "jerusalem" : [
