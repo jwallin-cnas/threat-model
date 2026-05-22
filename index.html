@@ -107,18 +107,6 @@
         </div>
       </div>
 
-      <!-- Area defenses section (emplacements covering this target) -->
-      <div class="section-header">
-        <h3>Area Defenses</h3>
-        <div class="section-header-right">
-          <span id="area-defense-count" class="badge">0 in range</span>
-          <button id="btn-manage-emplacements" class="btn btn-secondary btn-sm">Manage</button>
-        </div>
-      </div>
-      <div id="area-defenses-list" class="defense-layers">
-        <p class="empty-state">Select a target to view area defenses</p>
-      </div>
-
     </section><!-- /panel-target -->
 
     <!-- ── Right Panel: Attack Builder & Simulation ───────────────────── -->
@@ -194,75 +182,6 @@
     ⚠ Changes persist in browser <code>localStorage</code>.
     Use <strong>Export JSON</strong> to download and commit an updated <code>data.json</code> to your repo.
     <strong>Reset to Default</strong> clears local storage and reverts to the committed dataset.
-  </div>
-
-  <!-- Emplacement management panel — controlled by openEmplacementPanel() in app.js -->
-  <div id="empl-panel" class="empl-panel hidden">
-    <div class="empl-panel-inner">
-
-      <div class="empl-panel-header">
-        <h2>Manage Emplacements</h2>
-        <button id="btn-close-empl-panel" class="btn btn-secondary btn-sm">✕ Close</button>
-      </div>
-
-      <div class="empl-panel-content">
-
-        <div class="empl-controls">
-          <button id="btn-add-empl" class="btn btn-primary">+ Add Emplacement</button>
-          <button id="btn-reset-empl-mag" class="btn btn-secondary btn-sm">Reset All Magazines</button>
-        </div>
-
-        <div id="empl-list" class="empl-list">
-          <p class="empty-state">No emplacements defined yet.</p>
-        </div>
-
-        <!-- Add / edit form -->
-        <div id="empl-form" class="add-defense-form hidden">
-          <h4 id="empl-form-title">Add Emplacement</h4>
-
-          <div class="form-group">
-            <label for="empl-name">Name / Label</label>
-            <input type="text" id="empl-name" placeholder="e.g., Patriot Fwd Battery Alpha">
-          </div>
-
-          <div class="form-group">
-            <label for="empl-system">System</label>
-            <select id="empl-system">
-              <option value="">— Select System —</option>
-            </select>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group flex-grow">
-              <label for="empl-lat">Latitude</label>
-              <input type="number" id="empl-lat" step="0.001" placeholder="24.714">
-            </div>
-            <div class="form-group flex-grow">
-              <label for="empl-lon">Longitude</label>
-              <input type="number" id="empl-lon" step="0.001" placeholder="46.675">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="empl-quantity">Quantity (batteries / systems)</label>
-            <input type="number" id="empl-quantity" min="1" max="20" value="1">
-          </div>
-
-          <div class="form-group">
-            <label for="empl-notes">Notes (optional)</label>
-            <input type="text" id="empl-notes" placeholder="">
-          </div>
-
-          <div id="empl-mag-info" class="defense-magazine-info hidden"></div>
-
-          <div class="form-row">
-            <button id="btn-save-empl" class="btn btn-primary">Save</button>
-            <button id="btn-cancel-empl" class="btn btn-secondary">Cancel</button>
-          </div>
-        </div>
-
-      </div>
-    </div>
   </div>
 
   <!-- Modal overlay — controlled by showModal() / _resolveModal() in app.js -->

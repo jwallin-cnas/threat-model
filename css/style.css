@@ -1150,108 +1150,15 @@ select option, select optgroup {
 
 /* ── Emplacement management panel ───────────────────────────────────────── */
 
-.empl-panel {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 20px;
-  overflow-y: auto;
-  z-index: 450;
-}
+/* ── Cross-target defense cards ──────────────────────────────────────────── */
 
-.empl-panel-inner {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 620px;
-  margin: auto;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.7);
-  animation: modal-in 0.15s ease;
-}
-
-.empl-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.empl-panel-header h2 {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-bright);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-.empl-panel-content {
-  padding: 16px 20px 20px;
-}
-
-.empl-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-/* List of all emplacements in the management panel */
-.empl-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-  min-height: 20px;
-}
-
-.empl-row {
-  background: var(--bg-card);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.empl-row-info { flex: 1; min-width: 0; }
-
-.empl-row-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-bright);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.empl-row-meta {
-  font-size: 11px;
-  color: var(--text-dim);
-  font-family: var(--font-mono);
-  margin-top: 2px;
-}
-
-.empl-row-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-/* ── Area defense cards (in-range emplacements shown per target) ─────────── */
-
-/* Dashed left border distinguishes emplacement cards from per-target cards */
-.empl-card {
+/* Dashed left border distinguishes cross-target cards from local cards */
+.cross-target-card {
   border-left-style: dashed !important;
 }
 
-/* Distance badge shown on emplacement cards */
-.empl-distance {
+/* "Placed at [Target] · X km" badge on cross-target cards */
+.cross-target-badge {
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--accent);
@@ -1260,6 +1167,9 @@ select option, select optgroup {
   border-radius: 4px;
   border: 1px solid #1f4a7a;
   white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */

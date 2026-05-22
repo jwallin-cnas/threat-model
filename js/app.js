@@ -9,9 +9,8 @@
  *      to commit back into their repo
  */
 
-const STORAGE_KEY             = 'threatmodel_targets_v2';
-const EMPLACEMENT_STORAGE_KEY = 'threatmodel_emplacements_v1';
-const EMPLACEMENT_MAG_KEY     = 'threatmodel_empl_mag_v1';
+const STORAGE_KEY    = 'threatmodel_targets_v2';
+const MAG_STORAGE_KEY = 'threatmodel_mag_v2';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
@@ -25,39 +24,43 @@ let appDefaultDefenses = {};  // default defense assignments from data/defaults.
 
 let selectedTargetId   = null;
 let attackManifest     = [];   // [{platformId, count}]
-let perTargetMagStates = {};   // targetId → { defId: magazineRemaining }
+let globalMagState     = {};   // defId → magazineRemaining (flat, global — shared across all targets)
 let _manifestUnchanged = false; // true once a sim has run; reset whenever manifest/target/defenses change
 
-// ── Emplacement state ─────────────────────────────────────────────────────────
-let appEmplacements     = [];  // global list loaded from data/emplacements.json
-let emplacementMagState = {};  // global: emplacementId → remaining interceptors
-let _emplEditId         = null; // ID being edited in the management panel (null = new)
-let _minimapEmplCircles = [];   // Leaflet layers for emplacement coverage circles
+// ── Minimap state ─────────────────────────────────────────────────────────────
+let _minimapCrossLayers = [];   // Leaflet layers for cross-target coverage circles
 
-// ── Magazine state helpers (all scoped to the active target) ──────────────────
+// ── Magazine state helpers ────────────────────────────────────────────────────
 
-/** Return the magazine state object for the current target (may be empty). */
-function getMagState() {
-  return selectedTargetId ? (perTargetMagStates[selectedTargetId] ?? {}) : {};
+/** Return the global magazine state (keyed by def.id). */
+function getMagState() { return globalMagState; }
+
+/** Remove one defense's magazine entry (causes next read to return full loadout). */
+function deleteMagEntry(defId) { delete globalMagState[defId]; }
+
+/** Set one defense's remaining interceptor count. */
+function setMagEntry(defId, value) { globalMagState[defId] = value; }
+
+/**
+ * Clear magazine entries for all defenses assigned DIRECTLY to a target.
+ * Cross-target defenses owned by other targets are intentionally left alone.
+ */
+function clearMagStateForTarget(targetId) {
+  for (const def of getTargetDefenses(targetId)) delete globalMagState[def.id];
 }
-/** Replace the entire magazine state for the current target. */
-function setMagState(state) {
-  if (selectedTargetId) perTargetMagStates[selectedTargetId] = state;
+
+/** Persist global magazine state to localStorage. */
+function saveMagStateToStorage() {
+  try { localStorage.setItem(MAG_STORAGE_KEY, JSON.stringify(globalMagState)); }
+  catch (e) { /* non-critical */ }
 }
-/** Remove one system's entry from the current target's magazine state. */
-function deleteMagEntry(systemId) {
-  if (selectedTargetId && perTargetMagStates[selectedTargetId])
-    delete perTargetMagStates[selectedTargetId][systemId];
-}
-/** Set one system's remaining count for the current target. */
-function setMagEntry(systemId, value) {
-  if (!selectedTargetId) return;
-  if (!perTargetMagStates[selectedTargetId]) perTargetMagStates[selectedTargetId] = {};
-  perTargetMagStates[selectedTargetId][systemId] = value;
-}
-/** Clear the entire magazine state for the current target. */
-function clearMagState() {
-  if (selectedTargetId) delete perTargetMagStates[selectedTargetId];
+
+/** Load global magazine state from localStorage. */
+function loadMagStateFromStorage() {
+  try {
+    const raw = localStorage.getItem(MAG_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
 }
 
 let _minimap       = null;        // Leaflet map instance
@@ -69,13 +72,12 @@ let _minimapMarker = null;        // Leaflet circleMarker instance
 
 async function loadData() {
   // Fetch all data files in parallel
-  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes, emplRes] = await Promise.allSettled([
+  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes] = await Promise.allSettled([
     fetch('data/data.json').then(r => r.json()),
     fetch('data/targets.json').then(r => r.json()),
     fetch('data/defenses.json').then(r => r.json()),
     fetch('data/attacks.json').then(r => r.json()),
-    fetch('data/defaults.json').then(r => r.json()),
-    fetch('data/emplacements.json').then(r => r.json())
+    fetch('data/defaults.json').then(r => r.json())
   ]);
 
   // Scenario targets (data.json) — merged with localStorage overrides below
@@ -114,17 +116,8 @@ async function loadData() {
     console.warn('Could not load data/defaults.json:', defaultsRes.reason);
   }
 
-  // Emplacements (emplacements.json) — merged with localStorage overrides
-  if (emplRes.status === 'fulfilled') {
-    appEmplacements = emplRes.value.emplacements || [];
-  } else {
-    console.warn('Could not load data/emplacements.json:', emplRes.reason);
-  }
-  const storedEmplacements = loadEmplacementsFromStorage();
-  if (storedEmplacements) appEmplacements = storedEmplacements;
-
-  // Emplacement magazine state (localStorage)
-  emplacementMagState = loadEmplacementMagState();
+  // Magazine state (localStorage — flat, global, keyed by def.id)
+  globalMagState = loadMagStateFromStorage();
 
   // Keep data.json targets available for backward compatibility
   appTargets = baseline;
@@ -167,29 +160,6 @@ function saveToStorage() {
   }
 }
 
-function saveEmplacementsToStorage() {
-  try { localStorage.setItem(EMPLACEMENT_STORAGE_KEY, JSON.stringify(appEmplacements)); }
-  catch (e) { showToast('Storage error — could not save emplacements.', true); }
-}
-
-function loadEmplacementsFromStorage() {
-  try {
-    const raw = localStorage.getItem(EMPLACEMENT_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveEmplacementMagStateToStorage() {
-  try { localStorage.setItem(EMPLACEMENT_MAG_KEY, JSON.stringify(emplacementMagState)); }
-  catch (e) { /* silently swallow — non-critical */ }
-}
-
-function loadEmplacementMagState() {
-  try {
-    const raw = localStorage.getItem(EMPLACEMENT_MAG_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
 
 function exportData() {
   const payload = JSON.stringify({ $schema: './schemas/schema.json', version: '1.0', targets: appTargets }, null, 2);
@@ -213,6 +183,7 @@ async function resetData() {
   });
   if (!confirmed) return;
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(MAG_STORAGE_KEY);
   location.reload();
 }
 
@@ -293,25 +264,39 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Return all emplacements whose system range_km reaches the given target,
- * each annotated with distanceKm (rounded to nearest km).
+ * Return defenses placed on OTHER targets whose system range_km reaches the
+ * given targetId. Each entry is the original defense object annotated with
+ * _isCrossTarget, _placedAtTargetId, _placedAtTargetName, and _distanceKm.
+ * Sorted nearest-source-target first.
  */
-function getEmplacementsInRange(target) {
+function getCrossTargetDefenses(targetId) {
+  const target = getTarget(targetId);
   if (!target || !Array.isArray(target.location) || target.location[0] == null) return [];
   const [tlat, tlon] = target.location;
+
   const result = [];
-  for (const emp of appEmplacements) {
-    const catalog = DEFENSE_CATALOG[emp.system];
-    if (!catalog) continue;
-    if (!Array.isArray(emp.location) || emp.location.length < 2) continue;
-    const [elat, elon] = emp.location;
-    const dist = haversine(tlat, tlon, elat, elon);
-    if (dist <= catalog.range_km) {
-      result.push({ ...emp, distanceKm: Math.round(dist) });
+  for (const other of appTargetCatalog) {
+    if (other.id === targetId) continue;
+    if (!Array.isArray(other.location) || other.location[0] == null) continue;
+    const [olat, olon] = other.location;
+    const dist = haversine(tlat, tlon, olat, olon);
+
+    for (const def of (other.defenses || [])) {
+      const catalog = DEFENSE_CATALOG[def.system];
+      if (!catalog || catalog.range_km <= 0) continue;
+      if (dist <= catalog.range_km) {
+        result.push({
+          ...def,
+          _isCrossTarget:      true,
+          _placedAtTargetId:   other.id,
+          _placedAtTargetName: other.name,
+          _distanceKm:         Math.round(dist)
+        });
+      }
     }
   }
-  // Sort nearest first
-  result.sort((a, b) => a.distanceKm - b.distanceKm);
+
+  result.sort((a, b) => a._distanceKm - b._distanceKm);
   return result;
 }
 
@@ -395,9 +380,9 @@ function updateMinimap(target) {
   // Show container before Leaflet queries its size
   container.classList.remove('hidden');
 
-  // Remove stale emplacement circles from a previous target selection
-  for (const layer of _minimapEmplCircles) layer.remove();
-  _minimapEmplCircles = [];
+  // Remove stale cross-target coverage circles from a previous target selection
+  for (const layer of _minimapCrossLayers) layer.remove();
+  _minimapCrossLayers = [];
 
   if (!_minimap) {
     // First initialisation — create the map instance
@@ -433,14 +418,24 @@ function updateMinimap(target) {
     _minimapMarker.setLatLng([lat, lon]);
   }
 
-  // Draw coverage circles for emplacements in range of this target
-  const inRange = getEmplacementsInRange(target);
-  for (const emp of inRange) {
-    const catalog = DEFENSE_CATALOG[emp.system];
-    if (!catalog) continue;
-    const [elat, elon] = emp.location;
+  // Draw coverage circles for defenses on other targets that reach this target
+  const crossDefs = getCrossTargetDefenses(target.id);
+  const drawnKeys = new Set();
 
-    const circle = L.circle([elat, elon], {
+  for (const def of crossDefs) {
+    const sourceTarget = getTarget(def._placedAtTargetId);
+    if (!sourceTarget || !Array.isArray(sourceTarget.location)) continue;
+    const catalog = DEFENSE_CATALOG[def.system];
+    if (!catalog) continue;
+
+    // One circle + dot per unique (source-target, defense-entry) pair
+    const layerKey = `${def._placedAtTargetId}_${def.id}`;
+    if (drawnKeys.has(layerKey)) continue;
+    drawnKeys.add(layerKey);
+
+    const [slat, slon] = sourceTarget.location;
+
+    const circle = L.circle([slat, slon], {
       radius:      catalog.range_km * 1000,
       color:       '#58a6ff',
       fillColor:   '#58a6ff',
@@ -450,17 +445,17 @@ function updateMinimap(target) {
       dashArray:   '5 5'
     }).addTo(_minimap);
 
-    const dot = L.circleMarker([elat, elon], {
+    const dot = L.circleMarker([slat, slon], {
       radius:      4,
       fillColor:   '#58a6ff',
       color:       '#ffffff',
       weight:      1.5,
       opacity:     1,
       fillOpacity: 1
-    }).bindTooltip(emp.name || catalog.name, { permanent: false, direction: 'top' })
+    }).bindTooltip(`${catalog.name} @ ${sourceTarget.name}`, { permanent: false, direction: 'top' })
       .addTo(_minimap);
 
-    _minimapEmplCircles.push(circle, dot);
+    _minimapCrossLayers.push(circle, dot);
   }
 }
 
@@ -495,9 +490,9 @@ function renderTargetInfo(target) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function renderDefenseLayers(targetId) {
-  const container = document.getElementById('defense-layers');
+  const container  = document.getElementById('defense-layers');
   const countBadge = document.getElementById('defense-count');
-  const addBtn = document.getElementById('btn-add-defense');
+  const addBtn     = document.getElementById('btn-add-defense');
 
   if (!targetId) {
     container.innerHTML = '<p class="empty-state">Select a target to view defenses</p>';
@@ -506,84 +501,70 @@ function renderDefenseLayers(targetId) {
     return;
   }
 
-  const defenses = getTargetDefenses(targetId);
-  addBtn.disabled = false;
-  countBadge.textContent = `${defenses.length} system${defenses.length !== 1 ? 's' : ''}`;
+  const ownDefenses   = getTargetDefenses(targetId);
+  const crossDefenses = getCrossTargetDefenses(targetId);
+  const totalCount    = ownDefenses.length + crossDefenses.length;
 
-  if (defenses.length === 0) {
+  addBtn.disabled = false;
+  countBadge.textContent = `${totalCount} system${totalCount !== 1 ? 's' : ''}`;
+
+  if (ownDefenses.length === 0 && crossDefenses.length === 0) {
     container.innerHTML = '<p class="empty-state">No defenses assigned. Add one below.</p>';
     return;
   }
 
-  // Sort by tier for display
-  const sorted = [...defenses].sort((a, b) => {
+  container.innerHTML = '';
+
+  // Own defenses — sorted by tier, outermost first
+  const sorted = [...ownDefenses].sort((a, b) => {
     const ta = DEFENSE_CATALOG[a.system]?.tier ?? 99;
     const tb = DEFENSE_CATALOG[b.system]?.tier ?? 99;
     return ta - tb;
   });
-
-  container.innerHTML = '';
   for (const def of sorted) {
     container.appendChild(buildDefenseCard(def, targetId));
   }
 
-  renderAreaDefenses(targetId);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Rendering — Area defenses (in-range emplacements)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function renderAreaDefenses(targetId) {
-  const container  = document.getElementById('area-defenses-list');
-  const countBadge = document.getElementById('area-defense-count');
-  if (!container) return;
-
-  if (!targetId) {
-    container.innerHTML = '<p class="empty-state">Select a target to view area defenses</p>';
-    if (countBadge) countBadge.textContent = '0 in range';
-    return;
-  }
-
-  const target  = getTarget(targetId);
-  const inRange = getEmplacementsInRange(target);
-
-  if (countBadge) countBadge.textContent = `${inRange.length} in range`;
-
-  if (inRange.length === 0) {
-    container.innerHTML = '<p class="empty-state">No emplacements within range of this target.</p>';
-    return;
-  }
-
-  container.innerHTML = '';
-  for (const emp of inRange) {
-    container.appendChild(buildEmplacementCard(emp));
+  // Cross-target defenses — defenses on other targets whose range covers this target
+  for (const def of crossDefenses) {
+    container.appendChild(buildCrossTargetDefenseCard(def));
   }
 }
 
-function buildEmplacementCard(emp) {
-  const catalog  = DEFENSE_CATALOG[emp.system];
-  const tier     = catalog?.tier ?? 0;
-  const color    = TIER_COLORS[tier] || '#888';
-  const label    = TIER_LABELS[tier] || 'Unknown';
-  const fullMag  = (catalog?.magazinePerBattery || 0) * emp.quantity;
-  const remaining = emplacementMagState[emp.id];
-  const hasSim   = remaining !== undefined && fullMag > 0;
+// ─────────────────────────────────────────────────────────────────────────────
+// Rendering — Cross-target defense card
+// These are defenses placed on another target whose range_km covers the
+// currently-viewed target. Magazine is shared via globalMagState[def.id].
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildCrossTargetDefenseCard(def) {
+  const catalog = DEFENSE_CATALOG[def.system];
+  const tier    = catalog?.tier ?? 0;
+  const color   = TIER_COLORS[tier] || '#888';
+  const label   = TIER_LABELS[tier] || 'Unknown';
+
+  const initialMag   = (catalog?.magazinePerBattery || 0) * def.quantity;
+  const simRemaining = globalMagState[def.id];
+  const hasSim       = simRemaining !== undefined && initialMag > 0;
 
   let magHtml = '';
-  if (fullMag > 0) {
+  if (initialMag > 0) {
+    const ea       = `class="mag-count-editable" data-defense-id="${def.id}" data-max="${initialMag}"`;
+    const resetBtn = `<button class="btn-icon btn-reset-sys-loadout" data-defense-id="${def.id}" title="Reset to full loadout">↺</button>`;
     if (hasSim) {
-      const expended  = fullMag - remaining;
+      const expended  = initialMag - simRemaining;
       const usedClass = expended > 0 ? ' mag-used' : '';
       magHtml = `
         <div class="defense-card-mag">
-          <span class="defense-magazine${usedClass}">${remaining} / ${fullMag} interceptors</span>
+          <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} interceptors</span>
           <span class="mag-expended">${expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          ${resetBtn}
         </div>`;
     } else {
       magHtml = `
         <div class="defense-card-mag">
-          <span class="defense-magazine">${fullMag} interceptors</span>
+          <span class="defense-magazine"><span ${ea}>${initialMag}</span> interceptors</span>
+          ${resetBtn}
         </div>`;
     }
   }
@@ -593,22 +574,36 @@ function buildEmplacementCard(emp) {
     .join('');
 
   const card = document.createElement('div');
-  card.className = 'defense-card empl-card';
+  card.className = 'defense-card cross-target-card';
   card.style.setProperty('--tier-color', color);
 
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
-      <span class="empl-distance">${emp.distanceKm} km away</span>
+      <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}">📍 ${def._placedAtTargetName} · ${def._distanceKm} km</span>
     </div>
     <div class="defense-card-body">
-      <span class="defense-name">${catalog?.name || emp.system}</span>
-      <span class="defense-quantity">${emp.quantity} batter${emp.quantity !== 1 ? 'ies' : 'y'}</span>
+      <span class="defense-name">${catalog?.name || def.system}</span>
+      <span class="defense-quantity">${def.quantity} batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
     </div>
-    ${emp.name ? `<div class="defense-notes">${emp.name}</div>` : ''}
     ${magHtml}
+    ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
     <div class="defense-threats">${effectList}</div>
   `;
+
+  card.querySelectorAll('.mag-count-editable').forEach(span => {
+    span.addEventListener('click', () => activateMagazineEdit(span));
+  });
+
+  card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
+    btn.addEventListener('click', () => {
+      deleteMagEntry(btn.dataset.defenseId);
+      saveMagStateToStorage();
+      _manifestUnchanged = false;
+      document.getElementById('simulation-results').classList.add('hidden');
+      if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+    });
+  });
 
   return card;
 }
@@ -675,6 +670,7 @@ function buildDefenseCard(def, targetId) {
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
     btn.addEventListener('click', () => {
       deleteMagEntry(btn.dataset.defenseId);
+      saveMagStateToStorage();
       _manifestUnchanged = false;
       document.getElementById('simulation-results').classList.add('hidden');
       if (selectedTargetId) renderDefenseLayers(selectedTargetId);
@@ -736,7 +732,8 @@ function addDefense(targetId, systemId, quantity, notes) {
 
 function resetLoadouts() {
   if (!selectedTargetId) return;
-  clearMagState();
+  clearMagStateForTarget(selectedTargetId);
+  saveMagStateToStorage();
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
   renderDefenseLayers(selectedTargetId);
@@ -761,7 +758,8 @@ async function resetTargetToDefault(targetId) {
   target.defenses = Array.isArray(raw) ? raw.map(d => ({ ...d })) : [];
   saveToStorage();
 
-  clearMagState();
+  clearMagStateForTarget(targetId);
+  saveMagStateToStorage();
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
   renderDefenseLayers(targetId);
@@ -782,202 +780,6 @@ function removeDefense(targetId, defenseId) {
   renderDefenseLayers(targetId);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Emplacement CRUD
-// ─────────────────────────────────────────────────────────────────────────────
-
-function addEmplacement(data) {
-  const emp = {
-    id:       `empl_${Date.now()}`,
-    name:     data.name || '',
-    system:   data.system,
-    location: [parseFloat(data.lat), parseFloat(data.lon)],
-    quantity: data.quantity || 1,
-    notes:    data.notes || ''
-  };
-  appEmplacements.push(emp);
-  saveEmplacementsToStorage();
-  return emp;
-}
-
-function updateEmplacement(id, data) {
-  const idx = appEmplacements.findIndex(e => e.id === id);
-  if (idx === -1) return;
-  appEmplacements[idx] = {
-    ...appEmplacements[idx],
-    name:     data.name || '',
-    system:   data.system,
-    location: [parseFloat(data.lat), parseFloat(data.lon)],
-    quantity: data.quantity || 1,
-    notes:    data.notes || ''
-  };
-  // Clear magazine state for edited emplacement (range or system may have changed)
-  delete emplacementMagState[id];
-  saveEmplacementsToStorage();
-  saveEmplacementMagStateToStorage();
-}
-
-function removeEmplacement(id) {
-  appEmplacements = appEmplacements.filter(e => e.id !== id);
-  delete emplacementMagState[id];
-  saveEmplacementsToStorage();
-  saveEmplacementMagStateToStorage();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Emplacement management panel
-// ─────────────────────────────────────────────────────────────────────────────
-
-function openEmplacementPanel() {
-  _emplEditId = null;
-  document.getElementById('empl-panel').classList.remove('hidden');
-  renderEmplacementList();
-  document.getElementById('empl-form').classList.add('hidden');
-}
-
-function closeEmplacementPanel() {
-  document.getElementById('empl-panel').classList.add('hidden');
-  // Refresh area defenses in case anything changed
-  if (selectedTargetId) {
-    renderDefenseLayers(selectedTargetId);
-    updateMinimap(getTarget(selectedTargetId));
-  }
-}
-
-function renderEmplacementList() {
-  const container = document.getElementById('empl-list');
-  if (!container) return;
-
-  if (appEmplacements.length === 0) {
-    container.innerHTML = '<p class="empty-state">No emplacements defined yet.</p>';
-    return;
-  }
-
-  container.innerHTML = '';
-  for (const emp of appEmplacements) {
-    container.appendChild(buildEmplacementRow(emp));
-  }
-}
-
-function buildEmplacementRow(emp) {
-  const catalog = DEFENSE_CATALOG[emp.system];
-  const [lat, lon] = emp.location || [];
-  const coordStr = lat != null
-    ? `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`
-    : 'No location';
-
-  const row = document.createElement('div');
-  row.className = 'empl-row';
-  row.innerHTML = `
-    <div class="empl-row-info">
-      <div class="empl-row-name">${emp.name || catalog?.name || emp.system}</div>
-      <div class="empl-row-meta">
-        ${catalog?.name || emp.system} · ${emp.quantity} batt. · ${coordStr}
-        ${catalog ? ` · ${catalog.range_km} km range` : ''}
-      </div>
-    </div>
-    <div class="empl-row-actions">
-      <button class="btn btn-secondary btn-sm btn-edit-empl" data-id="${emp.id}">Edit</button>
-      <button class="btn-icon btn-remove-empl" data-id="${emp.id}" title="Remove">✕</button>
-    </div>
-  `;
-
-  row.querySelector('.btn-edit-empl').addEventListener('click', () => openEmplForm(emp.id));
-  row.querySelector('.btn-remove-empl').addEventListener('click', () => {
-    removeEmplacement(emp.id);
-    renderEmplacementList();
-  });
-
-  return row;
-}
-
-function populateEmplSystemSelect() {
-  const sel = document.getElementById('empl-system');
-  sel.innerHTML = '<option value="">— Select System —</option>';
-  const systems = Object.values(DEFENSE_CATALOG).sort((a, b) => a.name.localeCompare(b.name));
-  for (const sys of systems) {
-    const opt = document.createElement('option');
-    opt.value = sys.id;
-    opt.textContent = `${sys.name} (${sys.range_km} km range)`;
-    sel.appendChild(opt);
-  }
-}
-
-function updateEmplMagInfo() {
-  const systemId   = document.getElementById('empl-system').value;
-  const qty        = Math.max(1, parseInt(document.getElementById('empl-quantity').value) || 1);
-  const infoDiv    = document.getElementById('empl-mag-info');
-  const catalog    = systemId ? DEFENSE_CATALOG[systemId] : null;
-  const perBattery = catalog?.magazinePerBattery || 0;
-
-  if (!systemId || perBattery === 0) { infoDiv.classList.add('hidden'); return; }
-  const total = perBattery * qty;
-  infoDiv.classList.remove('hidden');
-  infoDiv.textContent =
-    `${perBattery} interceptors/battery × ${qty} batter${qty !== 1 ? 'ies' : 'y'} = ${total} total · ${catalog.range_km} km coverage radius`;
-}
-
-function openEmplForm(editId = null) {
-  _emplEditId = editId;
-  populateEmplSystemSelect();
-
-  const titleEl = document.getElementById('empl-form-title');
-  titleEl.textContent = editId ? 'Edit Emplacement' : 'Add Emplacement';
-
-  // Populate fields if editing
-  if (editId) {
-    const emp = appEmplacements.find(e => e.id === editId);
-    if (emp) {
-      document.getElementById('empl-name').value     = emp.name || '';
-      document.getElementById('empl-system').value   = emp.system || '';
-      document.getElementById('empl-lat').value      = emp.location?.[0] ?? '';
-      document.getElementById('empl-lon').value      = emp.location?.[1] ?? '';
-      document.getElementById('empl-quantity').value = emp.quantity || 1;
-      document.getElementById('empl-notes').value    = emp.notes || '';
-    }
-  } else {
-    document.getElementById('empl-name').value     = '';
-    document.getElementById('empl-system').value   = '';
-    document.getElementById('empl-lat').value      = '';
-    document.getElementById('empl-lon').value      = '';
-    document.getElementById('empl-quantity').value = 1;
-    document.getElementById('empl-notes').value    = '';
-  }
-
-  updateEmplMagInfo();
-  document.getElementById('empl-form').classList.remove('hidden');
-  document.getElementById('empl-name').focus();
-}
-
-function saveEmplForm() {
-  const system = document.getElementById('empl-system').value;
-  const lat    = parseFloat(document.getElementById('empl-lat').value);
-  const lon    = parseFloat(document.getElementById('empl-lon').value);
-  const qty    = parseInt(document.getElementById('empl-quantity').value) || 1;
-
-  if (!system)      { showToast('Please select a system.', true); return; }
-  if (isNaN(lat) || lat < -90  || lat > 90)  { showToast('Invalid latitude (must be −90 to 90).', true); return; }
-  if (isNaN(lon) || lon < -180 || lon > 180) { showToast('Invalid longitude (must be −180 to 180).', true); return; }
-
-  const data = {
-    name:     document.getElementById('empl-name').value.trim(),
-    system,
-    lat,
-    lon,
-    quantity: Math.max(1, qty),
-    notes:    document.getElementById('empl-notes').value.trim()
-  };
-
-  if (_emplEditId) {
-    updateEmplacement(_emplEditId, data);
-  } else {
-    addEmplacement(data);
-  }
-
-  _emplEditId = null;
-  document.getElementById('empl-form').classList.add('hidden');
-  renderEmplacementList();
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rendering — Platform select (attack builder)
@@ -1214,6 +1016,7 @@ function activateMagazineEdit(span) {
 
     // Valid — persist the override, reset dirty flag, and rebuild the cards
     setMagEntry(defId, val);
+    saveMagStateToStorage();
     _manifestUnchanged = false;
     if (selectedTargetId) renderDefenseLayers(selectedTargetId);
   });
@@ -1243,49 +1046,25 @@ async function simulate() {
     const target            = getTarget(selectedTargetId);
     const perTargetDefenses = target?.defenses || [];
 
-    // Find emplacements whose range covers this target
-    const inRangeEmplacements = getEmplacementsInRange(target);
-
-    // Convert emplacement records to the same shape runSimulation expects.
-    // Each emplacement's unique id becomes the defense entry id, ensuring its
-    // magazine is tracked separately from any same-system per-target battery.
-    const emplacementDefs = inRangeEmplacements.map(emp => ({
-      id:       emp.id,
-      system:   emp.system,
-      quantity: emp.quantity,
-      notes:    emp.notes || ''
+    // Include defenses from other targets whose range_km covers this target.
+    // Their def.id keys into globalMagState, so magazine is shared automatically.
+    const crossDefs = getCrossTargetDefenses(selectedTargetId).map(d => ({
+      id:       d.id,
+      system:   d.system,
+      quantity: d.quantity,
+      notes:    d.notes || ''
     }));
 
-    const allDefenses = [...perTargetDefenses, ...emplacementDefs];
+    const allDefenses = [...perTargetDefenses, ...crossDefs];
 
-    // Build combined initial magazine state:
-    //   per-target defenses → getMagState()  (keyed by def.id)
-    //   emplacements        → emplacementMagState (global, keyed by emplacement id)
-    const emplMagSnapshot = {};
-    for (const emp of inRangeEmplacements) {
-      const catalog = DEFENSE_CATALOG[emp.system];
-      const fullMag = (catalog?.magazinePerBattery || 0) * emp.quantity;
-      emplMagSnapshot[emp.id] = emplacementMagState[emp.id] ?? fullMag;
-    }
-    const combinedMagState = { ...getMagState(), ...emplMagSnapshot };
+    // globalMagState is flat and keyed by def.id — pass directly as initial state.
+    const results = runSimulation(attackManifest, allDefenses, globalMagState);
 
-    const results = runSimulation(attackManifest, allDefenses, combinedMagState);
-
-    // Extract updated magazine states and split back into per-target vs emplacement
-    const newMagState    = extractMagazineState(results);
-    const targetDefIdSet = new Set(perTargetDefenses.map(d => d.id));
-    const emplIdSet      = new Set(inRangeEmplacements.map(e => e.id));
-
-    const newTargetMag = {};
-    for (const [id, remaining] of Object.entries(newMagState)) {
-      if (targetDefIdSet.has(id)) newTargetMag[id] = remaining;
-    }
-    setMagState(newTargetMag);
-
-    for (const [id, remaining] of Object.entries(newMagState)) {
-      if (emplIdSet.has(id)) emplacementMagState[id] = remaining;
-    }
-    saveEmplacementMagStateToStorage();
+    // Merge updated magazine levels back into globalMagState.
+    // Cross-target def.id entries are automatically shared with their source targets.
+    const newMagState = extractMagazineState(results);
+    Object.assign(globalMagState, newMagState);
+    saveMagStateToStorage();
 
     _manifestUnchanged = true;
     renderDefenseLayers(selectedTargetId);
@@ -1574,8 +1353,9 @@ function wireEvents() {
     const target = getTarget(selectedTargetId);
     renderTargetInfo(target);
 
-    // Switching targets — reset dirty flag so the next sim runs freely,
-    // but leave perTargetMagStates intact so loadouts persist per target.
+    // Switching targets — reset dirty flag so the next sim runs freely.
+    // globalMagState is intentionally preserved so cross-target magazine
+    // depletion carries across target selections.
     _manifestUnchanged = false;
     renderDefenseLayers(selectedTargetId);
 
@@ -1665,34 +1445,10 @@ function wireEvents() {
   // Reset to default
   document.getElementById('btn-reset').addEventListener('click', resetData);
 
-  // ── Emplacement panel ──────────────────────────────────────────────────────
-  document.getElementById('btn-manage-emplacements').addEventListener('click', openEmplacementPanel);
-  document.getElementById('btn-close-empl-panel').addEventListener('click', closeEmplacementPanel);
-
-  document.getElementById('btn-add-empl').addEventListener('click', () => openEmplForm(null));
-  document.getElementById('btn-cancel-empl').addEventListener('click', () => {
-    document.getElementById('empl-form').classList.add('hidden');
-    _emplEditId = null;
-  });
-  document.getElementById('btn-save-empl').addEventListener('click', saveEmplForm);
-
-  document.getElementById('empl-system').addEventListener('change', updateEmplMagInfo);
-  document.getElementById('empl-quantity').addEventListener('input', updateEmplMagInfo);
-
-  document.getElementById('btn-reset-empl-mag').addEventListener('click', () => {
-    emplacementMagState = {};
-    saveEmplacementMagStateToStorage();
-    renderEmplacementList();
-    if (selectedTargetId) renderDefenseLayers(selectedTargetId);
-    showToast('Emplacement magazines reset to full loadout.');
-  });
-
   // ── Modal — ESC key dismisses ─────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (!document.getElementById('empl-panel').classList.contains('hidden')) {
-        closeEmplacementPanel();
-      } else if (!document.getElementById('modal-overlay').classList.contains('hidden')) {
+      if (!document.getElementById('modal-overlay').classList.contains('hidden')) {
         _resolveModal(false);
       }
     }
