@@ -21,7 +21,7 @@
 
     "DefenseSystem": {
       "type": "object",
-      "required": ["id", "name", "range_km", "armament", "threats"],
+      "required": ["id", "name", "range_km", "batteries", "armament", "threats"],
       "additionalProperties": false,
       "properties": {
 
@@ -39,6 +39,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Maximum engagement range in kilometers."
+        },
+        "batteries": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Default number of batteries deployed when this system is added to a target."
         },
         "armament": {
           "$ref": "#/definitions/Armament"
