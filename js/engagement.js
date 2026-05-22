@@ -281,8 +281,8 @@ const ENGAGEMENT_FUNCTIONS = {
   dca: function(threatType) {
     if (!['ballistic_missile', 'cruise_missile', 'drone'].includes(threatType)) return null;
     return {
-      pk:                 0.0,  // PLACEHOLDER
-      shotsPerEngagement: 2
+      pk:                 1.0,  // PLACEHOLDER
+      shotsPerEngagement: 1
     };
   },
 
