@@ -74,7 +74,7 @@
     ],
 
     "us_fifth_fleet": [
-      { "id": "us_fifth_fleet_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "United States" }
+      { "id": "us_fifth_fleet_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "Bahrain" }
     ],
 
     "jebel_ali_port": [
@@ -107,9 +107,9 @@
     ],
 
     "prince_sultan_ab": [
-      { "id": "prince_sultan_ab_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "United States" },
-      { "id": "prince_sultan_ab_d2", "system": "fslids",  "quantity": 1, "notes": "", "operator": "United States" },
-      { "id": "prince_sultan_ab_d3", "system": "merops",  "quantity": 1, "notes": "", "operator": "United States" }
+      { "id": "prince_sultan_ab_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "Saudi Arabia" },
+      { "id": "prince_sultan_ab_d2", "system": "fslids",  "quantity": 1, "notes": "", "operator": "Saudi Arabia" },
+      { "id": "prince_sultan_ab_d3", "system": "merops",  "quantity": 1, "notes": "", "operator": "Saudi Arabia" }
     ],
 
     "king_khalid_ab": [
@@ -142,11 +142,11 @@
     ],
 
     "ali_al_salem_ab": [
-      { "id": "ali_al_salem_ab_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
+      { "id": "ali_al_salem_ab_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "Kuwait" }
     ],
 
     "camp_arifjan": [
-      { "id": "camp_arifjan_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
+      { "id": "camp_arifjan_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "Kuwait" }
     ],
 
     "thumrait_ab": [
@@ -154,13 +154,13 @@
     ],
 
     "camp_as_sayliyah": [
-      { "id": "camp_as_sayliyah_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
+      { "id": "camp_as_sayliyah_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "Qatar" }
     ],
 
     "al_udeid_ab": [
-      { "id": "al_udeid_ab_d1", "system": "patriot", "quantity": 4, "notes": "", "operator": "United States" },
-      { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "", "operator": "United States" },
-      { "id": "al_udeid_ab_d3", "system": "fslids",  "quantity": 1, "notes": "", "operator": "United States" }
+      { "id": "al_udeid_ab_d1", "system": "patriot", "quantity": 4, "notes": "", "operator": "Qatar" },
+      { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "", "operator": "Qatar" },
+      { "id": "al_udeid_ab_d3", "system": "fslids",  "quantity": 1, "notes": "", "operator": "Qatar" }
     ],
 
     "muscat": [
@@ -204,12 +204,12 @@
     ],
 
     "isa_ab": [
-      { "id": "isa_ab_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
+      { "id": "isa_ab_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "Bahrain" }
     ],
 
     "muwaffaq_al_salti_ab": [
-      { "id": "muwaffaq_al_salti_ab_d1", "system": "thaad",   "quantity": 1, "notes": "", "operator": "United States" },
-      { "id": "muwaffaq_al_salti_ab_d2", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
+      { "id": "muwaffaq_al_salti_ab_d1", "system": "thaad",   "quantity": 1, "notes": "", "operator": "Jordan" },
+      { "id": "muwaffaq_al_salti_ab_d2", "system": "patriot", "quantity": 1, "notes": "", "operator": "Jordan" }
     ]
 
   }
