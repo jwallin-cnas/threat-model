@@ -1380,9 +1380,6 @@ select option, select optgroup {
   border-radius: 4px;
   border: 1px solid #1f4a7a;
   white-space: nowrap;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
