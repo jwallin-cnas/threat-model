@@ -695,9 +695,9 @@ function buildCrossTargetDefenseCard(def, targetId) {
   // Battery edit targets the SOURCE target (where the defense is placed)
   const qAttr = `class="qty-count-editable" data-defense-id="${def.id}" data-target-id="${def._placedAtTargetId}" data-system="${def.system}"`;
 
+  // const tierBadgeHtml = `<span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>`;
   card.innerHTML = `
     <div class="defense-card-header">
-      <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
       <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km</span>
       <div class="defense-card-actions">
         ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
@@ -785,9 +785,9 @@ function buildDefenseCard(def, targetId) {
 
   const qAttr = `class="qty-count-editable" data-defense-id="${def.id}" data-target-id="${targetId}" data-system="${def.system}"`;
 
+  // const tierBadgeHtml = `<span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>`;
   card.innerHTML = `
     <div class="defense-card-header">
-      <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
       <div class="defense-card-actions">
         ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
         <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
