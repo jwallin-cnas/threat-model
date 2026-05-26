@@ -53,7 +53,12 @@ function setMagEntry(defId, value) { globalMagState[defId] = value; }
  * Cross-target defenses owned by other targets are intentionally left alone.
  */
 function clearMagStateForTarget(targetId) {
-  for (const def of getTargetDefenses(targetId)) delete globalMagState[def.id];
+  for (const def of getTargetDefenses(targetId)) {
+    // Leave shared patrol asset magazines intact — they are shared across
+    // targets and can only be reset explicitly from their card.
+    if (DEFENSE_CATALOG[def.system]?.isShared) continue;
+    delete globalMagState[def.id];
+  }
 }
 
 /** Persist global magazine state to localStorage. */
@@ -235,6 +240,7 @@ function mergeLoadedData() {
       country:            '',
       range_km:           sys.range_km || 0,
       defaultBatteries:   sys.batteries || 1,
+      isShared:           sys.shared || false,
       effectiveAgainst:   sys.threats || [],
       magazinePerBattery: sys.armament?.standard_loadout || 0,
       description:        `Range: ${sys.range_km} km`
@@ -528,8 +534,15 @@ function renderDefenseLayers(targetId) {
 
   container.innerHTML = '';
 
-  // Own defenses — sorted by tier, outermost first
-  const sorted = [...ownDefenses].sort((a, b) => {
+  // Shared patrol assets — rendered first, above the fixed laydown
+  const sharedDefenses = ownDefenses.filter(d => DEFENSE_CATALOG[d.system]?.isShared);
+  for (const def of sharedDefenses) {
+    container.appendChild(buildSharedDefenseCard(def, targetId));
+  }
+
+  // Own fixed defenses — sorted by tier, outermost first
+  const fixedDefenses = ownDefenses.filter(d => !DEFENSE_CATALOG[d.system]?.isShared);
+  const sorted = [...fixedDefenses].sort((a, b) => {
     const ta = DEFENSE_CATALOG[a.system]?.tier ?? 99;
     const tb = DEFENSE_CATALOG[b.system]?.tier ?? 99;
     return ta - tb;
@@ -542,6 +555,94 @@ function renderDefenseLayers(targetId) {
   for (const def of crossDefenses) {
     container.appendChild(buildCrossTargetDefenseCard(def, targetId));
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rendering — Shared patrol asset card
+// These are patrol assets (e.g. F-15E, F/A-18) not tied to any specific target.
+// They use a fixed global ID so globalMagState[def.id] is shared across every
+// target they are assigned to. Battery count is not editable.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildSharedDefenseCard(def, targetId) {
+  const catalog    = DEFENSE_CATALOG[def.system];
+  const isDisabled = !!def.disabled;
+
+  const initialMag   = catalog?.magazinePerBattery || 0;
+  const simRemaining = globalMagState[def.id];
+  const hasSim       = simRemaining !== undefined && initialMag > 0;
+
+  let magHtml = '';
+  if (initialMag > 0) {
+    const ea       = `class="mag-count-editable" data-defense-id="${def.id}" data-max="${initialMag}"`;
+    const resetBtn = `<button class="btn-icon btn-reset-sys-loadout" data-defense-id="${def.id}" title="Reset to full loadout">↺</button>`;
+    if (hasSim) {
+      const expended  = initialMag - simRemaining;
+      const usedClass = expended > 0 ? ' mag-used' : '';
+      magHtml = `
+        <div class="defense-card-mag">
+          <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} missiles</span>
+          <span class="mag-expended">${expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          ${resetBtn}
+        </div>`;
+    } else {
+      magHtml = `
+        <div class="defense-card-mag">
+          <span class="defense-magazine"><span ${ea}>${initialMag}</span> missiles</span>
+          ${resetBtn}
+        </div>`;
+    }
+  }
+
+  const effectList = (catalog?.effectiveAgainst || [])
+    .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
+    .join('');
+
+  const card = document.createElement('div');
+  card.className = `defense-card patrol-card${isDisabled ? ' defense-card--disabled' : ''}`;
+
+  card.innerHTML = `
+    <div class="defense-card-header">
+      <span class="patrol-badge">✈ Patrol</span>
+      <div class="defense-card-actions">
+        ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
+        <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
+          data-target="${targetId}" data-defense="${def.id}"
+          title="${isDisabled ? 'Re-enable for simulation' : 'Exclude from simulation'}">⊘</button>
+        <button class="btn-icon btn-remove-defense" data-target="${targetId}" data-defense="${def.id}" title="Remove from this target">✕</button>
+      </div>
+    </div>
+    <div class="defense-card-body">
+      <span class="defense-name">${catalog?.name || def.system}</span>
+    </div>
+    ${magHtml}
+    ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
+    <div class="defense-threats">${effectList}</div>
+  `;
+
+  card.querySelectorAll('.mag-count-editable').forEach(span => {
+    span.addEventListener('click', () => activateMagazineEdit(span));
+  });
+
+  card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
+    btn.addEventListener('click', () => {
+      deleteMagEntry(btn.dataset.defenseId);
+      saveMagStateToStorage();
+      _manifestUnchanged = false;
+      document.getElementById('simulation-results').classList.add('hidden');
+      if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+    });
+  });
+
+  card.querySelector('.btn-toggle-defense').addEventListener('click', (e) => {
+    toggleOwnDefenseDisabled(e.currentTarget.dataset.target, e.currentTarget.dataset.defense);
+  });
+
+  card.querySelector('.btn-remove-defense').addEventListener('click', (e) => {
+    removeDefense(e.currentTarget.dataset.target, e.currentTarget.dataset.defense);
+  });
+
+  return card;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -760,19 +861,31 @@ function populateDefenseSystemSelect() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function addDefense(targetId, systemId, quantity, notes) {
-  const target = getTarget(targetId);
+  const target  = getTarget(targetId);
   if (!target) return;
-
-  const newDef = {
-    id:       `${targetId}_d${Date.now()}`,
-    system:   systemId,
-    quantity: quantity,
-    notes:    notes || ''
-  };
+  const catalog = DEFENSE_CATALOG[systemId];
 
   target.defenses = target.defenses || [];
-  target.defenses.push(newDef);
-  saveToStorage();
+
+  // Shared patrol assets use a fixed global ID so all targets share the same
+  // magazine pool. Prevent duplicate assignment to the same target.
+  if (catalog?.isShared) {
+    const sharedId = `shared_${systemId}`;
+    if (target.defenses.some(d => d.id === sharedId)) {
+      showToast('This patrol asset is already assigned to this target.', true);
+      return;
+    }
+    target.defenses.push({ id: sharedId, system: systemId, quantity: 1, notes: notes || '' });
+    saveToStorage();
+  } else {
+    target.defenses.push({
+      id:       `${targetId}_d${Date.now()}`,
+      system:   systemId,
+      quantity: quantity,
+      notes:    notes || ''
+    });
+    saveToStorage();
+  }
 
   // New defense entry has a fresh unique id — no magazine state to evict.
   _manifestUnchanged = false;
@@ -819,12 +932,14 @@ function removeDefense(targetId, defenseId) {
   const target = getTarget(targetId);
   if (!target) return;
 
-  target.defenses = (target.defenses || []).filter(d => d.id !== defenseId);
+  const removedDef = (target.defenses || []).find(d => d.id === defenseId);
+  target.defenses  = (target.defenses || []).filter(d => d.id !== defenseId);
   saveToStorage();
 
-  // Evict only this defense's magazine entry (keyed by def.id) so other
-  // systems retain any depletion recorded by prior simulation runs.
-  deleteMagEntry(defenseId);
+  // Shared patrol assets keep their magazine entry — other targets may still
+  // reference the same pool. Only evict the magazine for non-shared defenses.
+  const catalog = removedDef ? DEFENSE_CATALOG[removedDef.system] : null;
+  if (!catalog?.isShared) deleteMagEntry(defenseId);
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
   renderDefenseLayers(targetId);
@@ -1888,8 +2003,16 @@ function wireEvents() {
 
   // Magazine info — update when system or quantity changes; also seed quantity from defaultBatteries
   document.getElementById('defense-system-select').addEventListener('change', e => {
-    const catalog = DEFENSE_CATALOG[e.target.value];
-    if (catalog) document.getElementById('defense-quantity').value = catalog.defaultBatteries;
+    const catalog  = DEFENSE_CATALOG[e.target.value];
+    const qtyInput = document.getElementById('defense-quantity');
+    if (catalog?.isShared) {
+      // Patrol assets are always one indivisible unit — quantity is not meaningful
+      qtyInput.value    = 1;
+      qtyInput.disabled = true;
+    } else {
+      qtyInput.disabled = false;
+      if (catalog) qtyInput.value = catalog.defaultBatteries;
+    }
     updateDefenseMagazineInfo();
   });
   document.getElementById('defense-quantity').addEventListener('input', updateDefenseMagazineInfo);
@@ -1906,13 +2029,16 @@ function wireEvents() {
     addDefense(selectedTargetId, systemId, Math.max(1, qty), notes);
     document.getElementById('add-defense-form').classList.add('hidden');
     document.getElementById('defense-system-select').value = '';
-    document.getElementById('defense-quantity').value = '1';
+    const qtyInput = document.getElementById('defense-quantity');
+    qtyInput.value    = '1';
+    qtyInput.disabled = false;
     document.getElementById('defense-notes').value = '';
   });
 
   // Cancel add defense
   document.getElementById('btn-cancel-add-defense').addEventListener('click', () => {
     document.getElementById('add-defense-form').classList.add('hidden');
+    document.getElementById('defense-quantity').disabled = false;
   });
 
   // Update salvo options when platform changes

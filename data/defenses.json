@@ -282,18 +282,34 @@
       "threats": ["drone", "cruise_missile"]
     },
     {
-      "id": "dca",
-      "name": "Defensive Counter-Air (DCA)",
-      "range_km": 100,
+      "id": "f15e_patrol",
+      "name": "F-15E Patrol (×2)",
+      "range_km": 0,
       "batteries": 1,
+      "shared": true,
       "armament": {
         "type": "aircraft",
-        "name": "Fighter CAP",
-        "payload_kg": 0,
-        "kill_modality": "hit-to-kill",
+        "name": "AIM-120 AMRAAM",
+        "payload_kg": 22,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 200
+      },
+      "threats": ["drone", "cruise_missile"]
+    },
+    {
+      "id": "fa18_patrol",
+      "name": "F/A-18 Patrol (×2)",
+      "range_km": 0,
+      "batteries": 1,
+      "shared": true,
+      "armament": {
+        "type": "aircraft",
+        "name": "AIM-9X Sidewinder",
+        "payload_kg": 9.4,
+        "kill_modality": "fragmentation",
         "standard_loadout": 18
       },
-      "threats": ["ballistic_missile", "cruise_missile", "drone"]
+      "threats": ["drone", "cruise_missile"]
     }
   ]
 }

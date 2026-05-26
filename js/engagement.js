@@ -277,11 +277,20 @@ const ENGAGEMENT_FUNCTIONS = {
       shotsPerEngagement: shots };
   },
 
-  // ── Defensive Counter-Air (dca) ───────────────────────────────────────────
-  dca: function(threatType) {
-    if (!['ballistic_missile', 'cruise_missile', 'drone'].includes(threatType)) return null;
+  // ── F-15E Patrol ×2 (f15e_patrol) ────────────────────────────────────────
+  f15e_patrol: function(threatType) {
+    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
     return {
-      pk:                 1.0,  // PLACEHOLDER
+      pk:                 1.0,
+      shotsPerEngagement: 1
+    };
+  },
+
+  // ── F/A-18 Patrol ×2 (fa18_patrol) ───────────────────────────────────────
+  fa18_patrol: function(threatType) {
+    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    return {
+      pk:                 1.0,
       shotsPerEngagement: 1
     };
   },

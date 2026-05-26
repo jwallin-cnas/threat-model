@@ -1318,6 +1318,23 @@ select option, select optgroup {
 }
 
 /* "Placed at [Target] · X km" badge on cross-target cards */
+/* Shared patrol asset card */
+.patrol-card {
+  border-left-color: #c17f2a !important;
+}
+
+.patrol-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #c17f2a;
+  background: color-mix(in srgb, #c17f2a 15%, transparent);
+  border: 1px solid color-mix(in srgb, #c17f2a 40%, transparent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
 .cross-target-badge {
   font-size: 10px;
   font-family: var(--font-mono);

@@ -95,27 +95,28 @@ function applyEngagement(count, pk, magazine, shots = 2) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ENGAGEMENT_PRIORITY = [
-  'aegis_sm3',           // 1  — longest-range BMD (SM-3), outermost layer
-  'thaad',               // 2  — upper-tier area defense
-  'arrow',               // 3  — Arrow 2/3 exo/endo intercept
-  'dca',                 // 4  — Defensive Counter-Air (100 km CAP bubble)
-  'patriot',             // 5  — PAC-3 MSE area defense
-  'davids_sling',        // 6  — medium-long range
-  'cheongung2',          // 7  — medium range
-  'aegis_sm2',           // 8  — SM-2 area defense
-  'aegis_sm6',           // 9  — SM-6 dual-role
-  'iron_dome',           // 10 — short-range saturation defense
-  'nasams',              // 11 — SHORAD/MSHORAD
-  'ifpc2',               // 12 — indirect fire protection
-  'pantsirs1e',          // 13 — gun-missile combination
-  'fslids',              // 14 — drone-only point defense
-  'merops',              // 15 — electronic attack suite
-  'iron_beam',           // 16 — high-energy laser (directed energy)
-  'containerized_laser', // 17 — containerized high-energy laser
-  'm_shorad',            // 18 — short-range kinetic (Stinger/Hellfire)
-  'phalanx_cram',           // 19 — close-in gun (C-RAM)
-  'high_powered_microwave', // 20 — HPM directed energy
-  'tactical_jammer',        // 21 — RF jamming, innermost layer
+  'f15e_patrol',         // 1  — F-15E patrol (AIM-120 AMRAAM, BVR), highest priority
+  'fa18_patrol',         // 2  — F/A-18 patrol (AIM-9X Sidewinder)
+  'aegis_sm3',           // 3  — longest-range BMD (SM-3), outermost layer
+  'thaad',               // 4  — upper-tier area defense
+  'arrow',               // 5  — Arrow 2/3 exo/endo intercept
+  'patriot',             // 6  — PAC-3 MSE area defense
+  'davids_sling',        // 7  — medium-long range
+  'cheongung2',          // 8  — medium range
+  'aegis_sm2',           // 9  — SM-2 area defense
+  'aegis_sm6',           // 10 — SM-6 dual-role
+  'iron_dome',           // 11 — short-range saturation defense
+  'nasams',              // 12 — SHORAD/MSHORAD
+  'ifpc2',               // 13 — indirect fire protection
+  'pantsirs1e',          // 14 — gun-missile combination
+  'fslids',              // 15 — drone-only point defense
+  'merops',              // 16 — electronic attack suite
+  'iron_beam',           // 17 — high-energy laser (directed energy)
+  'containerized_laser', // 18 — containerized high-energy laser
+  'm_shorad',            // 19 — short-range kinetic (Stinger/Hellfire)
+  'phalanx_cram',        // 20 — close-in gun (C-RAM)
+  'high_powered_microwave', // 21 — HPM directed energy
+  'tactical_jammer',        // 22 — RF jamming, innermost layer
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

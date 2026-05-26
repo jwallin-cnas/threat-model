@@ -37,13 +37,17 @@
         },
         "range_km": {
           "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Maximum engagement range in kilometers."
+          "minimum": 0,
+          "description": "Maximum engagement range in kilometers. Use 0 for shared/patrol assets with no fixed emplacement range."
         },
         "batteries": {
           "type": "integer",
           "minimum": 1,
           "description": "Default number of batteries deployed when this system is added to a target."
+        },
+        "shared": {
+          "type": "boolean",
+          "description": "If true, this system is a shared patrol asset with no fixed emplacement. It uses a global fixed ID and its magazine is shared across all targets it is assigned to."
         },
         "armament": {
           "$ref": "#/definitions/Armament"
@@ -92,14 +96,6 @@
           "minimum": 1,
           "description": "Total rounds or missiles available per battery."
         }
-      },
-
-      "if":   { "properties": { "type": { "const": "missile" } }, "required": ["type"] },
-      "then": { "properties": { "kill_modality": { "enum": ["hit-to-kill", "fragmentation"] } } },
-      "else": {
-        "if":   { "properties": { "type": { "const": "gun" } }, "required": ["type"] },
-        "then": { "properties": { "kill_modality": { "enum": ["kinetic"] } } },
-        "else": { "properties": { "kill_modality": { "enum": ["directed-energy"] } } }
       }
     }
   }
