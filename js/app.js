@@ -975,14 +975,17 @@ function toggleOwnDefenseDisabled(targetId, defId) {
  * Priority:
  *   1. Explicit enable  (target.enabledCoverageDefIds)  → always enabled
  *   2. Explicit disable (target.disabledCoverageDefIds) → always disabled
- *   3. Default: disabled unless operator === 'United States'
+ *   3. Default: enabled if the defense's operator is 'United States' OR matches
+ *      the host country of the covered target (same-nation cross-coverage);
+ *      disabled otherwise.
  */
 function isCrossTargetDefenseDisabled(targetId, def) {
   const target = getTarget(targetId);
   if (!target) return false;
   if ((target.enabledCoverageDefIds  || []).includes(def.id)) return false;
   if ((target.disabledCoverageDefIds || []).includes(def.id)) return true;
-  return (def.operator || '') !== 'United States';
+  const op = def.operator || '';
+  return op !== 'United States' && op !== (target.country || '');
 }
 
 function toggleCrossTargetDefenseDisabled(targetId, def) {
