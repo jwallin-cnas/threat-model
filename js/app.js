@@ -1352,16 +1352,25 @@ async function simulate() {
     const target            = getTarget(selectedTargetId);
 
     // Own defenses — exclude any the user has marked as disabled pre-simulation
-    const perTargetDefenses = (target?.defenses || []).filter(d => !d.disabled);
+    const perTargetDefenses = (target?.defenses || [])
+      .filter(d => !d.disabled)
+      .map(d => ({
+        ...d,
+        locationName:    target.name,
+        locationCountry: target.country || ''
+      }));
 
     // Cross-target defenses — exclude any disabled for this covered target
     const crossDefs = getCrossTargetDefenses(selectedTargetId)
       .filter(d => !isCrossTargetDefenseDisabled(selectedTargetId, d))
       .map(d => ({
-        id:       d.id,
-        system:   d.system,
-        quantity: d.quantity,
-        notes:    d.notes || ''
+        id:              d.id,
+        system:          d.system,
+        quantity:        d.quantity,
+        notes:           d.notes || '',
+        operator:        d.operator || '',
+        locationName:    d._placedAtTargetName,
+        locationCountry: d._placedAtTargetCountry || ''
       }));
 
     const allDefenses = [...perTargetDefenses, ...crossDefs];
@@ -1970,10 +1979,15 @@ function buildEngagementRow(eng, threatType = '') {
          title="Override this layer's result">⚙</button>`
     : '';
 
+  const locationHtml = eng.locationName
+    ? `<span class="eng-location">📍 ${eng.locationName}${eng.locationCountry ? ', ' + eng.locationCountry : ''}</span>`
+    : '';
+
   row.innerHTML = `
     <div class="eng-system">
       <span class="eng-name">${eng.systemName}</span>
       <span class="eng-qty">${eng.quantity} batt.</span>
+      ${locationHtml}
       ${eng.notes ? `<span class="eng-notes">${eng.notes}</span>` : ''}
       ${overrideBadge}
     </div>

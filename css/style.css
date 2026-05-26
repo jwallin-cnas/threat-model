@@ -939,7 +939,8 @@ select option, select optgroup {
   flex: 1;
 }
 
-.eng-name  { font-weight: 600; color: var(--text-bright); }
+.eng-name     { font-weight: 600; color: var(--text-bright); }
+.eng-location { font-size: 10px; color: var(--text-dim); font-style: italic; }
 .eng-qty   { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
 .eng-notes { font-size: 11px; color: var(--text-dim); font-style: italic; }
 
