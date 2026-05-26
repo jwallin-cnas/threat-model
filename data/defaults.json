@@ -7,7 +7,8 @@
       "id":       "Stable unique string for this entry, e.g. manama_d1, manama_d2. Never reuse IDs across targets.",
       "system":   "System ID from defenses.json (see available_systems below).",
       "quantity": "Number of batteries / systems (integer ≥ 1).",
-      "notes":    "Optional free-text annotation. Use empty string for none."
+      "notes":    "Optional free-text annotation. Use empty string for none.",
+      "operator": "Nation or organisation operating this system at this location. Used to determine cross-target default enable/disable state: US-operated systems are enabled by default when they can cover a neighbouring target; all others are disabled by default."
     },
     "available_systems": [
       "aegis_sm3",
@@ -59,156 +60,156 @@
   "defaults": {
 
     "doha": [
-      { "id": "doha_d1", "system": "patriot",  "quantity": 3, "notes": "" },
-      { "id": "doha_d2", "system": "nasams",  "quantity": 1, "notes": "" }
+      { "id": "doha_d1", "system": "patriot", "quantity": 3, "notes": "", "operator": "Qatar" },
+      { "id": "doha_d2", "system": "nasams",  "quantity": 1, "notes": "", "operator": "Qatar" }
     ],
 
     "ras_laffan_lng": [
-      { "id": "ras_laffan_d1", "system": "merops",  "quantity": 2, "notes": "" }
+      { "id": "ras_laffan_d1", "system": "merops", "quantity": 2, "notes": "", "operator": "Qatar" }
     ],
 
     "hamad_port": [
-      { "id": "doha_d1", "system": "patriot",  "quantity": 3, "notes": "" },
-      { "id": "doha_d2", "system": "merops",  "quantity": 4, "notes": "" }
+      { "id": "hamad_port_d1", "system": "patriot", "quantity": 3, "notes": "", "operator": "Qatar" },
+      { "id": "hamad_port_d2", "system": "merops",  "quantity": 4, "notes": "", "operator": "Qatar" }
     ],
 
     "us_fifth_fleet": [
-      { "id": "us_fifth_fleet_d1", "system": "patriot",  "quantity": 2, "notes": "" }
+      { "id": "us_fifth_fleet_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "United States" }
     ],
 
     "jebel_ali_port": [
-      { "id": "jebel_ali_port_d1", "system": "patriot",  "quantity": 2, "notes": "" },
-      { "id": "jebel_ali_port_d2", "system": "cheongung2",  "quantity": 1, "notes": "" },
-      { "id": "jebel_ali_port_d3", "system": "merops",  "quantity": 9, "notes": "" }
+      { "id": "jebel_ali_port_d1", "system": "patriot",    "quantity": 2, "notes": "", "operator": "United Arab Emirates" },
+      { "id": "jebel_ali_port_d2", "system": "cheongung2", "quantity": 1, "notes": "", "operator": "United Arab Emirates" },
+      { "id": "jebel_ali_port_d3", "system": "merops",     "quantity": 9, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "al_dhafra_ab": [
-      { "id": "al_dhafra_ab_d1", "system": "patriot",  "quantity": 2, "notes": "" },
-      { "id": "al_dhafra_ab_d2", "system": "cheongung2",  "quantity": 1, "notes": "" }
+      { "id": "al_dhafra_ab_d1", "system": "patriot",    "quantity": 2, "notes": "", "operator": "United Arab Emirates" },
+      { "id": "al_dhafra_ab_d2", "system": "cheongung2", "quantity": 1, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "dubai": [
-      { "id": "dubai_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "dubai_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "abu_dhabi": [
-      { "id": "abu_dhabi_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+      { "id": "abu_dhabi_d1", "system": "thaad", "quantity": 1, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "ruwais_refinery": [
-      { "id": "ruwais_refinery_d1", "system": "thaad",  "quantity": 1, "notes": "" },
-      { "id": "ruwais_refinery_d2", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "ruwais_refinery_d1", "system": "thaad",   "quantity": 1, "notes": "", "operator": "United Arab Emirates" },
+      { "id": "ruwais_refinery_d2", "system": "patriot", "quantity": 1, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "fujairah_port": [
-      { "id": "fujairah_port_d1", "system": "patriot",  "quantity": 2, "notes": "" },
-      { "id": "fujairaj_port_d2", "system": "fs-lids",  "quantity": 1, "notes": "" }
+      { "id": "fujairah_port_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "United Arab Emirates" },
+      { "id": "fujairah_port_d2", "system": "fslids",  "quantity": 1, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "prince_sultan_ab": [
-      { "id": "prince_sultan_ab_d1", "system": "patriot",  "quantity": 2, "notes": "" },
-      { "id": "prince_sultan_ab_d2", "system": "fs-lids",  "quantity": 1, "notes": "" },
-      { "id": "prince_sultan_ab_d3", "system": "merops",  "quantity": 1, "notes": "" }
+      { "id": "prince_sultan_ab_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "United States" },
+      { "id": "prince_sultan_ab_d2", "system": "fslids",  "quantity": 1, "notes": "", "operator": "United States" },
+      { "id": "prince_sultan_ab_d3", "system": "merops",  "quantity": 1, "notes": "", "operator": "United States" }
     ],
 
     "king_khalid_ab": [
-      { "id": "king_khalid_ab_d1", "system": "patriot",  "quantity": 2, "notes": "" },
-      { "id": "king_khalid_ab_d2", "system": "merops",  "quantity": 1, "notes": "" }
+      { "id": "king_khalid_ab_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "Saudi Arabia" },
+      { "id": "king_khalid_ab_d2", "system": "merops",  "quantity": 1, "notes": "", "operator": "Saudi Arabia" }
     ],
 
     "aramco_persian_gulf_corridor": [
-      { "id": "aramco_persian_gulf_corridor_d1", "system": "patriot",  "quantity": 4, "notes": "" }
+      { "id": "aramco_persian_gulf_corridor_d1", "system": "patriot", "quantity": 4, "notes": "", "operator": "Saudi Arabia" }
     ],
 
     "aramco_riyadh": [
-      { "id": "aramco_riyadh_d1", "system": "patriot",  "quantity": 2, "notes": "" }
+      { "id": "aramco_riyadh_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "Saudi Arabia" }
     ],
 
     "dammam": [
-      { "id": "dammam_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+      { "id": "dammam_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "Saudi Arabia" }
     ],
 
     "aramco_red_sea_corridor": [
-      { "id": "aramco_red_sea_corridor_d1", "system": "patriot",  "quantity": 2, "notes": "" }
+      { "id": "aramco_red_sea_corridor_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "Saudi Arabia" }
     ],
 
-    "riyadh" : [
-      { "id": "riyadh_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    "riyadh": [
+      { "id": "riyadh_d1", "system": "thaad", "quantity": 1, "notes": "", "operator": "Saudi Arabia" }
     ],
 
-    "jeddah" : [
-      { "id": "jeddah_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    "jeddah": [
+      { "id": "jeddah_d1", "system": "thaad", "quantity": 1, "notes": "", "operator": "Saudi Arabia" }
     ],
 
-    "ali_al_salem_ab" : [
-      { "id": "ali_al_salem_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    "ali_al_salem_ab": [
+      { "id": "ali_al_salem_ab_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
     ],
 
-    "camp_arifjan" : [
-      { "id": "camp_arifjan_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    "camp_arifjan": [
+      { "id": "camp_arifjan_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
     ],
 
-    "thumrait_ab" : [
-      { "id": "thumrait_ab_d1", "system": "nasams",  "quantity": 1, "notes": "" }
+    "thumrait_ab": [
+      { "id": "thumrait_ab_d1", "system": "nasams", "quantity": 1, "notes": "", "operator": "Oman" }
     ],
 
-    "camp_as_sayliyah" : [
-      { "id": "camp_as_sayliyah_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    "camp_as_sayliyah": [
+      { "id": "camp_as_sayliyah_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
     ],
 
-    "al_udeid_ab" : [
-      { "id": "al_udeid_ab_d1", "system": "patriot",  "quantity": 4, "notes": "" },
-      { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "" },
-      { "id": "al_udeid_ab_d3", "system": "fs-lids",  "quantity": 1, "notes": "" }
+    "al_udeid_ab": [
+      { "id": "al_udeid_ab_d1", "system": "patriot", "quantity": 4, "notes": "", "operator": "United States" },
+      { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "", "operator": "United States" },
+      { "id": "al_udeid_ab_d3", "system": "fslids",  "quantity": 1, "notes": "", "operator": "United States" }
     ],
 
-    "muscat" : [
-      { "id": "muscat_d1", "system": "nasams",  "quantity": 1, "notes": "" }
+    "muscat": [
+      { "id": "muscat_d1", "system": "nasams", "quantity": 1, "notes": "", "operator": "Oman" }
     ],
 
-    "tel_nof_ab" : [
-      { "id": "tel_nof_ab_d1", "system": "davids_sling",  "quantity": 1, "notes": "" }
+    "tel_nof_ab": [
+      { "id": "tel_nof_ab_d1", "system": "davids_sling", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "ramat_david_ab" : [
-      { "id": "ramat_david_ab_d1", "system": "arrow",  "quantity": 1, "notes": "" }
+    "ramat_david_ab": [
+      { "id": "ramat_david_ab_d1", "system": "arrow", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "hatzerim_ab" : [
-      { "id": "hatzerim_ab_d1", "system": "thaad",  "quantity": 1, "notes": "" }
+    "hatzerim_ab": [
+      { "id": "hatzerim_ab_d1", "system": "thaad", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "nevatim_ab" : [
-      { "id": "nevatim_ab_d1", "system": "arrow",  "quantity": 1, "notes": "" }
+    "nevatim_ab": [
+      { "id": "nevatim_ab_d1", "system": "arrow", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "tel_aviv" : [
-      { "id": "tel_aviv_d1", "system": "arrow",  "quantity": 1, "notes": "" },
-      { "id": "tel_aviv_d2", "system": "iron_dome",  "quantity": 1, "notes": "" }
+    "tel_aviv": [
+      { "id": "tel_aviv_d1", "system": "arrow",     "quantity": 1, "notes": "", "operator": "Israel" },
+      { "id": "tel_aviv_d2", "system": "iron_dome", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "haifa" : [
-      { "id": "haifa_d1", "system": "arrow",  "quantity": 1, "notes": "" },
-      { "id": "haifa_d2", "system": "iron_dome",  "quantity": 1, "notes": "" },
-      { "id": "haifa_d3", "system": "iron_beam",  "quantity": 1, "notes": "" }
-    ],  
-
-    "jerusalem" : [
-      { "id": "jerusalem_d1", "system": "arrow",  "quantity": 1, "notes": "" }
+    "haifa": [
+      { "id": "haifa_d1", "system": "arrow",     "quantity": 1, "notes": "", "operator": "Israel" },
+      { "id": "haifa_d2", "system": "iron_dome", "quantity": 1, "notes": "", "operator": "Israel" },
+      { "id": "haifa_d3", "system": "iron_beam", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "beer_sheva" : [
-      { "id": "beer_sheva_d1", "system": "davids_sling",  "quantity": 1, "notes": "" },
-      { "id": "beer_sheva_d2", "system": "iron_dome",  "quantity": 1, "notes": "" }      
+    "jerusalem": [
+      { "id": "jerusalem_d1", "system": "arrow", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "isa_ab" : [
-      { "id": "isa_ab_d1", "system": "patriot",  "quantity": 1, "notes": "" }
+    "beer_sheva": [
+      { "id": "beer_sheva_d1", "system": "davids_sling", "quantity": 1, "notes": "", "operator": "Israel" },
+      { "id": "beer_sheva_d2", "system": "iron_dome",    "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
-    "muwaffaq_al_salti_ab" : [
-      { "id": "muwaffaq_al_salti_ab_d1", "system": "thaad",  "quantity": 1, "notes": "" },
-      { "id": "muwaffaq_al_salti_ab_d2", "system": "patriot",  "quantity": 1, "notes": "" }
+    "isa_ab": [
+      { "id": "isa_ab_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
+    ],
+
+    "muwaffaq_al_salti_ab": [
+      { "id": "muwaffaq_al_salti_ab_d1", "system": "thaad",   "quantity": 1, "notes": "", "operator": "United States" },
+      { "id": "muwaffaq_al_salti_ab_d2", "system": "patriot", "quantity": 1, "notes": "", "operator": "United States" }
     ]
 
   }

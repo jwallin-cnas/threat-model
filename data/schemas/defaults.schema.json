@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data/schemas/defaults.schema.json",
+  "title": "Default Defense Assignments Schema",
+  "description": "Validates defaults.json — the pre-configured defensive laydown applied to each target on first load or reset.",
+  "type": "object",
+  "required": ["version", "defaults"],
+  "additionalProperties": false,
+  "properties": {
+
+    "$schema": { "type": "string" },
+
+    "version": {
+      "type": "string",
+      "description": "Schema version string (e.g. \"1.0\")."
+    },
+
+    "_instructions": {
+      "type": "object",
+      "description": "Human-readable documentation embedded in the data file. Not used by the application.",
+      "additionalProperties": true
+    },
+
+    "defaults": {
+      "type": "object",
+      "description": "Map of target ID → array of default defense entries for that target.",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/DefaultDefenseEntry" }
+      }
+    }
+  },
+
+  "definitions": {
+
+    "DefaultDefenseEntry": {
+      "type": "object",
+      "required": ["id", "system", "quantity", "operator"],
+      "additionalProperties": false,
+      "properties": {
+
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier for this entry. Never reuse IDs across targets."
+        },
+        "system": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Defense system ID. Must match an entry in defenses.json."
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of batteries or systems deployed at this location."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional free-text annotation (readiness, posture, source, etc.)."
+        },
+        "operator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nation or organisation that operates this system at this location. Determines cross-target default enable/disable state: 'United States' is enabled by default; all other operators are disabled by default when covering a neighbouring target."
+        }
+      }
+    }
+  }
+}

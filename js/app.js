@@ -141,7 +141,7 @@ async function loadData() {
     t.defenses = Array.isArray(raw) ? raw.map(d => {
       const sysData = appDefenseSystems.find(s => s.id === d.system);
       const qty     = sysData?.batteries ?? d.quantity ?? 1;
-      return { ...d, quantity: qty };
+      return { ...d, quantity: qty, operator: d.operator || t.country || '' };
     }) : [];
   }
 
@@ -656,8 +656,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
   const tier        = catalog?.tier ?? 0;
   const color       = TIER_COLORS[tier] || '#888';
   const label       = TIER_LABELS[tier] || 'Unknown';
-  const coveredTarget = getTarget(targetId);
-  const isDisabled  = (coveredTarget?.disabledCoverageDefIds || []).includes(def.id);
+  const isDisabled  = isCrossTargetDefenseDisabled(targetId, def);
 
   const initialMag   = (catalog?.magazinePerBattery || 0) * def.quantity;
   const simRemaining = globalMagState[def.id];
@@ -735,7 +734,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
   });
 
   card.querySelector('.btn-toggle-defense').addEventListener('click', (e) => {
-    toggleCrossTargetDefenseDisabled(e.currentTarget.dataset.target, e.currentTarget.dataset.defense);
+    toggleCrossTargetDefenseDisabled(e.currentTarget.dataset.target, def);
   });
 
   return card;
@@ -882,7 +881,8 @@ function addDefense(targetId, systemId, quantity, notes) {
       id:       `${targetId}_d${Date.now()}`,
       system:   systemId,
       quantity: quantity,
-      notes:    notes || ''
+      notes:    notes || '',
+      operator: 'United States'
     });
     saveToStorage();
   }
@@ -968,16 +968,39 @@ function toggleOwnDefenseDisabled(targetId, defId) {
  * target's simulation. The disabled flag lives on the covered target so the
  * source target's defense entry is never mutated.
  */
-function toggleCrossTargetDefenseDisabled(targetId, defId) {
+/**
+ * Returns true if a cross-target defense should be excluded from the simulation
+ * for the given covered target.
+ *
+ * Priority:
+ *   1. Explicit enable  (target.enabledCoverageDefIds)  → always enabled
+ *   2. Explicit disable (target.disabledCoverageDefIds) → always disabled
+ *   3. Default: disabled unless operator === 'United States'
+ */
+function isCrossTargetDefenseDisabled(targetId, def) {
+  const target = getTarget(targetId);
+  if (!target) return false;
+  if ((target.enabledCoverageDefIds  || []).includes(def.id)) return false;
+  if ((target.disabledCoverageDefIds || []).includes(def.id)) return true;
+  return (def.operator || '') !== 'United States';
+}
+
+function toggleCrossTargetDefenseDisabled(targetId, def) {
   const target = getTarget(targetId);
   if (!target) return;
+  target.enabledCoverageDefIds  = target.enabledCoverageDefIds  || [];
   target.disabledCoverageDefIds = target.disabledCoverageDefIds || [];
-  const idx = target.disabledCoverageDefIds.indexOf(defId);
-  if (idx >= 0) {
-    target.disabledCoverageDefIds.splice(idx, 1);
+
+  if (isCrossTargetDefenseDisabled(targetId, def)) {
+    // Currently disabled → enable it
+    if (!target.enabledCoverageDefIds.includes(def.id)) target.enabledCoverageDefIds.push(def.id);
+    target.disabledCoverageDefIds = target.disabledCoverageDefIds.filter(id => id !== def.id);
   } else {
-    target.disabledCoverageDefIds.push(defId);
+    // Currently enabled → disable it
+    if (!target.disabledCoverageDefIds.includes(def.id)) target.disabledCoverageDefIds.push(def.id);
+    target.enabledCoverageDefIds = target.enabledCoverageDefIds.filter(id => id !== def.id);
   }
+
   saveToStorage();
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
@@ -1328,9 +1351,8 @@ async function simulate() {
     const perTargetDefenses = (target?.defenses || []).filter(d => !d.disabled);
 
     // Cross-target defenses — exclude any disabled for this covered target
-    const disabledCoverage = new Set(target?.disabledCoverageDefIds || []);
     const crossDefs = getCrossTargetDefenses(selectedTargetId)
-      .filter(d => !disabledCoverage.has(d.id))
+      .filter(d => !isCrossTargetDefenseDisabled(selectedTargetId, d))
       .map(d => ({
         id:       d.id,
         system:   d.system,
