@@ -278,7 +278,7 @@ function haversine(lat1, lon1, lat2, lon2) {
 /**
  * Return defenses placed on OTHER targets whose system range_km reaches the
  * given targetId. Each entry is the original defense object annotated with
- * _isCrossTarget, _placedAtTargetId, _placedAtTargetName, and _distanceKm.
+ * _isCrossTarget, _placedAtTargetId, _placedAtTargetName, _placedAtTargetCountry, and _distanceKm.
  * Sorted nearest-source-target first.
  */
 function getCrossTargetDefenses(targetId) {
@@ -300,9 +300,10 @@ function getCrossTargetDefenses(targetId) {
         result.push({
           ...def,
           _isCrossTarget:      true,
-          _placedAtTargetId:   other.id,
-          _placedAtTargetName: other.name,
-          _distanceKm:         Math.round(dist)
+          _placedAtTargetId:      other.id,
+          _placedAtTargetName:    other.name,
+          _placedAtTargetCountry: other.country || '',
+          _distanceKm:            Math.round(dist)
         });
       }
     }
@@ -597,7 +598,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>
-      <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}">📍 ${def._placedAtTargetName} · ${def._distanceKm} km</span>
+      <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km</span>
       <div class="defense-card-actions">
         ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
         <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
@@ -906,28 +907,22 @@ function populatePlatformSelect() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function updateSalvoSelect(platformId) {
-  const sel = document.getElementById('attack-quantity');
-  sel.innerHTML = '';
+  const input    = document.getElementById('attack-quantity');
+  const platform = platformId ? PLATFORM_CATALOG[platformId] : null;
 
-  const platform   = platformId ? PLATFORM_CATALOG[platformId] : null;
-  const salvoSizes = platform?.salvo_sizes || [];
-
-  if (!platform || salvoSizes.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = '—';
-    sel.appendChild(opt);
-    sel.disabled = true;
+  if (!platform) {
+    input.value    = '';
+    input.disabled = true;
     return;
   }
 
-  sel.disabled = false;
-  for (const size of salvoSizes) {
-    const opt = document.createElement('option');
-    opt.value = size;
-    opt.textContent = size;
-    sel.appendChild(opt);
-  }
+  // Pre-fill with the first defined salvo size as a convenience default;
+  // the user can overwrite it with any positive integer.
+  const defaultSize = platform.salvo_sizes?.[0] ?? 1;
+  input.value    = defaultSize;
+  input.disabled = false;
+  input.focus();
+  input.select();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1930,7 +1925,7 @@ function wireEvents() {
     const platformId = document.getElementById('platform-select').value;
     const qty        = parseInt(document.getElementById('attack-quantity').value) || 0;
     if (!platformId) { showToast('Please select a platform.', true); return; }
-    if (!qty)        { showToast('Please select a salvo size.', true); return; }
+    if (!qty)        { showToast('Please enter a quantity.', true); return; }
     addPlatformToManifest(platformId, qty);
     document.getElementById('platform-select').value = '';
     updateSalvoSelect(null);
