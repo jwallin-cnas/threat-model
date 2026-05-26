@@ -132,45 +132,53 @@ const THREAT_PRIORITY = ['ballistic_missile', 'cruise_missile', 'drone'];
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Run a full layered-defence simulation.
+ * Run a full layered-defence simulation, processing each platform in the
+ * attack manifest independently so that engagement functions receive the
+ * specific platformId and can apply per-platform Pk values.
  *
  * @param {Array<{platformId:string, count:number}>} attackManifest
  * @param {Array<{id:string, system:string, quantity:number, notes:string}>} defenses
- *   Each entry must have a unique `id`. Per-target defenses and emplacement-
- *   derived defenses are passed together; the caller is responsible for
- *   building the combined list.
- * @param {Object} [initialMagazineState={}]
- *   Keyed by def.id (not system type). Allows the caller to pass persisted
- *   magazine levels from prior simulation runs.
+ * @param {Object} [initialMagazineState={}]   Keyed by def.id.
+ * @param {Object} [excludedByThreatType={}]   { [threatType]: defId[] } — systems
+ *   to skip for a specific threat type (used by post-sim disengage overrides).
+ *
  * @returns {{ totalIn, totalOut, initialThreats, finalThreats, byThreatType }}
  *
  * byThreatType: Array<{
  *   threatType:   string,
- *   initialCount: number,
+ *   initialCount: number,      // sum across all platforms of this type
  *   finalCount:   number,
- *   engagements:  Array<{
- *     defId, systemId, systemName, quantity, notes,
- *     threatType, threatsIn, killed, survived,
- *     pk, shotsPerEngagement, magazineAtStart, magazineRemaining,
- *     interceptorsUsed, isPlaceholder, note
+ *   platforms: Array<{
+ *     platformId:   string,
+ *     platformName: string,
+ *     initialCount: number,
+ *     finalCount:   number,
+ *     engagements:  Array<{
+ *       defId, systemId, systemName, quantity, notes,
+ *       threatType, platformId, platformName,
+ *       threatsIn, killed, survived,
+ *       pk, pkTier, pkIsFixed,
+ *       shotsPerEngagement, shotsPerEngagementTier,
+ *       magazineAtStart, magazineRemaining,
+ *       interceptorsUsed, isPlaceholder, note
+ *     }>
  *   }>
  * }>
  */
 function runSimulation(attackManifest, defenses, initialMagazineState = {}, excludedByThreatType = {}) {
 
-  // ── Aggregate attack by threat type ──────────────────────────────────────
-  const threatCounts = {};
-  for (const entry of attackManifest) {
-    const platform = PLATFORM_CATALOG[entry.platformId];
-    if (!platform) continue;
-    threatCounts[platform.type] = (threatCounts[platform.type] || 0) + entry.count;
-  }
+  // ── Sort manifest by THREAT_PRIORITY so upper-tier magazine is consumed
+  //    correctly before lower-tier engagements. ──────────────────────────────
+  const threatOrder = Object.fromEntries(THREAT_PRIORITY.map((t, i) => [t, i]));
+  const sortedManifest = [...attackManifest]
+    .filter(entry => PLATFORM_CATALOG[entry.platformId])
+    .sort((a, b) => {
+      const ta = PLATFORM_CATALOG[a.platformId].type;
+      const tb = PLATFORM_CATALOG[b.platformId].type;
+      return (threatOrder[ta] ?? 99) - (threatOrder[tb] ?? 99);
+    });
 
   // ── Index deployed defenses by def.id ────────────────────────────────────
-  // Keyed by def.id (not def.system) so multiple instances of the same system
-  // type coexist — e.g., a per-target Patriot battery plus an emplacement-
-  // based Patriot covering the same target both operate independently with
-  // their own magazines.
   const deployed = {};
   for (const def of defenses) {
     const catalog = DEFENSE_CATALOG[def.system];
@@ -182,18 +190,26 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
     };
   }
 
-  // ── Process each threat type through the full stack in priority order ─────
-  const byThreatType = [];
+  // ── Process each platform through the full defensive stack ───────────────
+  // Magazine carries over across all platforms (in sorted order).
+  const byThreatTypeMap = {};
   let totalIn  = 0;
   let totalOut = 0;
 
-  for (const threatType of THREAT_PRIORITY) {
-    const initialCount = threatCounts[threatType] || 0;
+  for (const manifestEntry of sortedManifest) {
+    const platform     = PLATFORM_CATALOG[manifestEntry.platformId];
+    const threatType   = platform.type;
+    const platformId   = manifestEntry.platformId;
+    const platformName = platform.name || platformId;
+    const initialCount = manifestEntry.count || 0;
+
     if (initialCount === 0) continue;
 
-    // defIds explicitly excluded for this threat type (post-sim disengage overrides)
-    const excludedIds = new Set(excludedByThreatType[threatType] || []);
+    if (!byThreatTypeMap[threatType]) {
+      byThreatTypeMap[threatType] = { threatType, initialCount: 0, finalCount: 0, platforms: [] };
+    }
 
+    const excludedIds = new Set(excludedByThreatType[threatType] || []);
     totalIn += initialCount;
     let remaining = initialCount;
     const engagements = [];
@@ -201,8 +217,6 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
     for (const systemId of ENGAGEMENT_PRIORITY) {
       if (remaining <= 0) break;
 
-      // Find ALL deployed entries for this system type, minus any excluded for
-      // this specific threat type (per-threat-type disengage overrides).
       const entries = Object.values(deployed)
         .filter(e => e.def.system === systemId && !excludedIds.has(e.def.id));
       if (entries.length === 0) continue;
@@ -212,53 +226,54 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
         : undefined;
       if (!engFn) continue;
 
-      // Evaluate engagement parameters for each entry upfront so that each
-      // battery gets an independent Math.random() draw before any killing occurs.
+      // Draw random parameters for every battery upfront so each gets an
+      // independent roll before any kills are applied.
       const entryParams = entries.map(entry => ({
         entry,
-        params: engFn(threatType, entry.def.quantity, entry.magazineRemaining)
+        params: engFn(threatType, entry.def.quantity, entry.magazineRemaining, platformId)
       }));
 
-      // Record "Cannot engage" for entries whose engFn returned null.
+      // Record "Cannot engage" rows.
       for (const { entry, params } of entryParams) {
         if (params !== null) continue;
         engagements.push({
-          defId:              entry.def.id,
+          defId:                  entry.def.id,
           systemId,
-          systemName:         DEFENSE_CATALOG[systemId]?.name || systemId,
-          quantity:           entry.def.quantity,
-          notes:              entry.def.notes || '',
+          systemName:             DEFENSE_CATALOG[systemId]?.name || systemId,
+          quantity:               entry.def.quantity,
+          notes:                  entry.def.notes || '',
           threatType,
-          threatsIn:          remaining,
-          killed:             0,
-          survived:           remaining,
-          pk:                 null,
-          shotsPerEngagement: 0,
-          magazineRemaining:  entry.magazineRemaining,
-          magazineAtStart:    entry.magazineRemaining,
-          interceptorsUsed:   0,
-          isPlaceholder:      false,
-          note:               'Cannot engage'
+          platformId,
+          platformName,
+          threatsIn:              remaining,
+          killed:                 0,
+          survived:               remaining,
+          pk:                     null,
+          pkTier:                 null,
+          pkIsFixed:              false,
+          shotsPerEngagement:     0,
+          shotsPerEngagementTier: null,
+          magazineRemaining:      entry.magazineRemaining,
+          magazineAtStart:        entry.magazineRemaining,
+          interceptorsUsed:       0,
+          isPlaceholder:          false,
+          note:                   'Cannot engage'
         });
       }
 
-      // Process entries that can engage, in order.
-      // Each fires at whatever survived the previous entry's salvo.
+      // Engage in order; each battery fires at whatever survived the previous.
       for (const { entry, params } of entryParams) {
         if (!params) continue;
         if (remaining <= 0) break;
 
-        const pk                   = params.pk                    ?? 0;
-        const shots                = params.shotsPerEngagement    ?? 2;
-        const pkTier               = params.pkTier                ?? null;
-        const pkIsFixed            = params.pkIsFixed             ?? false;
-        const shotsPerEngageTier   = params.shotsPerEngagementTier ?? null;
+        const pk                 = params.pk                     ?? 0;
+        const shots              = params.shotsPerEngagement     ?? 2;
+        const pkTier             = params.pkTier                 ?? null;
+        const pkIsFixed          = params.pkIsFixed              ?? false;
+        const shotsPerEngageTier = params.shotsPerEngagementTier ?? null;
 
         const magazineBefore    = entry.magazineRemaining;
         const result            = applyEngagement(remaining, pk, magazineBefore, shots);
-
-        // Persist magazine depletion — carries across threat-type passes and
-        // across successive simulation runs (via initialMagazineState).
         entry.magazineRemaining = result.magazineRemaining;
 
         engagements.push({
@@ -268,6 +283,8 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
           quantity:               entry.def.quantity,
           notes:                  entry.def.notes || '',
           threatType,
+          platformId,
+          platformName,
           threatsIn:              remaining,
           killed:                 result.killed,
           survived:               result.survived,
@@ -288,8 +305,17 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
     }
 
     totalOut += remaining;
-    byThreatType.push({ threatType, initialCount, finalCount: remaining, engagements });
+    byThreatTypeMap[threatType].initialCount += initialCount;
+    byThreatTypeMap[threatType].finalCount   += remaining;
+    byThreatTypeMap[threatType].platforms.push({
+      platformId, platformName, initialCount, finalCount: remaining, engagements
+    });
   }
+
+  // ── Emit results in THREAT_PRIORITY order ────────────────────────────────
+  const byThreatType = THREAT_PRIORITY
+    .filter(t => byThreatTypeMap[t])
+    .map(t => byThreatTypeMap[t]);
 
   const initialThreats = byThreatType.map(b => ({ type: b.threatType, count: b.initialCount }));
   const finalThreats   = byThreatType

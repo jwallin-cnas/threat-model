@@ -1051,6 +1051,38 @@ select option, select optgroup {
   opacity: 0.35;
   transition: opacity 0.15s;
 }
+/* Per-platform sub-sections inside a threat-type block */
+.platform-subsection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 4px;
+  background: rgba(255,255,255,0.03);
+  border-top: 1px solid var(--border-soft);
+}
+.platform-subsection-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+.platform-subsection-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+.platform-subsection-footer {
+  font-size: 11px;
+  padding: 3px 10px;
+  text-align: right;
+  font-style: italic;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border-soft);
+}
+.platform-subsection-footer.ftr-all     { color: var(--success); }
+.platform-subsection-footer.ftr-none    { color: var(--danger);  }
+.platform-subsection-footer.ftr-partial { color: var(--warn);    }
+
 .engagement-row:hover .btn-override-eng { opacity: 1; }
 
 /* Toggleable prose detail block */

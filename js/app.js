@@ -32,7 +32,7 @@ let lastSimResults  = null;   // stored after each simulation run for override r
 let lastSimTarget   = null;   // stored alongside lastSimResults
 let lastSimDefenses = [];     // allDefenses passed to the last runSimulation call
 let preSimMagState  = {};     // snapshot of globalMagState before the last simulation depleted it
-let manualOverrides = {};     // { [threatType]: { [defId]: { survived:number, disengaged:bool } } }
+let manualOverrides = {};     // { [threatType]: { [platformId]: { [defId]: { survived:number, disengaged:bool } } } }
 
 // ── Minimap state ─────────────────────────────────────────────────────────────
 let _minimapCrossLayers = [];   // Leaflet layers for cross-target coverage circles
@@ -1160,10 +1160,11 @@ function renderAttackManifest() {
 function extractMagazineState(results) {
   const state = {};
   for (const group of results.byThreatType) {
-    for (const eng of group.engagements) {
-      // Keyed by defId so multiple instances of the same system type are tracked
-      // independently. The last write per defId is the lowest (final) remaining count.
-      state[eng.defId] = eng.magazineRemaining;
+    for (const platform of (group.platforms || [])) {
+      for (const eng of (platform.engagements || [])) {
+        // Keyed by defId. The last write per defId is the lowest (final) remaining count.
+        state[eng.defId] = eng.magazineRemaining;
+      }
     }
   }
   return state;
@@ -1410,98 +1411,104 @@ async function simulate() {
  *   - Override + engaged    = interceptors recomputed for the new remaining count.
  */
 function computeAdjustedResults(originalResults, overrides) {
-  // Build magazine map keyed by defId, initialised from the earliest magazineAtStart
-  // seen across all groups (= state before the first shot of the simulation).
+  // Build magazine map from the earliest magazineAtStart seen (= pre-sim state).
   const adjMag = {};
   for (const group of originalResults.byThreatType) {
-    for (const eng of group.engagements) {
-      if (adjMag[eng.defId] === undefined && eng.magazineAtStart !== undefined)
-        adjMag[eng.defId] = eng.magazineAtStart;
+    for (const platform of (group.platforms || [])) {
+      for (const eng of (platform.engagements || [])) {
+        if (adjMag[eng.defId] === undefined && eng.magazineAtStart !== undefined)
+          adjMag[eng.defId] = eng.magazineAtStart;
+      }
     }
   }
 
   let adjTotalOut = 0;
 
+  // overrides shape: { [threatType]: { [platformId]: { [defId]: { survived, disengaged } } } }
   const adjustedByThreatType = originalResults.byThreatType.map(group => {
-    const { threatType, initialCount, engagements } = group;
-    const groupOv = overrides[threatType] || {};
-    let remaining = initialCount;
-    const adjEngagements = [];
+    const { threatType } = group;
+    const ttOvs = overrides[threatType] || {};
+    let groupFinalCount = 0;
 
-    for (const eng of engagements) {
-      const magBefore = adjMag[eng.defId] ?? eng.magazineAtStart ?? 0;
+    const adjustedPlatforms = (group.platforms || []).map(platform => {
+      const { platformId } = platform;
+      const platformOvs = ttOvs[platformId] || {};
+      let remaining = platform.initialCount;
+      const adjEngagements = [];
 
-      // ── Cannot engage — pass through, just update threatsIn display ─────────
-      if (eng.note === 'Cannot engage') {
-        adjEngagements.push({ ...eng, threatsIn: remaining });
-        continue;
-      }
+      for (const eng of (platform.engagements || [])) {
+        const magBefore = adjMag[eng.defId] ?? eng.magazineAtStart ?? 0;
 
-      // ── Manual override at this layer ────────────────────────────────────────
-      if (groupOv[eng.defId] !== undefined) {
-        const ov = groupOv[eng.defId];
-        const forcedSurvived = Math.min(ov.survived, remaining);
-        const forcedKilled   = remaining - forcedSurvived;
-        let interceptorsUsed, magAfter;
+        // ── Cannot engage ───────────────────────────────────────────────────
+        if (eng.note === 'Cannot engage') {
+          adjEngagements.push({ ...eng, threatsIn: remaining });
+          continue;
+        }
 
-        if (ov.disengaged) {
-          // System stood down — no interceptors expended
-          interceptorsUsed = 0;
-          magAfter = magBefore;
-        } else {
-          // System fired; recompute expended interceptors for the new remaining count
-          const shots = eng.shotsPerEngagement ?? 2;
-          if (shots === 0) {
+        // ── Manual override ─────────────────────────────────────────────────
+        if (platformOvs[eng.defId] !== undefined) {
+          const ov = platformOvs[eng.defId];
+          const forcedSurvived = Math.min(ov.survived, remaining);
+          const forcedKilled   = remaining - forcedSurvived;
+          let interceptorsUsed, magAfter;
+
+          if (ov.disengaged) {
             interceptorsUsed = 0;
             magAfter = magBefore;
           } else {
-            const engageable = Math.min(remaining, Math.max(0, Math.floor(magBefore / shots)));
-            interceptorsUsed = engageable * shots;
-            magAfter = magBefore - interceptorsUsed;
+            const shots = eng.shotsPerEngagement ?? 2;
+            if (shots === 0) {
+              interceptorsUsed = 0;
+              magAfter = magBefore;
+            } else {
+              const engageable = Math.min(remaining, Math.max(0, Math.floor(magBefore / shots)));
+              interceptorsUsed = engageable * shots;
+              magAfter = magBefore - interceptorsUsed;
+            }
           }
+
+          adjMag[eng.defId] = magAfter;
+          adjEngagements.push({
+            ...eng,
+            threatsIn:         remaining,
+            killed:            forcedKilled,
+            survived:          forcedSurvived,
+            magazineAtStart:   magBefore,
+            magazineRemaining: magAfter,
+            interceptorsUsed,
+            isManualOverride:  true,
+            isPlaceholder:     false,
+            note: ov.disengaged ? 'Disengaged (manual)' : 'Manual override'
+          });
+          remaining = forcedSurvived;
+          continue;
         }
 
-        adjMag[eng.defId] = magAfter;
+        // ── Re-apply with updated remaining and magazine ────────────────────
+        const result = applyEngagement(
+          remaining, eng.pk ?? 0, magBefore, eng.shotsPerEngagement ?? 2
+        );
+        adjMag[eng.defId] = result.magazineRemaining;
         adjEngagements.push({
           ...eng,
           threatsIn:         remaining,
-          killed:            forcedKilled,
-          survived:          forcedSurvived,
+          killed:            result.killed,
+          survived:          result.survived,
           magazineAtStart:   magBefore,
-          magazineRemaining: magAfter,
-          interceptorsUsed,
-          isManualOverride:  true,
-          isPlaceholder:     false,
-          note: ov.disengaged ? 'Disengaged (manual)' : 'Manual override'
+          magazineRemaining: result.magazineRemaining,
+          interceptorsUsed:  magBefore - result.magazineRemaining,
+          note:              result.note,
+          isPlaceholder:     result.isPlaceholder
         });
-        remaining = forcedSurvived;
-        continue;
+        remaining = result.survived;
       }
 
-      // ── Re-apply engagement with updated remaining and adjusted magazine ─────
-      const result = applyEngagement(
-        remaining,
-        eng.pk ?? 0,
-        magBefore,
-        eng.shotsPerEngagement ?? 2
-      );
-      adjMag[eng.defId] = result.magazineRemaining;
-      adjEngagements.push({
-        ...eng,
-        threatsIn:         remaining,
-        killed:            result.killed,
-        survived:          result.survived,
-        magazineAtStart:   magBefore,
-        magazineRemaining: result.magazineRemaining,
-        interceptorsUsed:  magBefore - result.magazineRemaining,
-        note:              result.note,
-        isPlaceholder:     result.isPlaceholder
-      });
-      remaining = result.survived;
-    }
+      groupFinalCount += remaining;
+      return { ...platform, finalCount: remaining, engagements: adjEngagements };
+    });
 
-    adjTotalOut += remaining;
-    return { ...group, finalCount: remaining, engagements: adjEngagements };
+    adjTotalOut += groupFinalCount;
+    return { ...group, finalCount: groupFinalCount, platforms: adjustedPlatforms };
   });
 
   const finalThreats = adjustedByThreatType
@@ -1512,16 +1519,20 @@ function computeAdjustedResults(originalResults, overrides) {
 }
 
 /** Store an override for one layer and re-render results. */
-function applyLayerOverride(threatType, defId, survived, disengaged = false) {
-  if (!manualOverrides[threatType]) manualOverrides[threatType] = {};
-  manualOverrides[threatType][defId] = { survived, disengaged };
+function applyLayerOverride(threatType, platformId, defId, survived, disengaged = false) {
+  if (!manualOverrides[threatType])             manualOverrides[threatType] = {};
+  if (!manualOverrides[threatType][platformId]) manualOverrides[threatType][platformId] = {};
+  manualOverrides[threatType][platformId][defId] = { survived, disengaged };
   rerenderWithOverrides();
 }
 
 /** Remove the override for one layer and re-render. */
-function clearLayerOverride(threatType, defId) {
-  if (manualOverrides[threatType]) {
-    delete manualOverrides[threatType][defId];
+function clearLayerOverride(threatType, platformId, defId) {
+  const platOvs = manualOverrides[threatType]?.[platformId];
+  if (platOvs) {
+    delete platOvs[defId];
+    if (Object.keys(platOvs).length === 0)
+      delete manualOverrides[threatType][platformId];
     if (Object.keys(manualOverrides[threatType]).length === 0)
       delete manualOverrides[threatType];
   }
@@ -1551,14 +1562,19 @@ function rerenderWithOverrides() {
     const disengagedByThreatType = {};
     const killOverrides          = {};
 
-    for (const [tt, ttOvs] of Object.entries(manualOverrides)) {
-      for (const [defId, ov] of Object.entries(ttOvs)) {
-        if (ov.disengaged) {
-          if (!disengagedByThreatType[tt]) disengagedByThreatType[tt] = [];
-          disengagedByThreatType[tt].push(defId);
-        } else {
-          if (!killOverrides[tt]) killOverrides[tt] = {};
-          killOverrides[tt][defId] = ov;
+    for (const [tt, platOvs] of Object.entries(manualOverrides)) {
+      for (const [platformId, defOvs] of Object.entries(platOvs)) {
+        for (const [defId, ov] of Object.entries(defOvs)) {
+          if (ov.disengaged) {
+            // Disengaging a system for a threat type removes it from ALL platforms
+            // of that type — the system stood down entirely, not just against one platform.
+            if (!disengagedByThreatType[tt]) disengagedByThreatType[tt] = [];
+            if (!disengagedByThreatType[tt].includes(defId)) disengagedByThreatType[tt].push(defId);
+          } else {
+            if (!killOverrides[tt])             killOverrides[tt] = {};
+            if (!killOverrides[tt][platformId]) killOverrides[tt][platformId] = {};
+            killOverrides[tt][platformId][defId] = ov;
+          }
         }
       }
     }
@@ -1627,6 +1643,7 @@ function activateOverrideEdit(triggerBtn) {
   document.querySelector('.override-edit-form')?.remove();
 
   const threatType = triggerBtn.dataset.threat;
+  const platformId = triggerBtn.dataset.platform;
   const defId      = triggerBtn.dataset.def;
   const threatsIn  = parseInt(triggerBtn.dataset.threatsIn, 10);
   const killedNow  = parseInt(triggerBtn.dataset.killed,    10);
@@ -1654,12 +1671,12 @@ function activateOverrideEdit(triggerBtn) {
       return;
     }
     form.remove();
-    applyLayerOverride(threatType, defId, threatsIn - val, false);
+    applyLayerOverride(threatType, platformId, defId, threatsIn - val, false);
   });
 
   form.querySelector('.btn-ov-disengage').addEventListener('click', () => {
     form.remove();
-    applyLayerOverride(threatType, defId, threatsIn, true);
+    applyLayerOverride(threatType, platformId, defId, threatsIn, true);
   });
 
   form.querySelector('.btn-ov-cancel').addEventListener('click', () => form.remove());
@@ -1688,7 +1705,9 @@ function renderResultsSummary(results, target) {
   ).join('');
 
   const systemsEngaged = new Set(
-    results.byThreatType.flatMap(b => b.engagements.map(e => e.systemId))
+    results.byThreatType.flatMap(b =>
+      (b.platforms || []).flatMap(p => p.engagements.map(e => e.systemId))
+    )
   ).size;
 
   el.innerHTML = `
@@ -1719,14 +1738,14 @@ function renderResultsLayers(byThreatType) {
 }
 
 function buildThreatTypeSection(group) {
-  const { threatType, initialCount, finalCount, engagements } = group;
+  const { threatType, initialCount, finalCount, platforms = [] } = group;
   const icon  = THREAT_TYPE_ICONS[threatType]  || '';
   const label = THREAT_TYPE_LABELS[threatType] || threatType;
 
   const section = document.createElement('div');
   section.className = 'threat-section';
 
-  // ── Header ──────────────────────────────────────────────────────────────
+  // ── Threat-type header ───────────────────────────────────────────────────
   const hdr = document.createElement('div');
   hdr.className = `threat-section-header threat-section-${threatType}`;
   hdr.innerHTML = `
@@ -1736,30 +1755,71 @@ function buildThreatTypeSection(group) {
   `;
   section.appendChild(hdr);
 
-  // ── Engagement rows ──────────────────────────────────────────────────────
-  if (engagements.length === 0) {
+  // ── Per-platform sub-sections ────────────────────────────────────────────
+  const hasAnyEngagements = platforms.some(p => p.engagements.length > 0);
+
+  if (!hasAnyEngagements) {
     const empty = document.createElement('div');
     empty.className = 'engagement-row engagement-pass';
     empty.textContent = 'No systems assigned — all pass through';
     section.appendChild(empty);
   } else {
-    for (const eng of engagements) {
-      section.appendChild(buildEngagementRow(eng, threatType));
+    for (const platform of platforms) {
+      // Platform sub-header
+      const platHdr = document.createElement('div');
+      platHdr.className = 'platform-subsection-header';
+      platHdr.innerHTML = `
+        <span class="platform-subsection-name">${platform.platformName}</span>
+        <span class="platform-subsection-count">${platform.initialCount} inbound</span>
+      `;
+      section.appendChild(platHdr);
+
+      for (const eng of platform.engagements) {
+        section.appendChild(buildEngagementRow(eng, threatType));
+      }
+
+      // Platform outcome footer
+      const platAllKilled  = platform.finalCount === 0;
+      const platNoneKilled = platform.finalCount === platform.initialCount;
+      const platFtrClass   = platAllKilled ? 'ftr-all' : platNoneKilled ? 'ftr-none' : 'ftr-partial';
+      const platFtrText    = platAllKilled
+        ? `All ${platform.initialCount} intercepted`
+        : `${platform.finalCount} of ${platform.initialCount} penetrate`;
+
+      const platFtr = document.createElement('div');
+      platFtr.className = `platform-subsection-footer ${platFtrClass}`;
+      platFtr.textContent = platFtrText;
+      section.appendChild(platFtr);
     }
   }
 
-  // ── Footer ───────────────────────────────────────────────────────────────
-  const allKilled  = finalCount === 0;
-  const noneKilled = finalCount === initialCount;
-  const ftrClass   = allKilled ? 'ftr-all' : noneKilled ? 'ftr-none' : 'ftr-partial';
-  const ftrText    = allKilled
-    ? `All ${initialCount} intercepted`
-    : `${finalCount} of ${initialCount} penetrate`;
+  // ── Threat-type totals footer (only shown when > 1 platform) ────────────
+  if (platforms.length > 1) {
+    const allKilled  = finalCount === 0;
+    const noneKilled = finalCount === initialCount;
+    const ftrClass   = allKilled ? 'ftr-all' : noneKilled ? 'ftr-none' : 'ftr-partial';
+    const ftrText    = allKilled
+      ? `All ${initialCount} intercepted`
+      : `${finalCount} of ${initialCount} penetrate`;
 
-  const ftr = document.createElement('div');
-  ftr.className = `threat-section-footer ${ftrClass}`;
-  ftr.textContent = ftrText;
-  section.appendChild(ftr);
+    const ftr = document.createElement('div');
+    ftr.className = `threat-section-footer ${ftrClass}`;
+    ftr.textContent = `Total: ${ftrText}`;
+    section.appendChild(ftr);
+  } else if (platforms.length === 1) {
+    // Single platform — use the platform footer as the section footer
+    const allKilled  = finalCount === 0;
+    const noneKilled = finalCount === initialCount;
+    const ftrClass   = allKilled ? 'ftr-all' : noneKilled ? 'ftr-none' : 'ftr-partial';
+    const ftrText    = allKilled
+      ? `All ${initialCount} intercepted`
+      : `${finalCount} of ${initialCount} penetrate`;
+
+    const ftr = document.createElement('div');
+    ftr.className = `threat-section-footer ${ftrClass}`;
+    ftr.textContent = ftrText;
+    section.appendChild(ftr);
+  }
 
   return section;
 }
@@ -1872,10 +1932,10 @@ function buildEngagementRow(eng, threatType = '') {
         <span class="eng-in">${eng.threatsIn} in</span>
       </div>
       <button class="btn-icon btn-clear-override"
-        data-threat="${threatType}" data-def="${eng.defId}" title="Clear override">✕</button>
+        data-threat="${threatType}" data-platform="${eng.platformId ?? ''}" data-def="${eng.defId}" title="Clear override">✕</button>
     `;
     row.querySelector('.btn-clear-override')
-      .addEventListener('click', e => clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.def));
+      .addEventListener('click', e => clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.platform, e.currentTarget.dataset.def));
     return row;
   }
 
@@ -1898,14 +1958,14 @@ function buildEngagementRow(eng, threatType = '') {
   const overrideBadge = isOverride
     ? `<span class="override-badge">⚡ Override
          <button class="btn-icon btn-clear-override"
-           data-threat="${threatType}" data-def="${eng.defId}" title="Clear override">✕</button>
+           data-threat="${threatType}" data-platform="${eng.platformId ?? ''}" data-def="${eng.defId}" title="Clear override">✕</button>
        </span>`
     : '';
 
   // Edit button only appears on un-overridden rows when a simulation is stored
   const editBtn = (!isOverride && threatType && lastSimResults)
     ? `<button class="btn-icon btn-override-eng"
-         data-threat="${threatType}" data-def="${eng.defId}"
+         data-threat="${threatType}" data-platform="${eng.platformId ?? ''}" data-def="${eng.defId}"
          data-threats-in="${eng.threatsIn}" data-killed="${eng.killed}"
          title="Override this layer's result">⚙</button>`
     : '';
@@ -1933,7 +1993,7 @@ function buildEngagementRow(eng, threatType = '') {
   row.querySelectorAll('.btn-clear-override')
     .forEach(btn => btn.addEventListener('click', e => {
       e.stopPropagation();
-      clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.def);
+      clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.platform, e.currentTarget.dataset.def);
     }));
 
   // ── Toggleable prose detail block ────────────────────────────────────────
@@ -1956,7 +2016,9 @@ function renderResultsFinal(results) {
   const allKilled   = results.totalOut === 0;
   const noneKilled  = results.totalOut === results.totalIn;
 
-  const hasPlaceholder = results.byThreatType.some(b => b.engagements.some(e => e.isPlaceholder));
+  const hasPlaceholder = results.byThreatType.some(b =>
+    (b.platforms || []).some(p => p.engagements.some(e => e.isPlaceholder))
+  );
 
   let html = `<div class="final-result ${allKilled ? 'final-all-killed' : noneKilled ? 'final-none-killed' : 'final-partial'}">`;
 
