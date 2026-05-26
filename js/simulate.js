@@ -248,8 +248,11 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
         if (!params) continue;
         if (remaining <= 0) break;
 
-        const pk    = params.pk    ?? 0;
-        const shots = params.shotsPerEngagement ?? 2;
+        const pk                   = params.pk                    ?? 0;
+        const shots                = params.shotsPerEngagement    ?? 2;
+        const pkTier               = params.pkTier                ?? null;
+        const pkIsFixed            = params.pkIsFixed             ?? false;
+        const shotsPerEngageTier   = params.shotsPerEngagementTier ?? null;
 
         const magazineBefore    = entry.magazineRemaining;
         const result            = applyEngagement(remaining, pk, magazineBefore, shots);
@@ -259,22 +262,25 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
         entry.magazineRemaining = result.magazineRemaining;
 
         engagements.push({
-          defId:              entry.def.id,
+          defId:                  entry.def.id,
           systemId,
-          systemName:         DEFENSE_CATALOG[systemId]?.name || systemId,
-          quantity:           entry.def.quantity,
-          notes:              entry.def.notes || '',
+          systemName:             DEFENSE_CATALOG[systemId]?.name || systemId,
+          quantity:               entry.def.quantity,
+          notes:                  entry.def.notes || '',
           threatType,
-          threatsIn:          remaining,
-          killed:             result.killed,
-          survived:           result.survived,
+          threatsIn:              remaining,
+          killed:                 result.killed,
+          survived:               result.survived,
           pk,
-          shotsPerEngagement: shots,
-          magazineAtStart:    magazineBefore,
-          interceptorsUsed:   magazineBefore - entry.magazineRemaining,
-          magazineRemaining:  entry.magazineRemaining,
-          isPlaceholder:      result.isPlaceholder,
-          note:               result.note
+          pkTier,
+          pkIsFixed,
+          shotsPerEngagement:     shots,
+          shotsPerEngagementTier: shotsPerEngageTier,
+          magazineAtStart:        magazineBefore,
+          interceptorsUsed:       magazineBefore - entry.magazineRemaining,
+          magazineRemaining:      entry.magazineRemaining,
+          isPlaceholder:          result.isPlaceholder,
+          note:                   result.note
         });
 
         remaining = result.survived;

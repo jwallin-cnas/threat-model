@@ -1053,6 +1053,42 @@ select option, select optgroup {
 }
 .engagement-row:hover .btn-override-eng { opacity: 1; }
 
+/* Toggleable prose detail block */
+.eng-details {
+  padding: 0 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.eng-details[open] {
+  padding-bottom: 8px;
+}
+.eng-details-summary {
+  display: inline-block;
+  margin: 5px 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.eng-details-summary::-webkit-details-marker { display: none; }
+.eng-details-summary::after {
+  content: ' ▸';
+  font-size: 10px;
+}
+.eng-details[open] .eng-details-summary::after {
+  content: ' ▾';
+}
+.eng-prose {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.eng-prose strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 /* Inline form that appears below the engagement row */
 .override-edit-form {
   display: flex;

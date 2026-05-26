@@ -1764,6 +1764,77 @@ function buildThreatTypeSection(group) {
   return section;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Engagement prose builder
+// Returns an HTML string describing what happened in a single engagement.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildEngagementProse(eng, threatType) {
+  const PROSE_LABELS = {
+    ballistic_missile: 'ballistic missile',
+    cruise_missile:    'cruise missile',
+    drone:             'drone',
+    hypersonic:        'hypersonic glide vehicle'
+  };
+  const tLabel  = PROSE_LABELS[threatType] || threatType.replace(/_/g, ' ');
+  const tPlural = (eng.threatsIn === 1) ? tLabel : (tLabel + 's');
+  const name    = eng.systemName;
+  const killed  = eng.killed   ?? 0;
+  const total   = eng.threatsIn ?? 0;
+  const pk      = (eng.pk ?? 0).toFixed(2);
+
+  // ── Manual override ───────────────────────────────────────────────────────
+  if (eng.isManualOverride) {
+    const killWord = eng.shotsPerEngagement === 0 ? 'neutralised' : 'destroyed';
+    return `This engagement result was manually adjusted. ${name} was recorded as having ${killWord} <strong>${killed}</strong> of <strong>${total}</strong> ${tPlural}.`;
+  }
+
+  // ── Placeholder ───────────────────────────────────────────────────────────
+  if (eng.isPlaceholder) {
+    return `${name}'s Pk has not been configured. This engagement is a placeholder — no interceptors were consumed and no threats were destroyed.`;
+  }
+
+  // ── Pk sentence ───────────────────────────────────────────────────────────
+  let pkSentence;
+  if (eng.pkIsFixed) {
+    pkSentence = `${name} engaged with a fixed Pk of <strong>${pk}</strong>.`;
+  } else if (eng.pkTier) {
+    pkSentence = `${name} rolled a <strong>${eng.pkTier}</strong>-confidence Pk of <strong>${pk}</strong>.`;
+  } else {
+    pkSentence = `${name} engaged with a Pk of <strong>${pk}</strong>.`;
+  }
+
+  // ── Kill sentence ─────────────────────────────────────────────────────────
+  const killWord = eng.shotsPerEngagement === 0 ? 'neutralised' : 'destroyed';
+  let killPart;
+  if      (killed === 0)     killPart = `No ${tPlural} were ${killWord}`;
+  else if (killed === total) killPart = `All <strong>${total}</strong> ${tPlural} were ${killWord}`;
+  else                       killPart = `<strong>${killed}</strong> of <strong>${total}</strong> ${tPlural} were ${killWord}`;
+  const killSentence = `${killPart}.`;
+
+  // ── Interceptor sentence ──────────────────────────────────────────────────
+  let intSentence;
+  if (eng.shotsPerEngagement === 0) {
+    intSentence = `As a directed-energy or electronic-warfare system, no interceptors were consumed.`;
+  } else {
+    const shots    = eng.shotsPerEngagement ?? 2;
+    const expended = eng.interceptorsUsed   ?? 0;
+    const magStart = eng.magazineAtStart    ?? 0;
+    const magEnd   = eng.magazineRemaining  ?? 0;
+
+    let rateDesc;
+    if (eng.shotsPerEngagementTier === 'elevated') {
+      rateDesc = `at an <strong>elevated</strong> average rate of <strong>${shots}</strong> interceptors per ${tLabel}`;
+    } else {
+      rateDesc = `at <strong>${shots}</strong> interceptor${shots !== 1 ? 's' : ''} per ${tLabel}`;
+    }
+
+    intSentence = `<strong>${expended}</strong> interceptor${expended !== 1 ? 's' : ''} were expended ${rateDesc} (${magStart} → ${magEnd} remaining).`;
+  }
+
+  return `${pkSentence} ${killSentence} ${intSentence}`;
+}
+
 function buildEngagementRow(eng, threatType = '') {
   const row = document.createElement('div');
 
@@ -1864,6 +1935,16 @@ function buildEngagementRow(eng, threatType = '') {
       e.stopPropagation();
       clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.def);
     }));
+
+  // ── Toggleable prose detail block ────────────────────────────────────────
+  const details = document.createElement('details');
+  details.className = 'eng-details';
+  const prose = buildEngagementProse(eng, threatType);
+  details.innerHTML = `
+    <summary class="eng-details-summary">Details</summary>
+    <p class="eng-prose">${prose}</p>
+  `;
+  row.appendChild(details);
 
   return row;
 }
