@@ -71,13 +71,13 @@ const ENGAGEMENT_FUNCTIONS = {
   thaad: function(threatType) {
     if (!['srbm', 'mrbm'].includes(threatType)) return null;
     const roll  = Math.random();
-    const shots = roll <= 0.1 ? 1.5 : 1.0;
+    const shots = threatType === 'srbm' ? 2.0 : (roll <= 0.1 ? 1.5 : 1.0);
     return {
       pk:                     1.0,
       pkTier:                 'high',
       pkIsFixed:              true,
       shotsPerEngagement:     shots,
-      shotsPerEngagementTier: shots === 1.5 ? 'elevated' : 'standard'
+      shotsPerEngagementTier: shots >= 1.5 ? 'elevated' : 'standard'
     };
   },
 
