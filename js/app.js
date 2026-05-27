@@ -1386,8 +1386,12 @@ async function simulate() {
   try {
     const target            = getTarget(selectedTargetId);
 
-    // Own defenses — exclude any the user has marked as disabled pre-simulation
-    const perTargetDefenses = (target?.defenses || []).filter(d => !d.disabled);
+    // Own defenses — exclude any the user has marked as disabled pre-simulation.
+    // Stamp locationName/locationCountry so engagement records always carry a
+    // source location, just like cross-target defenses do.
+    const perTargetDefenses = (target?.defenses || [])
+      .filter(d => !d.disabled)
+      .map(d => ({ ...d, locationName: target.name, locationCountry: target.country || '' }));
 
     // Cross-target defenses — exclude any disabled for this covered target
     const crossDefs = getCrossTargetDefenses(selectedTargetId)
@@ -1880,10 +1884,15 @@ function buildEngagementProse(eng, threatType) {
 function buildEngagementRow(eng, threatType = '') {
   const row = document.createElement('div');
 
+  const locationHtml = eng.locationName
+    ? `<span class="eng-location">📍 ${eng.locationName}${eng.locationCountry ? ', ' + eng.locationCountry : ''}</span>`
+    : '';
+
   if (eng.note === 'Cannot engage') {
     row.className = 'engagement-row eng-no-capability';
     row.innerHTML = `
       <span class="eng-name">${eng.systemName}</span>
+      ${locationHtml}
       <span class="eng-note-text">Cannot engage this threat type — passes through</span>
     `;
     return row;
@@ -1893,6 +1902,7 @@ function buildEngagementRow(eng, threatType = '') {
     row.className = 'engagement-row eng-exhausted';
     row.innerHTML = `
       <span class="eng-name">${eng.systemName}</span>
+      ${locationHtml}
       <span class="eng-note-text">Magazine exhausted — ${eng.threatsIn} pass through</span>
     `;
     return row;
@@ -1906,6 +1916,7 @@ function buildEngagementRow(eng, threatType = '') {
         <span class="eng-name">${eng.systemName}</span>
         <span class="eng-qty">${eng.quantity} batt.</span>
         ${eng.notes ? `<span class="eng-notes">${eng.notes}</span>` : ''}
+        ${locationHtml}
         <span class="override-badge">⚡ Disengaged</span>
       </div>
       <div class="eng-stats">
@@ -1957,6 +1968,7 @@ function buildEngagementRow(eng, threatType = '') {
       <span class="eng-name">${eng.systemName}</span>
       <span class="eng-qty">${eng.quantity} batt.</span>
       ${eng.notes ? `<span class="eng-notes">${eng.notes}</span>` : ''}
+      ${locationHtml}
       ${overrideBadge}
     </div>
     <div class="eng-stats">
