@@ -1382,6 +1382,19 @@ select option, select optgroup {
   white-space: nowrap;
 }
 
+/* Warning note shown on cross-target cards when a system's per-threat-type
+   range cap means it cannot engage all threat types at this target's distance */
+.cross-target-range-note {
+  font-size: 10px;
+  color: var(--warn);
+  background: var(--warn-dim);
+  border: 1px solid #5a4500;
+  border-radius: 4px;
+  padding: 3px 7px;
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 860px) {

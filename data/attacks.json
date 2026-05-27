@@ -13,7 +13,7 @@
     {
       "id": "dji_fpv",
       "name": "DJI FPV UAV",
-      "type": "drone",
+      "type": "fpv",
       "payload_kg": 1,
       "range_km": 10,
       "salvo_sizes": [2, 10, 50]
@@ -77,7 +77,7 @@
     {
       "id": "fateh_110",
       "name": "Fateh-110",
-      "type": "ballistic_missile",
+      "type": "srbm",
       "payload_kg": 450,
       "range_km": 300,
       "salvo_sizes": [2, 10, 50]
@@ -85,7 +85,7 @@
     {
       "id": "ghadr",
       "name": "Ghadr",
-      "type": "ballistic_missile",
+      "type": "mrbm",
       "payload_kg": 750,
       "range_km": 1600,
       "salvo_sizes": [2, 10, 50]
@@ -93,7 +93,7 @@
     {
       "id": "haj_qasem",
       "name": "Haj Qasem",
-      "type": "ballistic_missile",
+      "type": "mrbm",
       "payload_kg": 500,
       "range_km": 1400,
       "salvo_sizes": [2, 10, 50]
@@ -101,7 +101,7 @@
     {
       "id": "khalij_e_fars",
       "name": "Khalij-e Fars",
-      "type": "ballistic_missile",
+      "type": "srbm",
       "payload_kg": 650,
       "range_km": 300,
       "salvo_sizes": [2, 10, 50]
@@ -109,7 +109,7 @@
     {
       "id": "khorramshahr",
       "name": "Khorramshahr",
-      "type": "ballistic_missile",
+      "type": "mrbm",
       "payload_kg": 1800,
       "range_km": 3000,
       "salvo_sizes": [2, 10, 50]
@@ -125,7 +125,7 @@
     {
       "id": "qaem_1",
       "name": "Qaem-1 / Borkan-H2",
-      "type": "ballistic_missile",
+      "type": "srbm",
       "payload_kg": 985,
       "range_km": 800,
       "salvo_sizes": [2, 10, 50]
@@ -133,7 +133,7 @@
     {
       "id": "shahab_3",
       "name": "Shahab-3",
-      "type": "ballistic_missile",
+      "type": "mrbm",
       "payload_kg": 1000,
       "range_km": 1000,
       "salvo_sizes": [2, 10, 50]
@@ -149,7 +149,7 @@
     {
       "id": "zulfagher",
       "name": "Zulfagher",
-      "type": "ballistic_missile",
+      "type": "srbm",
       "payload_kg": 450,
       "range_km": 700,
       "salvo_sizes": [2, 10, 50]
@@ -157,7 +157,7 @@
     {
       "id": "zulfagher_e_basir",
       "name": "Zulfagher-e Basir",
-      "type": "ballistic_missile",
+      "type": "srbm",
       "payload_kg": 500,
       "range_km": 700,
       "salvo_sizes": [2, 10, 50]

@@ -47,6 +47,7 @@
       "id": "patriot",
       "name": "Patriot",
       "range_km": 100,
+      "threat_range_overrides": { "ballistic_missile": 30 },
       "batteries": 3,
       "armament": {
         "type": "missile",

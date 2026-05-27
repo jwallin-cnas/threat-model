@@ -202,9 +202,18 @@ function runSimulation(attackManifest, defenses, initialMagazineState = {}, excl
       if (remaining <= 0) break;
 
       // Find ALL deployed entries for this system type, minus any excluded for
-      // this specific threat type (per-threat-type disengage overrides).
+      // this specific threat type (per-threat-type disengage overrides), and
+      // minus cross-target batteries whose per-type range cap excludes this threat.
       const entries = Object.values(deployed)
-        .filter(e => e.def.system === systemId && !excludedIds.has(e.def.id));
+        .filter(e => e.def.system === systemId && !excludedIds.has(e.def.id))
+        .filter(e => {
+          // restrictToThreatTypes is set on cross-target defenses when a system's
+          // per-threat-type range (threat_range_overrides in the catalog) is
+          // shorter than its general range_km for some types.
+          // null → no restriction; the battery engages all applicable threat types.
+          const r = e.def.restrictToThreatTypes;
+          return !r || r.includes(threatType);
+        });
       if (entries.length === 0) continue;
 
       const engFn = (typeof ENGAGEMENT_FUNCTIONS !== 'undefined')

@@ -241,9 +241,10 @@ function mergeLoadedData() {
       range_km:           sys.range_km || 0,
       defaultBatteries:   sys.batteries || 1,
       isShared:           sys.shared || false,
-      effectiveAgainst:   sys.threats || [],
-      magazinePerBattery: sys.armament?.standard_loadout || 0,
-      description:        `Range: ${sys.range_km} km`
+      effectiveAgainst:    sys.threats || [],
+      threatRangeOverrides: sys.threat_range_overrides || {},
+      magazinePerBattery:  sys.armament?.standard_loadout || 0,
+      description:         `Range: ${sys.range_km} km`
     };
   }
 
@@ -302,16 +303,29 @@ function getCrossTargetDefenses(targetId) {
     for (const def of (other.defenses || [])) {
       const catalog = DEFENSE_CATALOG[def.system];
       if (!catalog || catalog.range_km <= 0) continue;
-      if (dist <= catalog.range_km) {
-        result.push({
-          ...def,
-          _isCrossTarget:      true,
-          _placedAtTargetId:      other.id,
-          _placedAtTargetName:    other.name,
-          _placedAtTargetCountry: other.country || '',
-          _distanceKm:            Math.round(dist)
-        });
-      }
+
+      // Compute which threat types this battery is in range to engage.
+      // Systems with threat_range_overrides (e.g. Patriot: BM 30 km, CM/drone 100 km)
+      // may be in range for some types but not others.
+      const overrides       = catalog.threat_range_overrides || {};
+      const inRangeForTypes = (catalog.threats || []).filter(tt => {
+        const effectiveRange = overrides[tt] ?? catalog.range_km;
+        return dist <= effectiveRange;
+      });
+
+      if (inRangeForTypes.length === 0) continue;
+
+      // null means "all catalogued threat types are in range" — no restriction needed.
+      const hasRestriction = inRangeForTypes.length < (catalog.threats || []).length;
+      result.push({
+        ...def,
+        _isCrossTarget:         true,
+        _placedAtTargetId:      other.id,
+        _placedAtTargetName:    other.name,
+        _placedAtTargetCountry: other.country || '',
+        _distanceKm:            Math.round(dist),
+        _restrictToThreatTypes: hasRestriction ? inRangeForTypes : null
+      });
     }
   }
 
@@ -684,9 +698,28 @@ function buildCrossTargetDefenseCard(def, targetId) {
     }
   }
 
-  const effectList = (catalog?.effectiveAgainst || [])
+  // When a system's per-threat-type range cap means it can only reach this target
+  // for some threat types, show only the active chips and add a warning note.
+  const restrictedTypes = def._restrictToThreatTypes;   // null = no restriction
+  const displayTypes    = restrictedTypes || (catalog?.effectiveAgainst || []);
+  const effectList      = displayTypes
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
+
+  let rangeNoteHtml = '';
+  if (restrictedTypes) {
+    const allTypes     = catalog?.effectiveAgainst || [];
+    const excluded     = allTypes.filter(t => !restrictedTypes.includes(t));
+    if (excluded.length > 0) {
+      const overrides  = catalog?.threatRangeOverrides || {};
+      const parts      = excluded.map(t => {
+        const cap   = overrides[t];
+        const label = THREAT_TYPE_LABELS[t] || t;
+        return cap != null ? `${label} (max ${cap} km)` : label;
+      });
+      rangeNoteHtml = `<div class="cross-target-range-note">⚠ Limited coverage at ${def._distanceKm} km — cannot engage: ${parts.join(', ')}</div>`;
+    }
+  }
 
   const card = document.createElement('div');
   card.className = `defense-card cross-target-card${isDisabled ? ' defense-card--disabled' : ''}`;
@@ -713,6 +746,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
     ${magHtml}
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
     <div class="defense-threats">${effectList}</div>
+    ${rangeNoteHtml}
   `;
 
   card.querySelectorAll('.mag-count-editable').forEach(span => {
@@ -1357,10 +1391,14 @@ async function simulate() {
     const crossDefs = getCrossTargetDefenses(selectedTargetId)
       .filter(d => !isCrossTargetDefenseDisabled(selectedTargetId, d))
       .map(d => ({
-        id:       d.id,
-        system:   d.system,
-        quantity: d.quantity,
-        notes:    d.notes || ''
+        id:                   d.id,
+        system:               d.system,
+        quantity:             d.quantity,
+        notes:                d.notes || '',
+        operator:             d.operator || '',
+        locationName:         d._placedAtTargetName,
+        locationCountry:      d._placedAtTargetCountry || '',
+        restrictToThreatTypes: d._restrictToThreatTypes || null
       }));
 
     const allDefenses = [...perTargetDefenses, ...crossDefs];

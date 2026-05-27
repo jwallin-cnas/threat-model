@@ -40,6 +40,11 @@
           "minimum": 0,
           "description": "Maximum engagement range in kilometers. Use 0 for shared/patrol assets with no fixed emplacement range."
         },
+        "threat_range_overrides": {
+          "type": "object",
+          "description": "Per-threat-type range overrides in km. Keys are threat type strings (e.g. 'ballistic_missile'); values override range_km for the cross-target range check for that type only. Omit to use range_km for all threat types.",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        },
         "batteries": {
           "type": "integer",
           "minimum": 1,
