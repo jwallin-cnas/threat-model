@@ -5,7 +5,7 @@
  *
  * Each function receives one argument:
  *
- *   threatType    'ballistic_missile' | 'cruise_missile' | 'drone' | 'hypersonic'
+ *   threatType    'srbm' | 'mrbm' | 'cruise_missile' | 'drone' | 'fpv' | 'hypersonic'
  *
  * It must return ONE of:
  *
@@ -45,7 +45,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Aegis BMD — SM-3 (aegis_sm3) ─────────────────────────────────────────
   aegis_sm3: function(threatType) {
-    if (threatType !== 'ballistic_missile') return null;
+    if (!['srbm', 'mrbm'].includes(threatType)) return null;
     return {
       pk:                     1.0,
       pkTier:                 'high',
@@ -57,7 +57,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Aegis BMD — SM-6 (aegis_sm6) ─────────────────────────────────────────
   aegis_sm6: function(threatType) {
-    if (!['ballistic_missile', 'cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['srbm', 'mrbm', 'cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     return {
       pk:                     1.0,
       pkTier:                 'high',
@@ -69,7 +69,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── THAAD ─────────────────────────────────────────────────────────────────
   thaad: function(threatType) {
-    if (threatType !== 'ballistic_missile') return null;
+    if (!['srbm', 'mrbm'].includes(threatType)) return null;
     const roll  = Math.random();
     const shots = roll <= 0.1 ? 1.5 : 1.0;
     return {
@@ -83,7 +83,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Arrow 2/3 (arrow) ─────────────────────────────────────────────────────
   arrow: function(threatType) {
-    if (threatType !== 'ballistic_missile') return null;
+    if (!['srbm', 'mrbm'].includes(threatType)) return null;
     return {
       pk:                     1.0,
       pkTier:                 'high',
@@ -95,7 +95,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Aegis BMD — SM-2 (aegis_sm2) ─────────────────────────────────────────
   aegis_sm2: function(threatType) {
-    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     return {
       pk:                     1.0,
       pkTier:                 'high',
@@ -107,11 +107,11 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── David's Sling (davids_sling) ──────────────────────────────────────────
   davids_sling: function(threatType) {
-    if (!['ballistic_missile', 'cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['srbm', 'mrbm', 'cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
-    const shots  = threatType === 'drone' ? 3 : 2;
+    const shots  = (threatType === 'drone' || threatType === 'fpv') ? 3 : 2;
     return {
       pk:                     pks[pkTier],
       pkTier,
@@ -123,11 +123,11 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Patriot (patriot) ─────────────────────────────────────────────────────
   patriot: function(threatType) {
-    if (!['ballistic_missile', 'cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['srbm', 'mrbm', 'cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
-    const shots  = threatType === 'drone' ? 3 : 2;
+    const shots  = (threatType === 'drone' || threatType === 'fpv') ? 3 : 2;
     return {
       pk:                     pks[pkTier],
       pkTier,
@@ -139,7 +139,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Iron Dome (iron_dome) ─────────────────────────────────────────────────
   iron_dome: function(threatType) {
-    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -154,11 +154,11 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Cheongung II (cheongung2) ─────────────────────────────────────────────
   cheongung2: function(threatType) {
-    if (!['ballistic_missile', 'cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['srbm', 'mrbm', 'cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
-    const shots  = threatType === 'drone' ? 3 : 2;
+    const shots  = (threatType === 'drone' || threatType === 'fpv') ? 3 : 2;
     return {
       pk:                     pks[pkTier],
       pkTier,
@@ -170,7 +170,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── NASAMS (nasams) ───────────────────────────────────────────────────────
   nasams: function(threatType) {
-    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -185,7 +185,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Pantsir-S1E (pantsirs1e) ──────────────────────────────────────────────
   pantsirs1e: function(threatType) {
-    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -200,7 +200,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── IFPC-2 (ifpc2) ────────────────────────────────────────────────────────
   ifpc2: function(threatType) {
-    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -215,7 +215,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── FS-LIDS (fslids) ──────────────────────────────────────────────────────
   fslids: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -230,7 +230,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── M-SHORAD (m_shorad) ───────────────────────────────────────────────────
   m_shorad: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -245,7 +245,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Phalanx C-RAM (phalanx_cram) ──────────────────────────────────────────
   phalanx_cram: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -260,7 +260,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Tactical Jammer (tactical_jammer) ─────────────────────────────────────
   tactical_jammer: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.3, medium: 0.4, high: 0.5 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -275,7 +275,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Merops (merops) ───────────────────────────────────────────────────────
   merops: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.40, medium: 0.50, high: 0.60 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -290,7 +290,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── High-Powered Microwave (high_powered_microwave) ───────────────────────
   high_powered_microwave: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.4, medium: 0.5, high: 0.6 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -305,7 +305,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Containerized Laser (containerized_laser) ─────────────────────────────
   containerized_laser: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.2, medium: 0.3, high: 0.4 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -320,7 +320,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── Iron Beam (iron_beam) ─────────────────────────────────────────────────
   iron_beam: function(threatType) {
-    if (!['drone'].includes(threatType)) return null;
+    if (!['drone', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.2, medium: 0.3, high: 0.4 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
@@ -335,7 +335,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── F-15E Patrol ×2 (f15e_patrol) ────────────────────────────────────────
   f15e_patrol: function(threatType) {
-    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     return {
       pk:                     1.0,
       pkTier:                 'high',
@@ -347,7 +347,7 @@ const ENGAGEMENT_FUNCTIONS = {
 
   // ── F/A-18 Patrol ×2 (fa18_patrol) ───────────────────────────────────────
   fa18_patrol: function(threatType) {
-    if (!['cruise_missile', 'drone'].includes(threatType)) return null;
+    if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
     return {
       pk:                     1.0,
       pkTier:                 'high',

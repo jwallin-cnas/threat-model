@@ -1053,10 +1053,12 @@ function populatePlatformSelect() {
   sel.innerHTML = '<option value="">— Select Platform —</option>';
 
   const groups = {
-    drone:             { label: 'Drones & Loitering Munitions', items: [] },
-    cruise_missile:    { label: 'Cruise Missiles',              items: [] },
-    ballistic_missile: { label: 'Ballistic Missiles (SRBM/MRBM)', items: [] },
-    hypersonic:        { label: 'Hypersonic Glide Vehicles',    items: [] }
+    mrbm:           { label: 'Medium-Range Ballistic Missiles (MRBM)', items: [] },
+    srbm:           { label: 'Short-Range Ballistic Missiles (SRBM)',  items: [] },
+    cruise_missile: { label: 'Cruise Missiles',                        items: [] },
+    drone:          { label: 'Drones & Loitering Munitions',           items: [] },
+    fpv:            { label: 'FPV Drones',                             items: [] },
+    hypersonic:     { label: 'Hypersonic Glide Vehicles',              items: [] }
   };
 
   for (const [id, p] of Object.entries(PLATFORM_CATALOG)) {
@@ -1142,7 +1144,7 @@ function renderAttackManifest() {
 
   simBtn.disabled = !selectedTargetId;
 
-  const THREAT_ORDER = { ballistic_missile: 0, cruise_missile: 1, drone: 2 };
+  const THREAT_ORDER = { mrbm: 0, srbm: 1, cruise_missile: 2, drone: 3, fpv: 4 };
   const sortedManifest = [...attackManifest].sort((a, b) => {
     const ta = PLATFORM_CATALOG[a.platformId]?.type ?? '';
     const tb = PLATFORM_CATALOG[b.platformId]?.type ?? '';
@@ -1809,10 +1811,12 @@ function buildThreatTypeSection(group) {
 
 function buildEngagementProse(eng, threatType) {
   const PROSE_LABELS = {
-    ballistic_missile: 'ballistic missile',
-    cruise_missile:    'cruise missile',
-    drone:             'drone',
-    hypersonic:        'hypersonic glide vehicle'
+    mrbm:           'medium-range ballistic missile',
+    srbm:           'short-range ballistic missile',
+    cruise_missile: 'cruise missile',
+    drone:          'drone',
+    fpv:            'FPV drone',
+    hypersonic:     'hypersonic glide vehicle'
   };
   const tLabel  = PROSE_LABELS[threatType] || threatType.replace(/_/g, ' ');
   const tPlural = (eng.threatsIn === 1) ? tLabel : (tLabel + 's');

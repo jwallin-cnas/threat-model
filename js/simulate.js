@@ -125,7 +125,7 @@ const ENGAGEMENT_PRIORITY = [
 // order. Magazine consumed against earlier threat types carries over.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const THREAT_PRIORITY = ['ballistic_missile', 'cruise_missile', 'drone'];
+const THREAT_PRIORITY = ['mrbm', 'srbm', 'cruise_missile', 'drone', 'fpv'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main simulation orchestrator

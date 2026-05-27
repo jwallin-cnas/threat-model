@@ -157,7 +157,7 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "enum": ["ballistic_missile", "cruise_missile", "drone"]
+            "enum": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"]
           }
         }
       }

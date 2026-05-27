@@ -40,15 +40,19 @@ const TIER_LABELS = {
 };
 
 const THREAT_TYPE_LABELS = {
-  drone:             'Drone / Loitering Munition',
-  cruise_missile:    'Cruise Missile',
-  ballistic_missile: 'Ballistic Missile',
-  hypersonic:        'Hypersonic Glide Vehicle'
+  fpv:              'FPV Drone',
+  drone:            'Drone / Loitering Munition',
+  cruise_missile:   'Cruise Missile',
+  srbm:             'Short-Range Ballistic Missile (SRBM)',
+  mrbm:             'Medium-Range Ballistic Missile (MRBM)',
+  hypersonic:       'Hypersonic Glide Vehicle'
 };
 
 const THREAT_TYPE_ICONS = {
-  drone:             '●',
-  cruise_missile:    '●',
-  ballistic_missile: '●',
-  hypersonic:        '●'
+  fpv:              '●',
+  drone:            '●',
+  cruise_missile:   '●',
+  srbm:             '●',
+  mrbm:             '●',
+  hypersonic:       '●'
 };

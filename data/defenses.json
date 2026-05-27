@@ -13,7 +13,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 48
       },
-      "threats": ["ballistic_missile"]
+      "threats": ["srbm", "mrbm"]
     },
     {
       "id": "arrow",
@@ -27,7 +27,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 24
       },
-      "threats": ["ballistic_missile"]
+      "threats": ["srbm", "mrbm"]
     },
     {
       "id": "aegis_sm3",
@@ -41,13 +41,13 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 25
       },
-      "threats": ["ballistic_missile"]
+      "threats": ["srbm", "mrbm"]
     },
     {
       "id": "patriot",
       "name": "Patriot",
       "range_km": 110,
-      "threat_range_overrides": { "ballistic_missile": 30 },
+      "threat_range_overrides": { "srbm": 30, "mrbm": 30 },
       "batteries": 3,
       "armament": {
         "type": "missile",
@@ -56,7 +56,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 12
       },
-      "threats": ["ballistic_missile", "cruise_missile", "drone"]
+      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"]
     },
     {
       "id": "davids_sling",
@@ -70,7 +70,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 36
       },
-      "threats": ["ballistic_missile", "cruise_missile", "drone"]
+      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"]
     },
     {
       "id": "cheongung2",
@@ -84,7 +84,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 32
       },
-      "threats": ["ballistic_missile", "cruise_missile", "drone"]
+      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"]
     },
     {
       "id": "aegis_sm2",
@@ -98,7 +98,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 25
       },
-      "threats": ["ballistic_missile"]
+      "threats": ["cruise_missile", "drone", "fpv"]
     },
     {
       "id": "aegis_sm6",
@@ -112,7 +112,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 25
       },
-      "threats": ["ballistic_missile"]
+      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"]
     },
     {
       "id": "iron_dome",
@@ -126,7 +126,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 60
       },
-      "threats": ["ballistic_missile", "drone"]
+      "threats": ["cruise_missile", "drone", "fpv"]
     },
     {
       "id": "nasams",
@@ -140,7 +140,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 18
       },
-      "threats": ["ballistic_missile", "drone"]
+      "threats": ["cruise_missile", "drone", "fpv"]
     },
     {
       "id": "ifpc2",
@@ -154,7 +154,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 36
       },
-      "threats": ["drone"]
+      "threats": ["drone", "fpv"]
     },
     {
       "id": "pantsirs1e",
@@ -168,7 +168,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 36
       },
-      "threats": ["ballistic_missile", "drone"]
+      "threats": ["cruise_missile", "drone", "fpv"]
     },
     {
       "id": "fslids",
@@ -182,7 +182,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 16
       },
-      "threats": ["drone"]
+      "threats": ["drone", "fpv"]
     },
     {
       "id": "m_shorad",
@@ -196,7 +196,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 24
       },
-      "threats": ["drone", "cruise_missile"]
+      "threats": ["drone", "cruise_missile", "fpv"]
     },
     {
       "id": "phalanx_cram",
@@ -210,7 +210,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 1550
       },
-      "threats": ["drone", "cruise_missile"]
+      "threats": ["drone", "cruise_missile", "fpv"]
     },
     {
       "id": "tactical_jammer",
@@ -224,7 +224,7 @@
         "kill_modality": "jamming",
         "standard_loadout": 999
       },
-      "threats": ["drone"]
+      "threats": ["drone", "fpv"]
     },
     {
       "id": "merops",
@@ -238,7 +238,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 2
       },
-      "threats": ["drone"]
+      "threats": ["drone", "fpv"]
     },
     {
       "id": "high_powered_microwave",
@@ -252,7 +252,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
-      "threats": ["drone"]
+      "threats": ["drone", "fpv"]
     },
     {
       "id": "containerized_laser",
@@ -266,7 +266,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
-      "threats": ["drone", "cruise_missile"]
+      "threats": ["drone", "cruise_missile", "fpv"]
     },
     {
       "id": "iron_beam",
@@ -280,7 +280,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
-      "threats": ["drone", "cruise_missile"]
+      "threats": ["drone", "cruise_missile", "fpv"]
     },
     {
       "id": "f15e_patrol",
@@ -295,7 +295,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 200
       },
-      "threats": ["drone", "cruise_missile"]
+      "threats": ["drone", "cruise_missile", "fpv"]
     },
     {
       "id": "fa18_patrol",
@@ -310,7 +310,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 18
       },
-      "threats": ["drone", "cruise_missile"]
+      "threats": ["drone", "cruise_missile", "fpv"]
     }
   ]
 }
