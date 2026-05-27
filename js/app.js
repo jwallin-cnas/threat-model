@@ -307,8 +307,8 @@ function getCrossTargetDefenses(targetId) {
       // Compute which threat types this battery is in range to engage.
       // Systems with threat_range_overrides (e.g. Patriot: BM 30 km, CM/drone 100 km)
       // may be in range for some types but not others.
-      const overrides       = catalog.threat_range_overrides || {};
-      const inRangeForTypes = (catalog.threats || []).filter(tt => {
+      const overrides       = catalog.threatRangeOverrides || {};
+      const inRangeForTypes = (catalog.effectiveAgainst || []).filter(tt => {
         const effectiveRange = overrides[tt] ?? catalog.range_km;
         return dist <= effectiveRange;
       });
@@ -316,7 +316,7 @@ function getCrossTargetDefenses(targetId) {
       if (inRangeForTypes.length === 0) continue;
 
       // null means "all catalogued threat types are in range" — no restriction needed.
-      const hasRestriction = inRangeForTypes.length < (catalog.threats || []).length;
+      const hasRestriction = inRangeForTypes.length < (catalog.effectiveAgainst || []).length;
       result.push({
         ...def,
         _isCrossTarget:         true,
