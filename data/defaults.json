@@ -80,7 +80,7 @@
     "jebel_ali_port": [
       { "id": "jebel_ali_port_d1", "system": "patriot",    "quantity": 2, "notes": "", "operator": "United Arab Emirates" },
       { "id": "jebel_ali_port_d2", "system": "cheongung2", "quantity": 1, "notes": "", "operator": "United Arab Emirates" },
-      { "id": "jebel_ali_port_d3", "system": "merops",     "quantity": 9, "notes": "", "operator": "United Arab Emirates" }
+      { "id": "jebel_ali_port_d3", "system": "merops",     "quantity": 1, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "al_dhafra_ab": [
@@ -89,7 +89,7 @@
     ],
 
     "dubai": [
-      { "id": "dubai_d1", "system": "patriot", "quantity": 1, "notes": "", "operator": "United Arab Emirates" }
+      { "id": "dubai_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "United Arab Emirates" }
     ],
 
     "abu_dhabi": [

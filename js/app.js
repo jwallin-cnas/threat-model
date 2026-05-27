@@ -140,7 +140,7 @@ async function loadData() {
     const raw = appDefaultDefenses[t.id];
     t.defenses = Array.isArray(raw) ? raw.map(d => {
       const sysData = appDefenseSystems.find(s => s.id === d.system);
-      const qty     = sysData?.batteries ?? d.quantity ?? 1;
+      const qty     = (d.quantity ?? 1) * (sysData?.batteries ?? 1);
       return { ...d, quantity: qty, operator: d.operator || t.country || '' };
     }) : [];
   }
