@@ -608,7 +608,7 @@ function buildSharedDefenseCard(def, targetId) {
     }
   }
 
-  const effectList = (catalog?.effectiveAgainst || [])
+  const effectList = collapseThreatsForDisplay(catalog?.effectiveAgainst || [])
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 
@@ -702,7 +702,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
   // for some threat types, show only the active chips and add a warning note.
   const restrictedTypes = def._restrictToThreatTypes;   // null = no restriction
   const displayTypes    = restrictedTypes || (catalog?.effectiveAgainst || []);
-  const effectList      = displayTypes
+  const effectList      = collapseThreatsForDisplay(displayTypes)
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 
@@ -711,9 +711,11 @@ function buildCrossTargetDefenseCard(def, targetId) {
     const allTypes     = catalog?.effectiveAgainst || [];
     const excluded     = allTypes.filter(t => !restrictedTypes.includes(t));
     if (excluded.length > 0) {
-      const overrides  = catalog?.threatRangeOverrides || {};
-      const parts      = excluded.map(t => {
-        const cap   = overrides[t];
+      const overrides        = catalog?.threatRangeOverrides || {};
+      const collapsedExcl    = collapseThreatsForDisplay(excluded);
+      const parts            = collapsedExcl.map(t => {
+        // ballistic_missile is a display-only collapsed key — look up cap via srbm/mrbm
+        const cap   = overrides[t] ?? (t === 'ballistic_missile' ? (overrides['srbm'] ?? overrides['mrbm']) : undefined);
         const label = THREAT_TYPE_LABELS[t] || t;
         return cap != null ? `${label} (max ${cap} km)` : label;
       });
@@ -774,6 +776,41 @@ function buildCrossTargetDefenseCard(def, targetId) {
   return card;
 }
 
+/**
+ * Collapse granular ballistic/drone subtypes for defense capability chip display.
+ *
+ * - srbm + mrbm both present → single 'ballistic_missile' chip ("Ballistic Missiles")
+ * - srbm or mrbm alone       → shown with its specific label
+ * - drone + fpv both present → single 'drone' chip (fpv absorbed)
+ * - drone or fpv alone       → shown with its specific label
+ *
+ * All other types pass through unchanged. Does not affect simulation logic —
+ * display only.
+ */
+function collapseThreatsForDisplay(types) {
+  const hasSrbm  = types.includes('srbm');
+  const hasMrbm  = types.includes('mrbm');
+  const hasDrone = types.includes('drone');
+  const hasFpv   = types.includes('fpv');
+  const bothBM   = hasSrbm && hasMrbm;
+
+  const result = [];
+  let bmDone = false;
+
+  for (const t of types) {
+    if ((t === 'srbm' || t === 'mrbm') && bothBM) {
+      if (!bmDone) { result.push('ballistic_missile'); bmDone = true; }
+      // second of the pair is dropped — already represented by ballistic_missile
+    } else if (t === 'fpv' && hasDrone) {
+      // fpv is absorbed into the drone chip when drone is also present
+    } else {
+      result.push(t);
+    }
+  }
+
+  return result;
+}
+
 function buildDefenseCard(def, targetId) {
   const catalog = DEFENSE_CATALOG[def.system];
   const tier    = catalog?.tier ?? 0;
@@ -813,7 +850,7 @@ function buildDefenseCard(def, targetId) {
   card.className = `defense-card${isDisabled ? ' defense-card--disabled' : ''}`;
   card.style.setProperty('--tier-color', color);
 
-  const effectList = (catalog?.effectiveAgainst || [])
+  const effectList = collapseThreatsForDisplay(catalog?.effectiveAgainst || [])
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 

@@ -40,19 +40,22 @@ const TIER_LABELS = {
 };
 
 const THREAT_TYPE_LABELS = {
-  fpv:              'FPV Drone',
-  drone:            'Drone / Loitering Munition',
-  cruise_missile:   'Cruise Missile',
-  srbm:             'Short-Range Ballistic Missile (SRBM)',
-  mrbm:             'Medium-Range Ballistic Missile (MRBM)',
-  hypersonic:       'Hypersonic Glide Vehicle'
+  fpv:               'FPV Drone',
+  drone:             'Drone / Loitering Munition',
+  cruise_missile:    'Cruise Missile',
+  srbm:              'Short-Range Ballistic Missile (SRBM)',
+  mrbm:              'Medium-Range Ballistic Missile (MRBM)',
+  // Display-only collapsed label used when a system engages both srbm and mrbm
+  ballistic_missile: 'Ballistic Missiles',
+  hypersonic:        'Hypersonic Glide Vehicle'
 };
 
 const THREAT_TYPE_ICONS = {
-  fpv:              '●',
-  drone:            '●',
-  cruise_missile:   '●',
-  srbm:             '●',
-  mrbm:             '●',
-  hypersonic:       '●'
+  fpv:               '●',
+  drone:             '●',
+  cruise_missile:    '●',
+  srbm:              '●',
+  mrbm:              '●',
+  ballistic_missile: '●',
+  hypersonic:        '●'
 };
