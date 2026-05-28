@@ -1437,12 +1437,9 @@ async function simulate() {
   // If the cursor is behind the tail, warn that forward history will be overwritten
   if (simHistoryCursor >= 0 && simHistoryCursor < simHistory.length - 1) {
     const lostCount = simHistory.length - 1 - simHistoryCursor;
-    const fromLabel = simHistory[simHistoryCursor].isInitial
-      ? 'the initial state'
-      : `"${simHistory[simHistoryCursor].label}"`;
     const proceed = await showModal({
       title:   'Overwrite History?',
-      message: `Simulating from ${fromLabel} will discard ${lostCount} subsequent attack${lostCount !== 1 ? 's' : ''}. Continue?`,
+      message: `Simulating from this point in the history will discard ${lostCount} subsequent attack${lostCount !== 1 ? 's' : ''}. Continue?`,
       buttons: [
         { label: 'Continue', value: true,  style: 'primary'   },
         { label: 'Cancel',   value: false, style: 'secondary' }
