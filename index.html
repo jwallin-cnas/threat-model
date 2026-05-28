@@ -148,11 +148,26 @@
         <p class="empty-state">No platforms added to attack</p>
       </div>
 
-      <!-- Simulate button -->
+      <!-- Simulate / queue buttons -->
       <div class="simulate-controls">
         <button id="btn-simulate" class="btn btn-simulate" disabled>
           ▶ Simulate Attack
         </button>
+        <button id="btn-add-to-queue" class="btn btn-secondary" disabled>
+          + Add to Queue
+        </button>
+      </div>
+
+      <!-- Attack queue (hidden until at least one entry is staged) -->
+      <div id="attack-queue" class="attack-queue hidden">
+        <div class="section-header">
+          <h3>Attack Queue</h3>
+          <button id="btn-clear-queue" class="btn btn-danger btn-sm">Clear Queue</button>
+        </div>
+        <div id="queue-list" class="queue-list"></div>
+        <div class="queue-footer">
+          <button id="btn-simulate-queue" class="btn btn-simulate">▶ Simulate Queue</button>
+        </div>
       </div>
 
       <!-- Simulation results (hidden until first run) -->

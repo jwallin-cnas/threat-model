@@ -43,6 +43,10 @@ let simHistoryCursor = -1;    // index of the currently loaded snapshot (-1 unti
 // target and restored when returning to it.
 let perTargetState   = {};    // targetId → { attackManifest, lastSim*, preSimMagState, manualOverrides, _manifestUnchanged }
 
+// ── Attack queue ──────────────────────────────────────────────────────────────
+// Ordered list of staged attacks to be executed in sequence.
+let attackQueue      = [];    // [{ id, targetId, targetName, targetCountry, manifest }]
+
 // ── Minimap state ─────────────────────────────────────────────────────────────
 let _minimapCrossLayers = [];   // Leaflet layers for cross-target coverage circles
 
@@ -1203,17 +1207,20 @@ function clearManifest() {
 }
 
 function renderAttackManifest() {
-  const container  = document.getElementById('attack-manifest');
-  const simBtn     = document.getElementById('btn-simulate');
-  const totalCount = attackManifest.reduce((s, e) => s + e.count, 0);
+  const container     = document.getElementById('attack-manifest');
+  const simBtn        = document.getElementById('btn-simulate');
+  const addToQueueBtn = document.getElementById('btn-add-to-queue');
+  const totalCount    = attackManifest.reduce((s, e) => s + e.count, 0);
 
   if (attackManifest.length === 0) {
     container.innerHTML = '<p class="empty-state">No platforms added</p>';
     simBtn.disabled = true;
+    if (addToQueueBtn) addToQueueBtn.disabled = true;
     return;
   }
 
   simBtn.disabled = !selectedTargetId;
+  if (addToQueueBtn) addToQueueBtn.disabled = !selectedTargetId;
 
   const THREAT_ORDER = { mrbm: 0, srbm: 1, cruise_missile: 2, drone: 3, fpv: 4 };
   const sortedManifest = [...attackManifest].sort((a, b) => {
@@ -2181,12 +2188,17 @@ let _modalResolve = null;
  *   });
  *   if (ok) { ... }
  */
-function showModal({ title, message, buttons = [{ label: 'OK', value: true, style: 'primary' }] }) {
+function showModal({ title, message, html: htmlBody, buttons = [{ label: 'OK', value: true, style: 'primary' }] }) {
   return new Promise(resolve => {
     _modalResolve = resolve;
 
     document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-body').textContent  = message;
+    const bodyEl = document.getElementById('modal-body');
+    if (htmlBody !== undefined) {
+      bodyEl.innerHTML = htmlBody;
+    } else {
+      bodyEl.textContent = message || '';
+    }
 
     const footer = document.getElementById('modal-footer');
     footer.innerHTML = '';
@@ -2700,6 +2712,233 @@ function _buildFinalMagSection() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Attack queue
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Move the current manifest + selected target into the attack queue. */
+function addToQueue() {
+  if (!selectedTargetId || attackManifest.length === 0) return;
+  const target = getTarget(selectedTargetId);
+  attackQueue.push({
+    id:            `q_${Date.now()}`,
+    targetId:      selectedTargetId,
+    targetName:    target?.name    || selectedTargetId,
+    targetCountry: target?.country || '',
+    manifest:      JSON.parse(JSON.stringify(attackManifest))
+  });
+  // Clear the manifest so it's ready for the next entry
+  clearManifest();
+  renderQueuePanel();
+  showToast(`Added to queue (${attackQueue.length} attack${attackQueue.length !== 1 ? 's' : ''} staged)`);
+}
+
+function removeFromQueue(id) {
+  attackQueue = attackQueue.filter(e => e.id !== id);
+  renderQueuePanel();
+}
+
+/** Move a queue entry up (dir = -1) or down (dir = +1). */
+function moveQueueEntry(id, dir) {
+  const idx = attackQueue.findIndex(e => e.id === id);
+  if (idx < 0) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= attackQueue.length) return;
+  [attackQueue[idx], attackQueue[newIdx]] = [attackQueue[newIdx], attackQueue[idx]];
+  renderQueuePanel();
+}
+
+function renderQueuePanel() {
+  const container    = document.getElementById('attack-queue');
+  const simQueueBtn  = document.getElementById('btn-simulate-queue');
+  const list         = document.getElementById('queue-list');
+
+  if (attackQueue.length === 0) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+  list.innerHTML = '';
+
+  for (let i = 0; i < attackQueue.length; i++) {
+    const entry   = attackQueue[i];
+    const parts   = entry.manifest.map(p => {
+      const cat = PLATFORM_CATALOG[p.platformId];
+      return `${p.count}× ${cat?.name || p.platformId}`;
+    });
+    const manifestLabel = parts.join(', ');
+
+    const item = document.createElement('div');
+    item.className = 'queue-entry';
+    item.innerHTML = `
+      <span class="queue-entry-num">${i + 1}</span>
+      <div class="queue-entry-info">
+        <span class="queue-entry-target">${entry.targetName}${entry.targetCountry ? ', ' + entry.targetCountry : ''}</span>
+        <span class="queue-entry-manifest">${manifestLabel}</span>
+      </div>
+      <div class="queue-entry-controls">
+        <button class="btn-icon btn-queue-up"   data-id="${entry.id}" title="Move up"   ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="btn-icon btn-queue-down" data-id="${entry.id}" title="Move down" ${i === attackQueue.length - 1 ? 'disabled' : ''}>↓</button>
+        <button class="btn-icon btn-queue-remove" data-id="${entry.id}" title="Remove from queue">✕</button>
+      </div>
+    `;
+
+    item.querySelector('.btn-queue-up')
+      .addEventListener('click', () => moveQueueEntry(entry.id, -1));
+    item.querySelector('.btn-queue-down')
+      .addEventListener('click', () => moveQueueEntry(entry.id, 1));
+    item.querySelector('.btn-queue-remove')
+      .addEventListener('click', () => removeFromQueue(entry.id));
+
+    list.appendChild(item);
+  }
+
+  simQueueBtn.textContent = `▶ Simulate Queue (${attackQueue.length} attack${attackQueue.length !== 1 ? 's' : ''})`;
+}
+
+/** Confirm and sequentially execute every queued attack. */
+async function simulateQueue() {
+  if (attackQueue.length === 0) return;
+
+  // Forward-history overwrite check (same pattern as simulate())
+  if (simHistoryCursor >= 0 && simHistoryCursor < simHistory.length - 1) {
+    const lostCount = simHistory.length - 1 - simHistoryCursor;
+    const proceed = await showModal({
+      title:   'Overwrite History?',
+      message: `Simulating the queue from this point will discard ${lostCount} subsequent attack${lostCount !== 1 ? 's' : ''}. Continue?`,
+      buttons: [
+        { label: 'Continue', value: true,  style: 'primary'   },
+        { label: 'Cancel',   value: false, style: 'secondary' }
+      ]
+    });
+    if (!proceed) return;
+    simHistory = simHistory.slice(0, simHistoryCursor + 1);
+  }
+
+  // Build confirmation HTML list
+  let listItems = '';
+  for (const entry of attackQueue) {
+    const parts = entry.manifest.map(p => {
+      const cat = PLATFORM_CATALOG[p.platformId];
+      return `${p.count}× ${cat?.name || p.platformId}`;
+    });
+    listItems += `<li>
+      <strong>${entry.targetName}${entry.targetCountry ? ', ' + entry.targetCountry : ''}</strong>
+      <span class="queue-confirm-manifest">${parts.join(', ')}</span>
+    </li>`;
+  }
+  const bodyHtml = `
+    <p>Execute the following attacks in sequence? Magazine depletion carries over between each attack.</p>
+    <ol class="queue-confirm-list">${listItems}</ol>
+  `;
+
+  const confirmed = await showModal({
+    title:   `Simulate Queue — ${attackQueue.length} attack${attackQueue.length !== 1 ? 's' : ''}`,
+    html:    bodyHtml,
+    buttons: [
+      { label: 'Simulate All', value: true,  style: 'primary'   },
+      { label: 'Cancel',       value: false, style: 'secondary' }
+    ]
+  });
+  if (!confirmed) return;
+
+  const queueToRun = [...attackQueue];
+  attackQueue = [];
+  renderQueuePanel();
+
+  for (const entry of queueToRun) {
+    _runOneQueuedAttack(entry);
+  }
+
+  // Switch view to the last attacked target and show its results
+  const last = queueToRun[queueToRun.length - 1];
+  if (last) {
+    _saveTargetState(selectedTargetId);
+    selectedTargetId = last.targetId;
+    document.getElementById('target-select').value = last.targetId || '';
+    _loadTargetState(last.targetId);
+    const target = getTarget(last.targetId);
+    renderTargetInfo(target);
+    renderDefenseLayers(last.targetId);
+    renderAttackManifest();
+    document.getElementById('btn-reset-loadouts').disabled       = !selectedTargetId;
+    document.getElementById('btn-reset-target-default').disabled = !selectedTargetId;
+    if (lastSimResults) {
+      rerenderWithOverrides();
+      document.getElementById('simulation-results').classList.remove('hidden');
+      document.getElementById('simulation-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  showToast(`Queue complete — ${queueToRun.length} attack${queueToRun.length !== 1 ? 's' : ''} simulated`);
+}
+
+/**
+ * Execute one queued attack entry.
+ * Updates globalMagState, perTargetState, and simHistory — does NOT touch the
+ * live UI; the caller handles display after the loop finishes.
+ */
+function _runOneQueuedAttack(entry) {
+  const target = getTarget(entry.targetId);
+  if (!target) return;
+
+  const perTargetDefenses = (target.defenses || [])
+    .filter(d => !d.disabled)
+    .map(d => ({ ...d, locationName: target.name, locationCountry: target.country || '' }));
+
+  const crossDefs = getCrossTargetDefenses(entry.targetId)
+    .filter(d => !isCrossTargetDefenseDisabled(entry.targetId, d))
+    .map(d => ({
+      id:                    d.id,
+      system:                d.system,
+      quantity:              d.quantity,
+      notes:                 d.notes || '',
+      operator:              d.operator || '',
+      locationName:          d._placedAtTargetName,
+      locationCountry:       d._placedAtTargetCountry || '',
+      restrictToThreatTypes: d._restrictToThreatTypes || null
+    }));
+
+  const allDefenses = [...perTargetDefenses, ...crossDefs];
+  const preSimSnap  = { ...globalMagState };
+
+  const results = runSimulation(entry.manifest, allDefenses, globalMagState);
+
+  // Persist magazine depletion globally
+  const newMagState = extractMagazineState(results);
+  Object.assign(globalMagState, newMagState);
+  saveMagStateToStorage();
+
+  // Push to history
+  if (simHistoryCursor >= 0) {
+    simHistory.push(_createSnapshot({
+      isInitial:      false,
+      label:          _buildHistoryLabel(entry.manifest, target),
+      targetId:       entry.targetId,
+      targetName:     target.name,
+      magStateBefore: preSimSnap,
+      magStateAfter:  { ...globalMagState },
+      results,
+      allDefenses,
+      manualOverrides: {},
+      attackManifest:  entry.manifest
+    }));
+    simHistoryCursor = simHistory.length - 1;
+  }
+
+  // Persist per-target state so switching to this target later shows the result
+  perTargetState[entry.targetId] = {
+    attackManifest:     JSON.parse(JSON.stringify(entry.manifest)),
+    lastSimResults:     JSON.parse(JSON.stringify(results)),
+    lastSimTarget:      target,
+    lastSimDefenses:    JSON.parse(JSON.stringify(allDefenses)),
+    preSimMagState:     JSON.parse(JSON.stringify(preSimSnap)),
+    manualOverrides:    {},
+    _manifestUnchanged: true
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Event wiring
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2815,6 +3054,18 @@ function wireEvents() {
 
   // Simulate
   document.getElementById('btn-simulate').addEventListener('click', simulate);
+
+  // Add to queue
+  document.getElementById('btn-add-to-queue').addEventListener('click', addToQueue);
+
+  // Simulate queue
+  document.getElementById('btn-simulate-queue').addEventListener('click', simulateQueue);
+
+  // Clear queue
+  document.getElementById('btn-clear-queue').addEventListener('click', () => {
+    attackQueue = [];
+    renderQueuePanel();
+  });
 
   // Clear results
   document.getElementById('btn-clear-results').addEventListener('click', () => {

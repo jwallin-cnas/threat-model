@@ -685,7 +685,116 @@ select option, select optgroup {
 
 .simulate-controls {
   margin-top: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.simulate-controls .btn-simulate {
+  flex: 1;
+}
+
+/* ── Attack queue ────────────────────────────────────────────────────────── */
+
+.attack-queue {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.attack-queue .section-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 0;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.queue-entry:last-child {
+  border-bottom: none;
+}
+
+.queue-entry-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 16px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.queue-entry-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.queue-entry-target {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-entry-manifest {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-entry-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.queue-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.queue-footer .btn-simulate {
+  width: 100%;
+}
+
+/* Queue confirmation modal list */
+.queue-confirm-list {
+  margin: 10px 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.queue-confirm-list li {
+  line-height: 1.5;
+}
+
+.queue-confirm-manifest {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 1px;
 }
 
 /* ── Simulation results ──────────────────────────────────────────────────── */
@@ -1307,7 +1416,7 @@ select option, select optgroup {
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   width: 100%;
-  max-width: 420px;
+  max-width: 480px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
