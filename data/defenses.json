@@ -31,7 +31,7 @@
     },
     {
       "id": "aegis_sm3",
-      "name": "Aegis BMD",
+      "name": "Aegis SM3",
       "range_km": 1200,
       "batteries": 1,
       "armament": {
@@ -88,7 +88,7 @@
     },
     {
       "id": "aegis_sm2",
-      "name": "Aegis BMD",
+      "name": "Aegis SM2",
       "range_km": 150,
       "batteries": 1,
       "armament": {
@@ -102,7 +102,7 @@
     },
     {
       "id": "aegis_sm6",
-      "name": "Aegis BMD",
+      "name": "Aegis SM6",
       "range_km": 370,
       "batteries": 1,
       "armament": {

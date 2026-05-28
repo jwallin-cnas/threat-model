@@ -69,8 +69,8 @@
     ],
 
     "hamad_port": [
-      { "id": "hamad_port_d1", "system": "patriot", "quantity": 3, "notes": "", "operator": "Qatar" },
-      { "id": "hamad_port_d2", "system": "merops",  "quantity": 4, "notes": "", "operator": "Qatar" }
+      { "id": "hamad_port_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "Qatar" },
+      { "id": "hamad_port_d2", "system": "merops",  "quantity": 1, "notes": "", "operator": "Qatar" }
     ],
 
     "us_fifth_fleet": [
@@ -158,7 +158,7 @@
     ],
 
     "al_udeid_ab": [
-      { "id": "al_udeid_ab_d1", "system": "patriot", "quantity": 4, "notes": "", "operator": "Qatar" },
+      { "id": "al_udeid_ab_d1", "system": "patriot", "quantity": 3, "notes": "", "operator": "Qatar" },
       { "id": "al_udeid_ab_d2", "system": "nasams",  "quantity": 1, "notes": "", "operator": "Qatar" },
       { "id": "al_udeid_ab_d3", "system": "fslids",  "quantity": 1, "notes": "", "operator": "Qatar" }
     ],
@@ -173,10 +173,6 @@
 
     "ramat_david_ab": [
       { "id": "ramat_david_ab_d1", "system": "arrow", "quantity": 1, "notes": "", "operator": "Israel" }
-    ],
-
-    "hatzerim_ab": [
-      { "id": "hatzerim_ab_d1", "system": "thaad", "quantity": 1, "notes": "", "operator": "Israel" }
     ],
 
     "nevatim_ab": [
