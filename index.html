@@ -16,8 +16,9 @@
         <p class="header-sub">Layered Air Defense Adjudicator — Middle East</p>
       </div>
       <div class="header-controls">
-        <button id="btn-export" class="btn btn-secondary">Export JSON</button>
-        <button id="btn-reset"  class="btn btn-danger">Reset to Default</button>
+        <button id="btn-history" class="btn btn-secondary">History</button>
+        <button id="btn-export"  class="btn btn-secondary">Export JSON</button>
+        <button id="btn-reset"   class="btn btn-danger">Reset to Default</button>
       </div>
     </div>
   </header>
@@ -186,6 +187,18 @@
     ⚠ Changes persist in browser <code>localStorage</code>.
     Use <strong>Export JSON</strong> to download and commit an updated <code>data.json</code> to your repo.
     <strong>Reset to Default</strong> clears local storage and reverts to the committed dataset.
+  </div>
+
+  <!-- History dialog — controlled by openHistoryDialog() / closeHistoryDialog() in app.js -->
+  <div id="history-dialog" class="history-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="history-dialog-title">
+    <div class="history-dialog-backdrop"></div>
+    <div class="history-dialog-panel">
+      <div class="history-dialog-header">
+        <span class="history-dialog-title" id="history-dialog-title">Simulation History</span>
+        <button id="btn-history-close" class="history-dialog-close" aria-label="Close history">✕</button>
+      </div>
+      <div class="history-dialog-body" id="history-dialog-body"></div>
+    </div>
   </div>
 
   <!-- Modal overlay — controlled by showModal() / _resolveModal() in app.js -->

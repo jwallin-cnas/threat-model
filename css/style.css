@@ -1409,6 +1409,179 @@ select option, select optgroup {
   line-height: 1.5;
 }
 
+/* ── Simulation History Dialog ───────────────────────────────────────────── */
+
+.history-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history-dialog.hidden {
+  display: none;
+}
+
+.history-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.history-dialog-panel {
+  position: relative;
+  width: 380px;
+  max-width: 100vw;
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+}
+
+.history-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.history-dialog-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.history-dialog-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.history-dialog-close:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.history-dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.history-empty {
+  padding: 24px 18px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* Individual history entries */
+.history-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.history-entry:last-child {
+  border-bottom: none;
+}
+
+.history-entry:not(.history-entry--current):hover {
+  background: var(--surface-raised);
+}
+
+.history-entry--current {
+  cursor: default;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-left: 3px solid var(--accent);
+  padding-left: 15px; /* compensate for border */
+}
+
+.history-entry--initial {
+  opacity: 0.85;
+}
+
+.history-entry-indicator {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.history-entry--current .history-entry-indicator {
+  color: var(--accent);
+}
+
+.history-entry--initial .history-entry-indicator {
+  color: var(--text-dim);
+}
+
+.history-entry-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.history-entry-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-entry-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.history-entry-attack {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-entry-stats {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 860px) {

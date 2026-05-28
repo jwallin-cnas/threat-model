@@ -34,6 +34,10 @@ let lastSimDefenses = [];     // allDefenses passed to the last runSimulation ca
 let preSimMagState  = {};     // snapshot of globalMagState before the last simulation depleted it
 let manualOverrides = {};     // { [threatType]: { [defId]: { survived:number, disengaged:bool } } }
 
+// ── Simulation history ────────────────────────────────────────────────────────
+let simHistory       = [];    // ordered array of snapshots; index 0 is always the initial state
+let simHistoryCursor = -1;    // index of the currently loaded snapshot (-1 until loadData completes)
+
 // ── Minimap state ─────────────────────────────────────────────────────────────
 let _minimapCrossLayers = [];   // Leaflet layers for cross-target coverage circles
 
@@ -158,6 +162,20 @@ async function loadData() {
     }
     appTargetCatalog = merged;
   }
+
+  // Seed simulation history with the initial (pre-attack) state.
+  simHistory       = [];
+  simHistoryCursor = 0;
+  simHistory.push(_createSnapshot({
+    isInitial:      true,
+    label:          'Initial State',
+    magStateBefore: {},
+    magStateAfter:  globalMagState,
+    results:        null,
+    allDefenses:    [],
+    manualOverrides:{},
+    attackManifest: []
+  }));
 }
 
 function loadFromStorage() {
@@ -1416,6 +1434,24 @@ async function simulate() {
     if (!proceed) return;
   }
 
+  // If the cursor is behind the tail, warn that forward history will be overwritten
+  if (simHistoryCursor >= 0 && simHistoryCursor < simHistory.length - 1) {
+    const lostCount = simHistory.length - 1 - simHistoryCursor;
+    const fromLabel = simHistory[simHistoryCursor].isInitial
+      ? 'the initial state'
+      : `"${simHistory[simHistoryCursor].label}"`;
+    const proceed = await showModal({
+      title:   'Overwrite History?',
+      message: `Simulating from ${fromLabel} will discard ${lostCount} subsequent attack${lostCount !== 1 ? 's' : ''}. Continue?`,
+      buttons: [
+        { label: 'Continue', value: true,  style: 'primary'   },
+        { label: 'Cancel',   value: false, style: 'secondary' }
+      ]
+    });
+    if (!proceed) return;
+    simHistory = simHistory.slice(0, simHistoryCursor + 1);
+  }
+
   // New run — discard any overrides from the previous result
   manualOverrides = {};
   document.getElementById('override-notice')?.classList.add('hidden');
@@ -1466,6 +1502,23 @@ async function simulate() {
     renderDefenseLayers(selectedTargetId);
 
     renderSimulationResults(results, target);
+
+    // Record this attack in the simulation history
+    if (simHistoryCursor >= 0) {
+      simHistory.push(_createSnapshot({
+        isInitial:      false,
+        label:          _buildHistoryLabel(attackManifest, target),
+        targetId:       selectedTargetId,
+        targetName:     target.name,
+        magStateBefore: preSimSnap,
+        magStateAfter:  globalMagState,
+        results,
+        allDefenses,
+        manualOverrides: {},
+        attackManifest
+      }));
+      simHistoryCursor = simHistory.length - 1;
+    }
 
     document.getElementById('simulation-results').classList.remove('hidden');
     document.getElementById('simulation-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1697,6 +1750,16 @@ function rerenderWithOverrides() {
   renderResultsFinal(displayResults);
   // Refresh defense cards so magazine counters reflect the adjusted state
   if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+
+  // Keep the current history snapshot in sync with any override-adjusted state
+  if (simHistoryCursor >= 0 && simHistory[simHistoryCursor]) {
+    const snap = simHistory[simHistoryCursor];
+    snap.magStateAfter   = JSON.parse(JSON.stringify(globalMagState));
+    snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
+    if (snap.stats) {
+      snap.stats = { totalIn: displayResults.totalIn, totalOut: displayResults.totalOut };
+    }
+  }
 }
 
 /**
@@ -2160,6 +2223,155 @@ function showToast(message, isError = false) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Simulation history
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Create a deep-cloned snapshot object. All mutable inputs are defensively
+ * copied so later mutations to globalMagState etc. don't affect the record.
+ */
+function _createSnapshot({ isInitial, label, targetId, targetName,
+                            magStateBefore, magStateAfter,
+                            results, allDefenses, manualOverrides, attackManifest }) {
+  const snap = {
+    id:             `snap_${Date.now()}_${simHistory.length}`,
+    label,
+    timestamp:      Date.now(),
+    isInitial:      !!isInitial,
+    attackManifest: JSON.parse(JSON.stringify(attackManifest  || [])),
+    targetId:       targetId   || null,
+    targetName:     targetName || null,
+    magStateAfter:  JSON.parse(JSON.stringify(magStateAfter   || {})),
+    preSimMagState: JSON.parse(JSON.stringify(magStateBefore  || {})),
+    results:        results    ? JSON.parse(JSON.stringify(results))        : null,
+    allDefenses:    JSON.parse(JSON.stringify(allDefenses     || [])),
+    manualOverrides:JSON.parse(JSON.stringify(manualOverrides || {})),
+    stats:          results    ? { totalIn: results.totalIn, totalOut: results.totalOut } : null
+  };
+  return snap;
+}
+
+/** Build a human-readable label for a simulation history entry. */
+function _buildHistoryLabel(manifest, target) {
+  const parts = manifest.map(p => {
+    const cat = PLATFORM_CATALOG[p.platformId];
+    return `${p.count}× ${cat?.name || p.platformId}`;
+  });
+  return `${parts.join(', ')} → ${target?.name || 'Unknown'}`;
+}
+
+/**
+ * Navigate the history cursor to the given index, restoring all simulation
+ * state (magazine, results, manifest, overrides) and re-rendering the UI.
+ * Does NOT truncate — that only happens when a new simulation fires.
+ */
+function navigateToSnapshot(index) {
+  if (index < 0 || index >= simHistory.length) return;
+  if (index === simHistoryCursor) { closeHistoryDialog(); return; }
+
+  const snap = simHistory[index];
+
+  // Restore simulation state
+  globalMagState   = JSON.parse(JSON.stringify(snap.magStateAfter));
+  saveMagStateToStorage();
+  lastSimResults   = snap.results  ? JSON.parse(JSON.stringify(snap.results))    : null;
+  lastSimTarget    = snap.targetId ? getTarget(snap.targetId)                    : null;
+  lastSimDefenses  = JSON.parse(JSON.stringify(snap.allDefenses));
+  preSimMagState   = JSON.parse(JSON.stringify(snap.preSimMagState));
+  manualOverrides  = JSON.parse(JSON.stringify(snap.manualOverrides));
+  attackManifest   = JSON.parse(JSON.stringify(snap.attackManifest));
+  simHistoryCursor = index;
+  _manifestUnchanged = !!snap.results;
+
+  // Auto-switch to the target that was attacked
+  selectedTargetId = snap.targetId || null;
+  document.getElementById('target-select').value = snap.targetId || '';
+  renderTargetInfo(snap.targetId ? getTarget(snap.targetId) : null);
+
+  // Refresh defence cards, manifest, and button states
+  renderDefenseLayers(selectedTargetId);
+  renderAttackManifest();
+  document.getElementById('btn-simulate').disabled              = !selectedTargetId || attackManifest.length === 0;
+  document.getElementById('btn-reset-loadouts').disabled        = !selectedTargetId;
+  document.getElementById('btn-reset-target-default').disabled  = !selectedTargetId;
+
+  // Re-render results (override re-walk handles both plain and overridden states)
+  if (snap.results) {
+    rerenderWithOverrides();
+    document.getElementById('simulation-results').classList.remove('hidden');
+  } else {
+    document.getElementById('simulation-results').classList.add('hidden');
+    document.getElementById('override-notice')?.classList.add('hidden');
+  }
+
+  renderHistoryDialogBody();
+  showToast(snap.isInitial ? 'Restored to initial state' : `Viewing Attack #${index}`);
+}
+
+function openHistoryDialog() {
+  renderHistoryDialogBody();
+  document.getElementById('history-dialog').classList.remove('hidden');
+}
+
+function closeHistoryDialog() {
+  document.getElementById('history-dialog').classList.add('hidden');
+}
+
+function renderHistoryDialogBody() {
+  const body = document.getElementById('history-dialog-body');
+  if (!body) return;
+
+  if (simHistory.length === 0) {
+    body.innerHTML = '<p class="history-empty">No simulation history yet.</p>';
+    return;
+  }
+
+  body.innerHTML = '';
+
+  // Newest entry first
+  for (let i = simHistory.length - 1; i >= 0; i--) {
+    const snap      = simHistory[i];
+    const isCurrent = i === simHistoryCursor;
+    const timeStr   = new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let statsHtml = '';
+    if (snap.stats) {
+      const killed = snap.stats.totalIn - snap.stats.totalOut;
+      statsHtml = `<div class="history-entry-stats">${killed} killed · ${snap.stats.totalOut} leaked</div>`;
+    }
+
+    const item = document.createElement('div');
+    item.className = [
+      'history-entry',
+      isCurrent      ? 'history-entry--current' : '',
+      snap.isInitial ? 'history-entry--initial'  : ''
+    ].filter(Boolean).join(' ');
+
+    item.innerHTML = `
+      <div class="history-entry-indicator">${isCurrent ? '◉' : snap.isInitial ? '⚓' : '○'}</div>
+      <div class="history-entry-content">
+        <div class="history-entry-header">
+          <span class="history-entry-label">${
+            snap.isInitial ? 'Initial State' : `Attack #${i} · ${timeStr}`
+          }</span>
+          ${isCurrent ? '<span class="history-entry-badge">VIEWING</span>' : ''}
+        </div>
+        ${snap.isInitial
+          ? '<div class="history-entry-attack">Full magazine · 0 attacks</div>'
+          : `<div class="history-entry-attack">${snap.label}</div>${statsHtml}`
+        }
+      </div>
+    `;
+
+    if (!isCurrent) {
+      item.addEventListener('click', () => navigateToSnapshot(i));
+    }
+
+    body.appendChild(item);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Event wiring
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2279,6 +2491,12 @@ function wireEvents() {
 
   // Reset to default
   document.getElementById('btn-reset').addEventListener('click', resetData);
+
+  // Simulation history dialog
+  document.getElementById('btn-history').addEventListener('click', openHistoryDialog);
+  document.getElementById('btn-history-close').addEventListener('click', closeHistoryDialog);
+  document.getElementById('history-dialog').querySelector('.history-dialog-backdrop')
+    .addEventListener('click', closeHistoryDialog);
 
   // ── Modal — ESC key dismisses ─────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
