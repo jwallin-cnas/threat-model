@@ -16,9 +16,10 @@
         <p class="header-sub">Layered Air Defense Adjudicator — Middle East</p>
       </div>
       <div class="header-controls">
-        <button id="btn-history" class="btn btn-secondary">History</button>
-        <button id="btn-export"  class="btn btn-secondary">Export JSON</button>
-        <button id="btn-reset"   class="btn btn-danger">Reset to Default</button>
+        <button id="btn-history"    class="btn btn-secondary">History</button>
+        <button id="btn-export-pdf" class="btn btn-secondary">Export PDF</button>
+        <button id="btn-export"     class="btn btn-secondary">Export JSON</button>
+        <button id="btn-reset"      class="btn btn-danger">Reset to Default</button>
       </div>
     </div>
   </header>
@@ -188,6 +189,9 @@
     Use <strong>Export JSON</strong> to download and commit an updated <code>data.json</code> to your repo.
     <strong>Reset to Default</strong> clears local storage and reverts to the committed dataset.
   </div>
+
+  <!-- Print root — populated by exportHistoryPDF() and hidden outside print context -->
+  <div id="print-root"></div>
 
   <!-- History dialog — controlled by openHistoryDialog() / closeHistoryDialog() in app.js -->
   <div id="history-dialog" class="history-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="history-dialog-title">

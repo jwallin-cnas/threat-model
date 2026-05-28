@@ -1409,6 +1409,122 @@ select option, select optgroup {
   line-height: 1.5;
 }
 
+/* ── PDF Export (Print CSS) ──────────────────────────────────────────────── */
+
+/* Hidden in normal view; revealed only during window.print() */
+#print-root {
+  display: none;
+}
+
+@media print {
+  /* Hide the entire app UI; show only the print root */
+  body.is-printing > header,
+  body.is-printing > main,
+  body.is-printing > .storage-notice,
+  body.is-printing > #print-root + *,
+  body.is-printing > #history-dialog,
+  body.is-printing > #modal-overlay {
+    display: none !important;
+  }
+
+  body.is-printing #print-root {
+    display: block;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 10pt;
+    line-height: 1.5;
+    color: #111;
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ── Report header ─────────────────────────────────────────────────────── */
+  .pr-header        { margin-bottom: 14pt; }
+  .pr-title         { font-size: 17pt; font-weight: bold; letter-spacing: 0.01em; margin-bottom: 1pt; }
+  .pr-subtitle      { font-size: 11pt; color: #444; margin-bottom: 3pt; }
+  .pr-meta          { font-size: 9pt;  color: #555; margin-bottom: 1pt; }
+
+  /* ── Rules ─────────────────────────────────────────────────────────────── */
+  .pr-rule          { border: none; border-top: 0.5pt solid #aaa; margin: 12pt 0; }
+  .pr-rule--heavy   { border-top-width: 2pt; border-color: #111; }
+
+  /* ── Attack sections ───────────────────────────────────────────────────── */
+  .pr-attack        { margin-bottom: 18pt; }
+  .pr-attack--break { page-break-before: always; }
+
+  .pr-attack-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12pt;
+    border-bottom: 1pt solid #333;
+    padding-bottom: 4pt;
+    margin-bottom: 8pt;
+  }
+  .pr-attack-num    { font-size: 13pt; font-weight: bold; }
+  .pr-attack-time   { font-size: 10pt; color: #555; }
+  .pr-attack-target { font-size: 10pt; font-style: italic; margin-left: auto; }
+
+  /* ── Section labels ────────────────────────────────────────────────────── */
+  .pr-section-label {
+    font-size: 7.5pt;
+    font-weight: bold;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #555;
+    margin: 9pt 0 3pt;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .pr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    margin-bottom: 4pt;
+  }
+  .pr-table th {
+    background: #efefef;
+    font-weight: bold;
+    text-align: left;
+    padding: 3pt 6pt;
+    border: 0.5pt solid #bbb;
+  }
+  .pr-table td {
+    padding: 2.5pt 6pt;
+    border: 0.5pt solid #ddd;
+    vertical-align: top;
+  }
+  .pr-table tr:nth-child(even) td { background: #f9f9f9; }
+  .pr-num    { text-align: right; font-variant-numeric: tabular-nums; }
+  .pr-italic { font-style: italic; color: #777; }
+  .pr-leaked { font-weight: bold; }
+  .pr-row-dim td { color: #999; }
+
+  /* ── Sub-summary / attack summary ─────────────────────────────────────── */
+  .pr-sub-summary {
+    font-size: 8.5pt;
+    color: #333;
+    margin: 1pt 0 6pt;
+  }
+  .pr-attack-summary {
+    font-size: 10pt;
+    font-weight: 600;
+    padding: 5pt 9pt;
+    background: #f2f2f2;
+    border-left: 3pt solid #333;
+    margin: 7pt 0 5pt;
+  }
+  .pr-attack-summary--leak {
+    border-left-color: #c00;
+    background: #fff5f5;
+  }
+  .pr-no-change {
+    font-size: 8.5pt;
+    color: #888;
+    font-style: italic;
+    margin: 2pt 0 6pt;
+  }
+}
+
 /* ── Simulation History Dialog ───────────────────────────────────────────── */
 
 .history-dialog {

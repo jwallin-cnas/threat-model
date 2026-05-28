@@ -2369,6 +2369,270 @@ function renderHistoryDialogBody() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PDF export (Print CSS / window.print)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Entry point.  Builds the print document, injects it into #print-root,
+ * adds the `is-printing` body class so @media print CSS hides the main UI,
+ * then calls window.print().  The afterprint event cleans up.
+ */
+function exportHistoryPDF() {
+  const attacks = simHistory.slice(1);  // exclude initial-state entry
+  if (attacks.length === 0) {
+    showToast('No attacks in history to export.', true);
+    return;
+  }
+
+  document.getElementById('print-root').innerHTML = _buildPrintDocument();
+  document.body.classList.add('is-printing');
+
+  window.addEventListener('afterprint', function cleanup() {
+    document.body.classList.remove('is-printing');
+    document.getElementById('print-root').innerHTML = '';
+    window.removeEventListener('afterprint', cleanup);
+  });
+
+  window.print();
+}
+
+/** Assemble the full print-document HTML from simHistory. */
+function _buildPrintDocument() {
+  const attacks = simHistory.slice(1);
+  const uniqueTargets = new Set(attacks.map(s => s.targetId).filter(Boolean)).size;
+  const now = new Date().toLocaleString([], {
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  let html = `
+    <div class="pr-header">
+      <div class="pr-title">Strike Assessment Tool</div>
+      <div class="pr-subtitle">Layered Air Defense Adjudicator — Middle East</div>
+      <div class="pr-meta">Simulation History Report &nbsp;·&nbsp; Generated ${now}</div>
+      <div class="pr-meta">${attacks.length} attack${attacks.length !== 1 ? 's' : ''} &nbsp;·&nbsp; ${uniqueTargets} target${uniqueTargets !== 1 ? 's' : ''} engaged</div>
+    </div>
+    <hr class="pr-rule pr-rule--heavy">
+  `;
+
+  for (let i = 1; i < simHistory.length; i++) {
+    html += _buildAttackSection(simHistory[i], i);
+  }
+
+  html += _buildFinalMagSection();
+
+  return html;
+}
+
+/** Build one attack section (header + engagements + magazine changes). */
+function _buildAttackSection(snap, index) {
+  if (!snap.results) return '';
+
+  const time       = new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const target     = getTarget(snap.targetId);
+  const location   = [snap.targetName, target?.country].filter(Boolean).join(', ');
+  const totalIn    = snap.stats?.totalIn  ?? 0;
+  const totalOut   = snap.stats?.totalOut ?? 0;
+  const totalKilled = totalIn - totalOut;
+
+  // ── Inbound platforms table ────────────────────────────────────────────────
+  let platformRows = '';
+  for (const entry of snap.attackManifest) {
+    const cat     = PLATFORM_CATALOG[entry.platformId];
+    const rawPlat = appAttackSystems.find(s => s.id === entry.platformId);
+    platformRows += `<tr>
+      <td>${cat?.name || entry.platformId}</td>
+      <td>${rawPlat?.country || '—'}</td>
+      <td>${THREAT_TYPE_LABELS[cat?.type] || cat?.type || '—'}</td>
+      <td class="pr-num">${entry.count}</td>
+    </tr>`;
+  }
+
+  // ── Per-threat-type engagement tables ─────────────────────────────────────
+  let engagementHtml = '';
+  for (const group of snap.results.byThreatType) {
+    const typeLabel = THREAT_TYPE_LABELS[group.threatType] || group.threatType;
+    const killed    = group.initialCount - group.finalCount;
+
+    let engRows = '';
+    for (const eng of group.engagements) {
+      const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ');
+
+      if (eng.note === 'Cannot engage') {
+        engRows += `<tr class="pr-row-dim">
+          <td>${eng.systemName}</td><td>${loc || '—'}</td>
+          <td colspan="5" class="pr-italic">Cannot engage this threat type</td></tr>`;
+        continue;
+      }
+      if (eng.note === 'Magazine exhausted') {
+        engRows += `<tr class="pr-row-dim">
+          <td>${eng.systemName}</td><td>${loc || '—'}</td>
+          <td class="pr-num">${eng.threatsIn}</td>
+          <td colspan="4" class="pr-italic">Magazine exhausted</td></tr>`;
+        continue;
+      }
+      if (eng.isPlaceholder) {
+        engRows += `<tr class="pr-row-dim">
+          <td>${eng.systemName}</td><td>${loc || '—'}</td>
+          <td class="pr-num">${eng.threatsIn}</td>
+          <td colspan="4" class="pr-italic">Placeholder — Pk not modelled</td></tr>`;
+        continue;
+      }
+
+      const pkTier = eng.pkTier
+        ? eng.pkTier.charAt(0).toUpperCase() + eng.pkTier.slice(1)
+        : '—';
+
+      engRows += `<tr>
+        <td>${eng.systemName}</td>
+        <td>${loc || '—'}</td>
+        <td class="pr-num">${eng.threatsIn}</td>
+        <td>${pkTier}</td>
+        <td class="pr-num">${eng.shotsPerEngagement ?? '—'}</td>
+        <td class="pr-num">${eng.killed}</td>
+        <td class="pr-num${eng.survived > 0 ? ' pr-leaked' : ''}">${eng.survived}</td>
+      </tr>`;
+    }
+
+    engagementHtml += `
+      <div class="pr-section-label">${typeLabel} &nbsp;—&nbsp; ${group.initialCount} inbound</div>
+      <table class="pr-table">
+        <thead><tr>
+          <th>System</th><th>Location</th><th>In</th>
+          <th>Pk Tier</th><th>Shots</th><th>Killed</th><th>Survived</th>
+        </tr></thead>
+        <tbody>${engRows}</tbody>
+      </table>
+      <div class="pr-sub-summary">${killed} killed &nbsp;·&nbsp; <strong>${group.finalCount} leaked</strong></div>
+    `;
+  }
+
+  // ── Page-level summary line ────────────────────────────────────────────────
+  const summaryClass = totalOut > 0 ? 'pr-attack-summary pr-attack-summary--leak' : 'pr-attack-summary';
+  const summaryHtml = `
+    <div class="${summaryClass}">
+      ${totalIn} inbound &nbsp;·&nbsp; ${totalKilled} killed &nbsp;·&nbsp;
+      <strong>${totalOut} penetrated</strong>
+    </div>
+  `;
+
+  return `
+    <div class="pr-attack${index > 1 ? ' pr-attack--break' : ''}">
+      <div class="pr-attack-header">
+        <span class="pr-attack-num">Attack #${index}</span>
+        <span class="pr-attack-time">${time}</span>
+        <span class="pr-attack-target">${location}</span>
+      </div>
+
+      <div class="pr-section-label">Inbound Platforms</div>
+      <table class="pr-table">
+        <thead><tr><th>Platform</th><th>Country</th><th>Type</th><th>Salvo</th></tr></thead>
+        <tbody>${platformRows}</tbody>
+      </table>
+
+      ${engagementHtml}
+      ${summaryHtml}
+      ${_buildMagChangesSection(snap)}
+    </div>
+  `;
+}
+
+/** Build the interceptor expenditure table for one attack. */
+function _buildMagChangesSection(snap) {
+  const prevMag  = snap.preSimMagState;
+  const afterMag = snap.magStateAfter;
+  const changes  = [];
+
+  for (const def of snap.allDefenses) {
+    const catalog = DEFENSE_CATALOG[def.system];
+    if (!catalog) continue;
+    const maxMag = (catalog.magazinePerBattery || 0) * (def.quantity || 1);
+    if (maxMag === 0) continue;  // directed-energy / jamming — no magazine
+
+    const before = (def.id in prevMag)  ? prevMag[def.id]  : maxMag;
+    const after  = (def.id in afterMag) ? afterMag[def.id] : maxMag;
+    if (before === after) continue;
+
+    const loc = [def.locationName, def.locationCountry].filter(Boolean).join(', ');
+    changes.push({ name: catalog.name, loc, before, after, maxMag, used: before - after });
+  }
+
+  if (changes.length === 0) {
+    return '<div class="pr-no-change">No interceptors expended this attack.</div>';
+  }
+
+  let rows = '';
+  for (const c of changes) {
+    rows += `<tr>
+      <td>${c.name}</td>
+      <td>${c.loc || '—'}</td>
+      <td class="pr-num">${c.before} / ${c.maxMag}</td>
+      <td class="pr-num">${c.after} / ${c.maxMag}</td>
+      <td class="pr-num">${c.used}</td>
+    </tr>`;
+  }
+
+  return `
+    <div class="pr-section-label">Interceptor Expenditure</div>
+    <table class="pr-table">
+      <thead><tr><th>System</th><th>Location</th><th>Before</th><th>After</th><th>Used</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+/** Build the final magazine state summary (all expended systems across all targets). */
+function _buildFinalMagSection() {
+  if (simHistory.length <= 1) return '';
+
+  const finalMag = simHistory[simHistory.length - 1].magStateAfter;
+  const seen     = new Set();
+  const rows     = [];
+
+  for (const target of appTargetCatalog) {
+    for (const def of (target.defenses || [])) {
+      if (seen.has(def.id)) continue;
+      seen.add(def.id);
+
+      const catalog = DEFENSE_CATALOG[def.system];
+      if (!catalog) continue;
+      const maxMag = (catalog.magazinePerBattery || 0) * (def.quantity || 1);
+      if (maxMag === 0) continue;
+
+      const remaining = (def.id in finalMag) ? finalMag[def.id] : maxMag;
+      if (remaining >= maxMag) continue;  // untouched — omit
+
+      const pct = Math.round((remaining / maxMag) * 100);
+      rows.push({
+        name: catalog.name,
+        location: target.name,
+        country: target.country || '',
+        remaining, maxMag, pct
+      });
+    }
+  }
+
+  const bodyHtml = rows.length === 0
+    ? '<tr><td colspan="5" class="pr-italic">All systems at full magazine.</td></tr>'
+    : rows.map(r => `<tr>
+        <td>${r.name}</td>
+        <td>${r.location}</td>
+        <td>${r.country}</td>
+        <td class="pr-num">${r.remaining} / ${r.maxMag}</td>
+        <td class="pr-num">${r.pct}%</td>
+      </tr>`).join('');
+
+  return `
+    <hr class="pr-rule">
+    <div class="pr-section-label">Final Magazine State — All Expended Systems</div>
+    <table class="pr-table">
+      <thead><tr><th>System</th><th>Target</th><th>Country</th><th>Remaining</th><th>Loaded</th></tr></thead>
+      <tbody>${bodyHtml}</tbody>
+    </table>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Event wiring
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2482,6 +2746,9 @@ function wireEvents() {
 
   // Clear all manual overrides
   document.getElementById('btn-clear-overrides').addEventListener('click', clearAllOverrides);
+
+  // Export PDF (print)
+  document.getElementById('btn-export-pdf').addEventListener('click', exportHistoryPDF);
 
   // Export JSON
   document.getElementById('btn-export').addEventListener('click', exportData);
