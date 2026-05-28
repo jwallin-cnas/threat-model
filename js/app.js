@@ -2438,11 +2438,9 @@ function _buildAttackSection(snap, index) {
   // ── Inbound platforms table ────────────────────────────────────────────────
   let platformRows = '';
   for (const entry of snap.attackManifest) {
-    const cat     = PLATFORM_CATALOG[entry.platformId];
-    const rawPlat = appAttackSystems.find(s => s.id === entry.platformId);
+    const cat = PLATFORM_CATALOG[entry.platformId];
     platformRows += `<tr>
       <td>${cat?.name || entry.platformId}</td>
-      <td>${rawPlat?.country || '—'}</td>
       <td>${THREAT_TYPE_LABELS[cat?.type] || cat?.type || '—'}</td>
       <td class="pr-num">${entry.count}</td>
     </tr>`;
@@ -2456,7 +2454,7 @@ function _buildAttackSection(snap, index) {
 
     let engRows = '';
     for (const eng of group.engagements) {
-      const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ');
+      const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—';
 
       if (eng.note === 'Cannot engage') {
         engRows += `<tr class="pr-row-dim">
@@ -2479,15 +2477,18 @@ function _buildAttackSection(snap, index) {
         continue;
       }
 
-      const pkTier = eng.pkTier
+      const pkTierLabel = eng.pkTier
         ? eng.pkTier.charAt(0).toUpperCase() + eng.pkTier.slice(1)
         : '—';
+      const pkDisplay = (eng.pk != null)
+        ? `${eng.pk.toFixed(2)} (${pkTierLabel})`
+        : pkTierLabel;
 
       engRows += `<tr>
         <td>${eng.systemName}</td>
         <td>${loc || '—'}</td>
         <td class="pr-num">${eng.threatsIn}</td>
-        <td>${pkTier}</td>
+        <td>${pkDisplay}</td>
         <td class="pr-num">${eng.shotsPerEngagement ?? '—'}</td>
         <td class="pr-num">${eng.killed}</td>
         <td class="pr-num${eng.survived > 0 ? ' pr-leaked' : ''}">${eng.survived}</td>
@@ -2499,7 +2500,7 @@ function _buildAttackSection(snap, index) {
       <table class="pr-table">
         <thead><tr>
           <th>System</th><th>Location</th><th>In</th>
-          <th>Pk Tier</th><th>Shots</th><th>Killed</th><th>Survived</th>
+          <th>Pk</th><th>Shots per Threat</th><th>Killed</th><th>Survived</th>
         </tr></thead>
         <tbody>${engRows}</tbody>
       </table>
@@ -2526,7 +2527,7 @@ function _buildAttackSection(snap, index) {
 
       <div class="pr-section-label">Inbound Platforms</div>
       <table class="pr-table">
-        <thead><tr><th>Platform</th><th>Country</th><th>Type</th><th>Salvo</th></tr></thead>
+        <thead><tr><th>Platform</th><th>Type</th><th>Salvo</th></tr></thead>
         <tbody>${platformRows}</tbody>
       </table>
 
