@@ -38,6 +38,11 @@ let manualOverrides = {};     // { [threatType]: { [defId]: { survived:number, d
 let simHistory       = [];    // ordered array of snapshots; index 0 is always the initial state
 let simHistoryCursor = -1;    // index of the currently loaded snapshot (-1 until loadData completes)
 
+// ── Per-target attack & results state ─────────────────────────────────────────
+// Each entry mirrors the six simulation globals below, saved when leaving a
+// target and restored when returning to it.
+let perTargetState   = {};    // targetId → { attackManifest, lastSim*, preSimMagState, manualOverrides, _manifestUnchanged }
+
 // ── Minimap state ─────────────────────────────────────────────────────────────
 let _minimapCrossLayers = [];   // Leaflet layers for cross-target coverage circles
 
@@ -1012,8 +1017,19 @@ async function resetTargetToDefault(targetId) {
 
   clearMagStateForTarget(targetId);
   saveMagStateToStorage();
+
+  // Clear the per-target manifest and results for this target
+  delete perTargetState[targetId];
   _manifestUnchanged = false;
+  attackManifest     = [];
+  lastSimResults     = null;
+  lastSimDefenses    = [];
+  preSimMagState     = {};
+  manualOverrides    = {};
+
+  renderAttackManifest();
   document.getElementById('simulation-results').classList.add('hidden');
+  document.getElementById('override-notice')?.classList.add('hidden');
   renderDefenseLayers(targetId);
 }
 
@@ -2220,6 +2236,49 @@ function showToast(message, isError = false) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Per-target state helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Persist the current simulation globals into perTargetState[targetId]. */
+function _saveTargetState(targetId) {
+  if (!targetId) return;
+  perTargetState[targetId] = {
+    attackManifest:     JSON.parse(JSON.stringify(attackManifest)),
+    lastSimResults:     lastSimResults  ? JSON.parse(JSON.stringify(lastSimResults))  : null,
+    lastSimTarget:      lastSimTarget,
+    lastSimDefenses:    JSON.parse(JSON.stringify(lastSimDefenses)),
+    preSimMagState:     JSON.parse(JSON.stringify(preSimMagState)),
+    manualOverrides:    JSON.parse(JSON.stringify(manualOverrides)),
+    _manifestUnchanged: _manifestUnchanged
+  };
+}
+
+/**
+ * Load saved state for targetId into the live globals.
+ * If the target has never been visited, all globals are reset to empty defaults.
+ */
+function _loadTargetState(targetId) {
+  const s = targetId ? perTargetState[targetId] : null;
+  if (s) {
+    attackManifest     = JSON.parse(JSON.stringify(s.attackManifest));
+    lastSimResults     = s.lastSimResults ? JSON.parse(JSON.stringify(s.lastSimResults)) : null;
+    lastSimTarget      = s.lastSimTarget;
+    lastSimDefenses    = JSON.parse(JSON.stringify(s.lastSimDefenses));
+    preSimMagState     = JSON.parse(JSON.stringify(s.preSimMagState));
+    manualOverrides    = JSON.parse(JSON.stringify(s.manualOverrides));
+    _manifestUnchanged = s._manifestUnchanged;
+  } else {
+    attackManifest     = [];
+    lastSimResults     = null;
+    lastSimTarget      = null;
+    lastSimDefenses    = [];
+    preSimMagState     = {};
+    manualOverrides    = {};
+    _manifestUnchanged = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Simulation history
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2268,7 +2327,10 @@ function navigateToSnapshot(index) {
 
   const snap = simHistory[index];
 
-  // Restore simulation state
+  // Save the outgoing target's current working state before we overwrite globals
+  _saveTargetState(selectedTargetId);
+
+  // Restore simulation state from snapshot
   globalMagState   = JSON.parse(JSON.stringify(snap.magStateAfter));
   saveMagStateToStorage();
   lastSimResults   = snap.results  ? JSON.parse(JSON.stringify(snap.results))    : null;
@@ -2279,6 +2341,10 @@ function navigateToSnapshot(index) {
   attackManifest   = JSON.parse(JSON.stringify(snap.attackManifest));
   simHistoryCursor = index;
   _manifestUnchanged = !!snap.results;
+
+  // Persist restored state as the active per-target state for the destination
+  // so switching away and back keeps the history-navigated view intact.
+  _saveTargetState(snap.targetId);
 
   // Auto-switch to the target that was attacked
   selectedTargetId = snap.targetId || null;
@@ -2640,24 +2706,34 @@ function _buildFinalMagSection() {
 function wireEvents() {
   // Target selection
   document.getElementById('target-select').addEventListener('change', (e) => {
+    // Save manifest + results for the target we're leaving
+    _saveTargetState(selectedTargetId);
+
     selectedTargetId = e.target.value || null;
+
+    // Restore (or initialise) manifest + results for the target we're entering.
+    // globalMagState is intentionally preserved — it is shared across targets.
+    _loadTargetState(selectedTargetId);
+
     const target = getTarget(selectedTargetId);
     renderTargetInfo(target);
-
-    // Switching targets — reset dirty flag so the next sim runs freely.
-    // globalMagState is intentionally preserved so cross-target magazine
-    // depletion carries across target selections.
-    _manifestUnchanged = false;
     renderDefenseLayers(selectedTargetId);
+    renderAttackManifest();
+
+    // Show or restore results if this target was previously simulated
+    if (lastSimResults) {
+      rerenderWithOverrides();
+      document.getElementById('simulation-results').classList.remove('hidden');
+    } else {
+      document.getElementById('simulation-results').classList.add('hidden');
+      document.getElementById('override-notice')?.classList.add('hidden');
+    }
 
     // Update simulate / reset-loadouts button states
     const simBtn = document.getElementById('btn-simulate');
     simBtn.disabled = !selectedTargetId || attackManifest.length === 0;
-    document.getElementById('btn-reset-loadouts').disabled      = !selectedTargetId;
+    document.getElementById('btn-reset-loadouts').disabled       = !selectedTargetId;
     document.getElementById('btn-reset-target-default').disabled = !selectedTargetId;
-
-    // Hide results when target changes
-    document.getElementById('simulation-results').classList.add('hidden');
   });
 
   // Add defense toggle
