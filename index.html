@@ -14,10 +14,15 @@
       <div class="header-title">
         <h1>Strike Assessment Tool</h1>
         <p class="header-sub">Layered Air Defense Adjudicator — Middle East</p>
+        <div class="laydown-indicator">
+          <span class="laydown-indicator-label">Laydown</span>
+          <span id="laydown-badge" class="laydown-badge">Default</span>
+        </div>
       </div>
       <div class="header-controls">
-        <button id="btn-history"    class="btn btn-secondary">History</button>
-        <button id="btn-export-pdf" class="btn btn-secondary">Export PDF</button>
+        <button id="btn-history"        class="btn btn-secondary">History</button>
+        <button id="btn-import-laydown" class="btn btn-secondary">Import Laydown</button>
+        <button id="btn-export-pdf"     class="btn btn-secondary">Export PDF</button>
         <button id="btn-export"     class="btn btn-secondary">Export JSON</button>
         <button id="btn-reset"      class="btn btn-danger">Reset to Default</button>
       </div>
@@ -93,14 +98,14 @@
 
         <div class="form-group">
           <label for="defense-quantity">Quantity (batteries / systems)</label>
-          <input type="number" id="defense-quantity" min="1" max="20" value="1">
+          <input type="number" id="defense-quantity" min="1" value="1">
         </div>
 
         <div id="defense-magazine-info" class="defense-magazine-info hidden"></div>
 
         <div class="form-group">
           <label for="defense-notes">Notes (optional)</label>
-          <input type="text" id="defense-notes" placeholder="e.g., Forward deployed, degraded readiness">
+          <input type="text" id="defense-notes" placeholder="e.g., Forward deployed, degraded readiness" autocomplete="off">
         </div>
 
         <div class="form-row">
@@ -230,6 +235,9 @@
       <div class="modal-footer" id="modal-footer"></div>
     </div>
   </div>
+
+  <!-- Hidden file input for laydown import — triggered programmatically -->
+  <input type="file" id="import-laydown-input" accept=".json" style="display:none">
 
   <!-- Scripts — load in dependency order -->
   <script src="js/leaflet.js"></script>

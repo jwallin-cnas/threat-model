@@ -82,6 +82,37 @@ header {
   gap: 8px;
 }
 
+.laydown-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.laydown-indicator-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}
+
+.laydown-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+.laydown-badge--custom {
+  background: var(--warn-dim);
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
 /* ── Main layout ─────────────────────────────────────────────────────────── */
 
 .main-grid {

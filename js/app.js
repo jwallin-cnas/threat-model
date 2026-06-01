@@ -9,8 +9,9 @@
  *      to commit back into their repo
  */
 
-const STORAGE_KEY    = 'threatmodel_targets_v2';
-const MAG_STORAGE_KEY = 'threatmodel_mag_v2';
+const STORAGE_KEY      = 'threatmodel_targets_v2';
+const MAG_STORAGE_KEY  = 'threatmodel_mag_v2';
+const LAYDOWN_NAME_KEY = 'threatmodel_laydown_name_v2';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
@@ -185,6 +186,12 @@ async function loadData() {
     manualOverrides:{},
     attackManifest: []
   }));
+
+  // Restore laydown badge (name persists across reloads in localStorage)
+  try {
+    const storedName = localStorage.getItem(LAYDOWN_NAME_KEY);
+    renderLaydownBadge(storedName || null);
+  } catch { /* non-critical */ }
 }
 
 function loadFromStorage() {
@@ -227,6 +234,7 @@ async function resetData() {
   if (!confirmed) return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(MAG_STORAGE_KEY);
+  localStorage.removeItem(LAYDOWN_NAME_KEY);
   location.reload();
 }
 
@@ -2712,6 +2720,134 @@ function _buildFinalMagSection() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Laydown import
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Update the header badge to reflect the active laydown source. */
+function renderLaydownBadge(name) {
+  const badge = document.getElementById('laydown-badge');
+  if (!badge) return;
+  const isDefault = !name;
+  badge.textContent = isDefault ? 'Default' : name;
+  badge.classList.toggle('laydown-badge--custom', !isDefault);
+}
+
+/**
+ * Parse and apply a laydown JSON file (same schema as defaults.json).
+ * Fully replaces all target defense assignments — targets not listed in the
+ * file are left with empty defense arrays.
+ */
+function importLaydown(file) {
+  const reader = new FileReader();
+
+  reader.onload = function (e) {
+    // ── Parse ────────────────────────────────────────────────────────────────
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch (err) {
+      showToast('Import failed — invalid JSON: ' + err.message, true);
+      return;
+    }
+
+    if (!data.defaults || typeof data.defaults !== 'object' || Array.isArray(data.defaults)) {
+      showToast('Import failed — file must contain a "defaults" object.', true);
+      return;
+    }
+
+    // ── Clear all existing defenses and magazine state ────────────────────────
+    for (const t of appTargetCatalog) {
+      t.defenses                = [];
+      delete t.enabledCoverageDefIds;
+      delete t.disabledCoverageDefIds;
+    }
+    globalMagState = {};
+
+    // ── Apply imported assignments ────────────────────────────────────────────
+    let targetsUpdated = 0;
+    const warnings     = [];
+
+    for (const [targetId, entries] of Object.entries(data.defaults)) {
+      const target = getTarget(targetId);
+      if (!target) {
+        warnings.push(`Unknown target ID: "${targetId}"`);
+        continue;
+      }
+      if (!Array.isArray(entries)) {
+        warnings.push(`Expected array for target "${targetId}" — skipped`);
+        continue;
+      }
+
+      const applied = [];
+      for (const d of entries) {
+        if (!d.system) {
+          warnings.push(`Entry missing "system" field for target "${targetId}" — skipped`);
+          continue;
+        }
+        if (!DEFENSE_CATALOG[d.system]) {
+          warnings.push(`Unknown system "${d.system}" at target "${targetId}" — skipped`);
+          continue;
+        }
+        const qty = parseInt(d.quantity, 10);
+        if (!Number.isInteger(qty) || qty < 1) {
+          warnings.push(`Invalid quantity for system "${d.system}" at target "${targetId}" — skipped`);
+          continue;
+        }
+        const sysData    = appDefenseSystems.find(s => s.id === d.system);
+        const scaledQty  = qty * (sysData?.batteries ?? 1);
+        applied.push({
+          ...d,
+          quantity: scaledQty,
+          operator: d.operator || target.country || ''
+        });
+      }
+
+      target.defenses = applied;
+      targetsUpdated++;
+    }
+
+    // ── Persist ───────────────────────────────────────────────────────────────
+    saveToStorage();
+    saveMagStateToStorage();
+
+    // ── Update badge ──────────────────────────────────────────────────────────
+    const displayName = file.name.replace(/\.json$/i, '');
+    try { localStorage.setItem(LAYDOWN_NAME_KEY, displayName); } catch { /* non-critical */ }
+    renderLaydownBadge(displayName);
+
+    // ── Reset live simulation state ───────────────────────────────────────────
+    perTargetState     = {};
+    attackManifest     = [];
+    lastSimResults     = null;
+    lastSimTarget      = null;
+    lastSimDefenses    = [];
+    preSimMagState     = {};
+    manualOverrides    = {};
+    _manifestUnchanged = false;
+    renderAttackManifest();
+    document.getElementById('simulation-results').classList.add('hidden');
+    document.getElementById('override-notice')?.classList.add('hidden');
+
+    // ── Re-render current target ──────────────────────────────────────────────
+    if (selectedTargetId) {
+      renderDefenseLayers(selectedTargetId);
+      updateMinimap(getTarget(selectedTargetId));
+    }
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    const hasWarnings = warnings.length > 0;
+    let msg = `Laydown loaded — ${targetsUpdated} target${targetsUpdated !== 1 ? 's' : ''} updated.`;
+    if (hasWarnings) {
+      msg += ` ${warnings.length} warning${warnings.length !== 1 ? 's' : ''} (see console).`;
+      console.warn('[importLaydown] warnings:', warnings);
+    }
+    showToast(msg, hasWarnings);
+  };
+
+  reader.readAsText(file);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Attack queue
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -3024,7 +3160,12 @@ function wireEvents() {
   // Cancel add defense
   document.getElementById('btn-cancel-add-defense').addEventListener('click', () => {
     document.getElementById('add-defense-form').classList.add('hidden');
-    document.getElementById('defense-quantity').disabled = false;
+    document.getElementById('defense-system-select').value = '';
+    const qtyInput = document.getElementById('defense-quantity');
+    qtyInput.value    = '1';
+    qtyInput.disabled = false;
+    document.getElementById('defense-notes').value = '';
+    document.getElementById('defense-magazine-info').classList.add('hidden');
   });
 
   // Update salvo options when platform changes
@@ -3062,7 +3203,17 @@ function wireEvents() {
   document.getElementById('btn-simulate-queue').addEventListener('click', simulateQueue);
 
   // Clear queue
-  document.getElementById('btn-clear-queue').addEventListener('click', () => {
+  document.getElementById('btn-clear-queue').addEventListener('click', async () => {
+    if (attackQueue.length === 0) return;
+    const confirmed = await showModal({
+      title:   'Clear Queue?',
+      message: `Remove all ${attackQueue.length} staged attack${attackQueue.length !== 1 ? 's' : ''} from the queue?`,
+      buttons: [
+        { label: 'Clear', value: true,  style: 'danger'    },
+        { label: 'Cancel', value: false, style: 'secondary' }
+      ]
+    });
+    if (!confirmed) return;
     attackQueue = [];
     renderQueuePanel();
   });
@@ -3074,6 +3225,17 @@ function wireEvents() {
 
   // Clear all manual overrides
   document.getElementById('btn-clear-overrides').addEventListener('click', clearAllOverrides);
+
+  // Import laydown — button triggers the hidden file input
+  document.getElementById('btn-import-laydown').addEventListener('click', () => {
+    document.getElementById('import-laydown-input').click();
+  });
+  document.getElementById('import-laydown-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    importLaydown(file);
+    e.target.value = '';   // reset so the same file can be re-imported
+  });
 
   // Export PDF (print)
   document.getElementById('btn-export-pdf').addEventListener('click', exportHistoryPDF);
