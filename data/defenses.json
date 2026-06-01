@@ -112,7 +112,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 25
       },
-      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"]
+      "threats": ["srbm", "cruise_missile"]
     },
     {
       "id": "iron_dome",
@@ -284,8 +284,8 @@
     },
     {
       "id": "f15e_patrol",
-      "name": "F-15E Patrol (×2)",
-      "range_km": 0,
+      "name": "F-15E Patrol (×4)",
+      "range_km": 200,
       "batteries": 1,
       "shared": true,
       "armament": {
@@ -299,8 +299,8 @@
     },
     {
       "id": "fa18_patrol",
-      "name": "F/A-18 Patrol (×2)",
-      "range_km": 0,
+      "name": "F/A-18 Patrol (×4)",
+      "range_km": 100,
       "batteries": 1,
       "shared": true,
       "armament": {
@@ -308,7 +308,7 @@
         "name": "AIM-9X Sidewinder",
         "payload_kg": 9.4,
         "kill_modality": "fragmentation",
-        "standard_loadout": 18
+        "standard_loadout": 72
       },
       "threats": ["drone", "cruise_missile", "fpv"]
     }

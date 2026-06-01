@@ -20,6 +20,7 @@ let appTargetCatalog  = [];   // target catalog from data/targets.json
 let appDefenseSystems = [];   // defense system specs from data/defenses.json
 let appAttackSystems  = [];   // attack platforms from data/attacks.json
 let appDefaultDefenses = {};  // default defense assignments from data/defaults.json  (targetId → defenses[])
+let appPresets         = [];  // defense group presets from data/presets.json
 
 let selectedTargetId   = null;
 let attackManifest     = [];   // [{platformId, count}]
@@ -96,12 +97,13 @@ let _minimapMarker = null;        // Leaflet circleMarker instance
 
 async function loadData() {
   // Fetch all data files in parallel
-  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes] = await Promise.allSettled([
+  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes, presetsRes] = await Promise.allSettled([
     fetch('data/data.json').then(r => r.json()),
     fetch('data/targets.json').then(r => r.json()),
     fetch('data/defenses.json').then(r => r.json()),
     fetch('data/attacks.json').then(r => r.json()),
-    fetch('data/defaults.json').then(r => r.json())
+    fetch('data/defaults.json').then(r => r.json()),
+    fetch('data/presets.json').then(r => r.json())
   ]);
 
   // Scenario targets (data.json) — merged with localStorage overrides below
@@ -138,6 +140,13 @@ async function loadData() {
     appDefaultDefenses = defaultsRes.value.defaults || {};
   } else {
     console.warn('Could not load data/defaults.json:', defaultsRes.reason);
+  }
+
+  // Defense group presets (presets.json)
+  if (presetsRes.status === 'fulfilled') {
+    appPresets = presetsRes.value.presets || [];
+  } else {
+    console.warn('Could not load data/presets.json:', presetsRes.reason);
   }
 
   // Magazine state (localStorage — flat, global, keyed by def.id)
@@ -893,15 +902,31 @@ function populateDefenseSystemSelect() {
   const sel = document.getElementById('defense-system-select');
   sel.innerHTML = '<option value="">— Select System —</option>';
 
+  // Presets optgroup — appears first so they're easy to reach
+  if (appPresets.length > 0) {
+    const presetGroup = document.createElement('optgroup');
+    presetGroup.label = 'Presets';
+    for (const preset of appPresets) {
+      const opt = document.createElement('option');
+      opt.value = preset.id;
+      opt.textContent = preset.name;
+      presetGroup.appendChild(opt);
+    }
+    sel.appendChild(presetGroup);
+  }
+
+  // Individual systems optgroup
+  const systemGroup = document.createElement('optgroup');
+  systemGroup.label = 'Systems';
   const systems = Object.values(DEFENSE_CATALOG)
     .sort((a, b) => a.name.localeCompare(b.name));
-
   for (const sys of systems) {
     const opt = document.createElement('option');
     opt.value = sys.id;
     opt.textContent = sys.name;
-    sel.appendChild(opt);
+    systemGroup.appendChild(opt);
   }
+  sel.appendChild(systemGroup);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1242,6 +1267,13 @@ function updateDefenseMagazineInfo() {
   const systemId   = document.getElementById('defense-system-select').value;
   const qty        = Math.max(1, parseInt(document.getElementById('defense-quantity').value) || 1);
   const infoDiv    = document.getElementById('defense-magazine-info');
+
+  // Presets expand to multiple systems — no single magazine capacity to display
+  if (appPresets.find(p => p.id === systemId)) {
+    infoDiv.classList.add('hidden');
+    return;
+  }
+
   const catalog    = systemId ? DEFENSE_CATALOG[systemId] : null;
   const perBattery = catalog?.magazinePerBattery || 0;
 
@@ -3413,10 +3445,12 @@ function wireEvents() {
 
   // Magazine info — update when system or quantity changes; also seed quantity from defaultBatteries
   document.getElementById('defense-system-select').addEventListener('change', e => {
-    const catalog  = DEFENSE_CATALOG[e.target.value];
+    const val      = e.target.value;
+    const preset   = appPresets.find(p => p.id === val);
+    const catalog  = preset ? null : DEFENSE_CATALOG[val];
     const qtyInput = document.getElementById('defense-quantity');
-    if (catalog?.isShared) {
-      // Patrol assets are always one indivisible unit — quantity is not meaningful
+    if (preset || catalog?.isShared) {
+      // Presets and patrol assets are indivisible — quantity is not meaningful
       qtyInput.value    = 1;
       qtyInput.disabled = true;
     } else {
@@ -3436,7 +3470,15 @@ function wireEvents() {
     if (!systemId) { showToast('Please select a system.', true); return; }
     if (!selectedTargetId) { showToast('Please select a target first.', true); return; }
 
-    addDefense(selectedTargetId, systemId, Math.max(1, qty), notes);
+    const preset = appPresets.find(p => p.id === systemId);
+    if (preset) {
+      for (const component of preset.components) {
+        addDefense(selectedTargetId, component.system, component.quantity, component.notes);
+      }
+    } else {
+      addDefense(selectedTargetId, systemId, Math.max(1, qty), notes);
+    }
+
     document.getElementById('add-defense-form').classList.add('hidden');
     document.getElementById('defense-system-select').value = '';
     const qtyInput = document.getElementById('defense-quantity');

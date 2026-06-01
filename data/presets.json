@@ -1,0 +1,23 @@
+{
+  "presets": [
+    {
+      "id": "preset_csg",
+      "name": "Carrier Strike Group (CSG)",
+      "components": [
+        { "system": "fa18_patrol", "quantity": 1, "notes": "CAP" },
+        { "system": "aegis_sm3",   "quantity": 1, "notes": "" },
+        { "system": "aegis_sm6",   "quantity": 1, "notes": "" },
+        { "system": "aegis_sm2",   "quantity": 1, "notes": "" }
+      ]
+    },
+    {
+      "id": "preset_sag",
+      "name": "Surface Action Group (SAG)",
+      "components": [
+        { "system": "aegis_sm3", "quantity": 1, "notes": "" },
+        { "system": "aegis_sm6", "quantity": 1, "notes": "" },
+        { "system": "aegis_sm2", "quantity": 1, "notes": "" }
+      ]
+    }
+  ]
+}
