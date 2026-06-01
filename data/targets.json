@@ -385,6 +385,13 @@
       "country": "United Arab Emirates",
       "location": [25.02197708, 55.0365012],
       "infrastructure": ["base"]
+    },
+    {
+      "id": "mediterranean_sea_place_point",
+      "name": "Mediterranean Sea",
+      "country": "United States",
+      "location": [32.42095, 34.70485],
+      "infrastructure": ["base"]
     }
   ]
 }
