@@ -392,6 +392,27 @@
       "country": "United States",
       "location": [32.42095, 34.70485],
       "infrastructure": ["base"]
+    },
+    {
+      "id": "persian_gulf_place_point",
+      "name": "Persian Gulf",
+      "country": "United States",
+      "location": [27.46872, 50.83899],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "red_sea_place_point",
+      "name": "Red Sea",
+      "country": "United States",
+      "location": [20.93354, 39.08745],
+      "infrastructure": ["base"]
+    },
+    {
+      "id": "gulf_of_oman_place_point",
+      "name": "Gulf of Oman",
+      "country": "United States",
+      "location": [23.69908, 61.49567],
+      "infrastructure": ["base"]
     }
   ]
 }

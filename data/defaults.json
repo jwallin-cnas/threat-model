@@ -53,7 +53,8 @@
       "aramco_red_sea_corridor",
       "ruwais_refinery",              "upper_zakum_oil_field",      "murban_bab_hashah",
       "fujairah_port",                "dubai",                      "abu_dhabi",
-      "al_dhafra_ab",                 "jebel_ali_port", "mediterranean_sea_place_point"
+      "al_dhafra_ab",                 "jebel_ali_port", "mediterranean_sea_place_point",
+      "persian_gulf_place_point",     "red_sea_place_point",        "gulf_of_oman_place_point"
     ]
   },
 
