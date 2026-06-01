@@ -13,3 +13,9 @@
 
 # Internal documentation (not for repo)
 CODEGUIDE.md
+
+# Node.js dependencies
+node_modules/
+
+# Batch runner output (generated PDFs)
+output/
