@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "attacks": [
+
+    {
+      "targetId": "al_dhafra_ab",
+      "platforms": [
+        { "platformId": "zulfagher",    "quantity": 50 },
+        { "platformId": "soumar",       "quantity": 50 }
+      ]
+    },
+
+    {
+      "targetId": "ruwais_refinery",
+      "platforms": [
+        { "platformId": "geran_2",      "quantity": 250 },
+        { "platformId": "zulfagher",    "quantity": 50  }
+      ]
+    },
+
+    {
+      "targetId": "al_udeid_ab",
+      "platforms": [
+        { "platformId": "shahed_238",   "quantity": 100 },
+        { "platformId": "paveh_quds",   "quantity": 100 },
+        { "platformId": "haj_qasem",    "quantity": 100 }
+      ]
+    },
+
+    {
+      "targetId": "hamad_port",
+      "platforms": [
+        { "platformId": "khalij_e_fars",    "quantity": 50 },
+        { "platformId": "zulfagher_e_basir","quantity": 50 },
+        { "platformId": "abu_mahdi",        "quantity": 50 }
+      ]
+    },
+
+    {
+      "targetId": "doha",
+      "platforms": [
+        { "platformId": "geran_2",      "quantity": 250 }
+      ]
+    }
+
+  ]
+}

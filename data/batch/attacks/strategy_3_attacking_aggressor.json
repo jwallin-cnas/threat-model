@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "attacks": [
+
+    {
+      "targetId": "tel_nof_ab",
+      "platforms": [
+        { "platformId": "soumar",       "quantity": 50  },
+        { "platformId": "khorramshahr", "quantity": 100 }
+      ]
+    },
+
+    {
+      "targetId": "tel_aviv",
+      "platforms": [
+        { "platformId": "geran_2",      "quantity": 250 },
+        { "platformId": "ghadr",        "quantity": 100 }
+      ]
+    },
+
+    {
+      "targetId": "haifa",
+      "platforms": [
+        { "platformId": "shahed_101",   "quantity": 100 },
+        { "platformId": "fateh_110",    "quantity": 150 }
+      ]
+    },
+
+    {
+      "targetId": "ramat_david_ab",
+      "platforms": [
+        { "platformId": "paveh_quds",   "quantity": 100 },
+        { "platformId": "geran_2",      "quantity": 150 }
+      ]
+    },
+
+    {
+      "targetId": "beer_sheva",
+      "platforms": [
+        { "platformId": "shahed_238",   "quantity": 100 }
+      ]
+    }
+
+  ]
+}

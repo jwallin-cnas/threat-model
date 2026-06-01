@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "attacks": [
+
+    {
+      "targetId": "fujairah_port",
+      "platforms": [
+        { "platformId": "khalij_e_fars",  "quantity": 50  },
+        { "platformId": "geran_2",        "quantity": 250 }
+      ]
+    },
+
+    {
+      "targetId": "jebel_ali_port",
+      "platforms": [
+        { "platformId": "zulfagher_e_basir", "quantity": 50  },
+        { "platformId": "abu_mahdi",         "quantity": 50  },
+        { "platformId": "shahed_238",        "quantity": 100 }
+      ]
+    },
+
+    {
+      "targetId": "port_of_salalah",
+      "platforms": [
+        { "platformId": "samad_3",        "quantity": 50 },
+        { "platformId": "ghadr",          "quantity": 50 }
+      ]
+    },
+
+    {
+      "targetId": "haifa",
+      "platforms": [
+        { "platformId": "dji_fpv",        "quantity": 100 },
+        { "platformId": "fateh_110",      "quantity": 250 }
+      ]
+    },
+
+    {
+      "targetId": "shuaiba_port",
+      "platforms": [
+        { "platformId": "shahed_101",     "quantity": 100 },
+        { "platformId": "paveh_quds",     "quantity": 100 }
+      ]
+    }
+
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "attacks": [
+
+    {
+      "targetId": "dubai",
+      "platforms": [
+        { "platformId": "shahed_136",   "quantity": 150 },
+        { "platformId": "qaem_1",       "quantity": 50  }
+      ]
+    },
+
+    {
+      "targetId": "riyadh",
+      "platforms": [
+        { "platformId": "shahed_136",   "quantity": 100 },
+        { "platformId": "qaem_1",       "quantity": 100 }
+      ]
+    },
+
+    {
+      "targetId": "aramco_riyadh",
+      "platforms": [
+        { "platformId": "haj_qasem",    "quantity": 100 },
+        { "platformId": "geran_2",      "quantity": 150 },
+        { "platformId": "paveh_quds",   "quantity": 50  }
+      ]
+    },
+
+    {
+      "targetId": "fujairah_port",
+      "platforms": [
+        { "platformId": "ghadr",        "quantity": 150 },
+        { "platformId": "samad_3",      "quantity": 50  }
+      ]
+    },
+
+    {
+      "targetId": "jebel_ali_port",
+      "platforms": [
+        { "platformId": "abu_mahdi",      "quantity": 50  },
+        { "platformId": "khalij_e_fars",  "quantity": 50  },
+        { "platformId": "shahed_238",     "quantity": 100 }
+      ]
+    }
+
+  ]
+}

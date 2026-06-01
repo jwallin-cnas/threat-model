@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "defaults": {
+
+    "al_udeid_ab": [
+      { "id": "s2_udeid_thaad",        "system": "thaad",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_udeid_merops",        "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_udeid_ifpc2",         "system": "ifpc2",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_udeid_laser",         "system": "containerized_laser",      "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_udeid_tjammer",       "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "prince_sultan_ab": [
+      { "id": "s2_psab_thaad",          "system": "thaad",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_psab_hpm",            "system": "high_powered_microwave",   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_psab_tjammer",        "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "us_fifth_fleet": [
+      { "id": "s2_5thfleet_patriot",    "system": "patriot",                  "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_5thfleet_fslids",     "system": "fslids",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_5thfleet_cram",       "system": "phalanx_cram",             "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "al_dhafra_ab": [
+      { "id": "s2_dhafra_patriot",      "system": "patriot",                  "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_dhafra_merops",       "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_dhafra_hpm",          "system": "high_powered_microwave",   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_dhafra_tjammer",      "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "camp_arifjan": [
+      { "id": "s2_arifjan_merops",      "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_arifjan_ifpc2",       "system": "ifpc2",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_arifjan_cram",        "system": "phalanx_cram",             "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_arifjan_tjammer",     "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "camp_buehring": [
+      { "id": "s2_buehring_fslids",     "system": "fslids",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s2_buehring_mshorad",    "system": "m_shorad",                 "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "mohammed_al_ahmed_naval_base": [
+      { "id": "s2_moham_mshorad",       "system": "m_shorad",                 "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "aramco_red_sea_corridor": [
+      { "id": "s2_aramcors_tjammer",    "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "persian_gulf_place_point": [
+      { "id": "shared_f15e_patrol",     "system": "f15e_patrol",              "quantity": 1, "notes": "DCA",     "operator": "United States" },
+      { "id": "s2_pg_sag_sm3",          "system": "aegis_sm3",                "quantity": 1, "notes": "SAG",     "operator": "United States" },
+      { "id": "s2_pg_sag_sm6",          "system": "aegis_sm6",                "quantity": 1, "notes": "SAG",     "operator": "United States" },
+      { "id": "s2_pg_sag_sm2",          "system": "aegis_sm2",                "quantity": 1, "notes": "SAG",     "operator": "United States" }
+    ],
+
+    "gulf_of_oman_place_point": [
+      { "id": "shared_fa18_patrol",     "system": "fa18_patrol",              "quantity": 1, "notes": "CSG CAP", "operator": "United States" },
+      { "id": "s2_goo_csg_sm3",         "system": "aegis_sm3",                "quantity": 1, "notes": "CSG",     "operator": "United States" },
+      { "id": "s2_goo_csg_sm6",         "system": "aegis_sm6",                "quantity": 1, "notes": "CSG",     "operator": "United States" },
+      { "id": "s2_goo_csg_sm2",         "system": "aegis_sm2",                "quantity": 1, "notes": "CSG",     "operator": "United States" }
+    ]
+
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "defaults": {
+
+    "tel_nof_ab": [
+      { "id": "s4_telnof_thaad",        "system": "thaad",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_telnof_merops",       "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_telnof_ifpc2",        "system": "ifpc2",                    "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "ramat_david_ab": [
+      { "id": "s4_ramatdavid_thaad",    "system": "thaad",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_ramatdavid_merops",   "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_ramatdavid_ifpc2",    "system": "ifpc2",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_ramatdavid_hpm",      "system": "high_powered_microwave",   "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "tel_aviv": [
+      { "id": "s4_telaviv_patriot",     "system": "patriot",                  "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_telaviv_tjammer",     "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "jerusalem": [
+      { "id": "s4_jerusalem_patriot",   "system": "patriot",                  "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_jerusalem_tjammer",   "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "haifa": [
+      { "id": "s4_haifa_merops",        "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_haifa_hpm",           "system": "high_powered_microwave",   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_haifa_laser",         "system": "containerized_laser",      "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_haifa_cram",          "system": "phalanx_cram",             "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_haifa_tjammer",       "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "hatzerim_ab": [
+      { "id": "s4_hatzerim_fslids",     "system": "fslids",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_hatzerim_mshorad",    "system": "m_shorad",                 "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_hatzerim_cram",       "system": "phalanx_cram",             "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "nevatim_ab": [
+      { "id": "s4_nevatim_fslids",      "system": "fslids",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s4_nevatim_mshorad",     "system": "m_shorad",                 "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "beer_sheva": [
+      { "id": "s4_beersheva_tjammer",   "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "persian_gulf_place_point": [
+      { "id": "shared_f15e_patrol",     "system": "f15e_patrol",              "quantity": 1, "notes": "DCA",     "operator": "United States" }
+    ],
+
+    "mediterranean_sea_place_point": [
+      { "id": "shared_fa18_patrol",     "system": "fa18_patrol",              "quantity": 1, "notes": "CSG CAP", "operator": "United States" },
+      { "id": "s4_med_csg_sm3",         "system": "aegis_sm3",                "quantity": 1, "notes": "CSG",     "operator": "United States" },
+      { "id": "s4_med_csg_sm6",         "system": "aegis_sm6",                "quantity": 1, "notes": "CSG",     "operator": "United States" },
+      { "id": "s4_med_csg_sm2",         "system": "aegis_sm2",                "quantity": 1, "notes": "CSG",     "operator": "United States" },
+      { "id": "s4_med_sag_sm3",         "system": "aegis_sm3",                "quantity": 1, "notes": "SAG",     "operator": "United States" },
+      { "id": "s4_med_sag_sm6",         "system": "aegis_sm6",                "quantity": 1, "notes": "SAG",     "operator": "United States" },
+      { "id": "s4_med_sag_sm2",         "system": "aegis_sm2",                "quantity": 1, "notes": "SAG",     "operator": "United States" }
+    ]
+
+  }
+}

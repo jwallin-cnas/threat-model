@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "defaults": {
+
+    "us_fifth_fleet": [
+      { "id": "s5_5thfleet_thaad",      "system": "thaad",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_5thfleet_laser",      "system": "containerized_laser",      "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "ali_al_salem_ab": [
+      { "id": "s5_alialsalem_thaad",    "system": "thaad",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_alialsalem_merops",   "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "ras_laffan_lng": [
+      { "id": "s5_raslaffan_patriot",   "system": "patriot",                  "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_raslaffan_ifpc2",     "system": "ifpc2",                    "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_raslaffan_hpm",       "system": "high_powered_microwave",   "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "muwaffaq_al_salti_ab": [
+      { "id": "s5_muwaffaq_patriot",    "system": "patriot",                  "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_muwaffaq_merops",     "system": "merops",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_muwaffaq_hpm",        "system": "high_powered_microwave",   "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "burgan_oil_field": [
+      { "id": "s5_burgan_fslids",       "system": "fslids",                   "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_burgan_tjammer",      "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "aramco_persian_gulf_corridor": [
+      { "id": "s5_aramcogulf_ifpc2",    "system": "ifpc2",                    "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "prince_sultan_ab": [
+      { "id": "s5_psab_mshorad",        "system": "m_shorad",                 "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "al_udeid_ab": [
+      { "id": "s5_udeid_mshorad",       "system": "m_shorad",                 "quantity": 1, "notes": "",        "operator": "United States" },
+      { "id": "s5_udeid_tjammer",       "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "camp_arifjan": [
+      { "id": "s5_arifjan_cram",        "system": "phalanx_cram",             "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "jebel_ali_port": [
+      { "id": "s5_jebel_ali_cram",      "system": "phalanx_cram",             "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "al_dhafra_ab": [
+      { "id": "s5_dhafra_tjammer",      "system": "tactical_jammer",          "quantity": 1, "notes": "",        "operator": "United States" }
+    ],
+
+    "persian_gulf_place_point": [
+      { "id": "shared_f15e_patrol",     "system": "f15e_patrol",              "quantity": 1, "notes": "DCA",     "operator": "United States" }
+    ],
+
+    "red_sea_place_point": [
+      { "id": "shared_fa18_patrol",     "system": "fa18_patrol",              "quantity": 1, "notes": "CSG CAP", "operator": "United States" },
+      { "id": "s5_rs_csg_sm3",          "system": "aegis_sm3",                "quantity": 1, "notes": "CSG (ranging King Khalid)", "operator": "United States" },
+      { "id": "s5_rs_csg_sm6",          "system": "aegis_sm6",                "quantity": 1, "notes": "CSG (ranging King Khalid)", "operator": "United States" },
+      { "id": "s5_rs_csg_sm2",          "system": "aegis_sm2",                "quantity": 1, "notes": "CSG (ranging King Khalid)", "operator": "United States" }
+    ],
+
+    "gulf_of_oman_place_point": [
+      { "id": "s5_goo_sag_sm3",         "system": "aegis_sm3",                "quantity": 1, "notes": "SAG",     "operator": "United States" },
+      { "id": "s5_goo_sag_sm6",         "system": "aegis_sm6",                "quantity": 1, "notes": "SAG",     "operator": "United States" },
+      { "id": "s5_goo_sag_sm2",         "system": "aegis_sm2",                "quantity": 1, "notes": "SAG",     "operator": "United States" }
+    ]
+
+  }
+}
