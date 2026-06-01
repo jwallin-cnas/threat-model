@@ -1,0 +1,18 @@
+{
+  "name": "threat-model",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Strike Assessment Tool — Layered Air Defense Adjudicator",
+  "scripts": {
+    "test":       "vitest run",
+    "test:watch": "vitest",
+    "batch":      "node scripts/batch-sim.js"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0"
+  }
+}

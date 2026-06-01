@@ -358,3 +358,12 @@ const ENGAGEMENT_FUNCTIONS = {
   },
 
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Node.js export shim
+// No-op in the browser (module is undefined); enables require() in Node.js.
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { ENGAGEMENT_FUNCTIONS };
+}

@@ -242,61 +242,17 @@ async function resetData() {
 // Populate runtime catalog objects from loaded JSON data
 // Clears any existing entries first so the JSON files are the sole source
 // of truth. Called once after loadData() completes.
+// Delegates to buildDefenseCatalog() / buildPlatformCatalog() in engine.js.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Infer engagement tier from range_km so defenses are sorted outermost-first
- * during simulation (tier 1 = longest range / exo-atmospheric).
- */
-function inferTier(range_km) {
-  if (range_km >= 200) return 1;
-  if (range_km >= 100) return 2;
-  if (range_km >= 50)  return 3;
-  if (range_km >= 25)  return 4;
-  if (range_km >= 10)  return 5;
-  return 6;
-}
 
 function mergeLoadedData() {
   // Clear existing entries — JSON files are the only source of truth
   for (const key of Object.keys(DEFENSE_CATALOG))  delete DEFENSE_CATALOG[key];
   for (const key of Object.keys(PLATFORM_CATALOG)) delete PLATFORM_CATALOG[key];
 
-  // Populate DEFENSE_CATALOG from defenses.json
-  for (const sys of appDefenseSystems) {
-    const tier = inferTier(sys.range_km);
-    DEFENSE_CATALOG[sys.id] = {
-      id:                 sys.id,
-      name:               sys.name,
-      shortName:          sys.name,
-      tier:               tier,
-      tierLabel:          TIER_LABELS[tier] || 'Unknown',
-      type:               'SAM',
-      country:            '',
-      range_km:           sys.range_km || 0,
-      defaultBatteries:   sys.batteries || 1,
-      isShared:           sys.shared || false,
-      effectiveAgainst:    sys.threats || [],
-      threatRangeOverrides: sys.threat_range_overrides || {},
-      magazinePerBattery:  sys.armament?.standard_loadout || 0,
-      description:         `Range: ${sys.range_km} km`
-    };
-  }
-
-  // Populate PLATFORM_CATALOG from attacks.json
-  for (const sys of appAttackSystems) {
-    PLATFORM_CATALOG[sys.id] = {
-      id:          sys.id,
-      name:        sys.name,
-      shortName:   sys.name,
-      type:        sys.type,
-      country:     '',
-      range_km:    sys.range_km,
-      warhead_kg:  sys.payload_kg,
-      salvo_sizes: sys.salvo_sizes || [],
-      description: `Range: ${sys.range_km} km · Payload: ${sys.payload_kg} kg`
-    };
-  }
+  // Build catalogs using pure functions from engine.js, then merge into globals
+  Object.assign(DEFENSE_CATALOG,  buildDefenseCatalog(appDefenseSystems));
+  Object.assign(PLATFORM_CATALOG, buildPlatformCatalog(appAttackSystems));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2980,6 +2936,219 @@ async function importAttackQueue(file) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Batch / automation helpers
+// These "_direct" variants bypass confirmation modals and FileReader so the
+// batch runner (scripts/batch-sim.js) can drive the app via page.evaluate().
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Reset simulation history to a single "Initial State" entry.
+ * Called by the _direct import functions to give each batch run a clean slate.
+ */
+function _resetSimulationHistory() {
+  simHistory       = [];
+  simHistoryCursor = 0;
+  simHistory.push(_createSnapshot({
+    isInitial:       true,
+    label:           'Initial State',
+    magStateBefore:  {},
+    magStateAfter:   globalMagState,
+    results:         null,
+    allDefenses:     [],
+    manualOverrides: {},
+    attackManifest:  []
+  }));
+}
+
+/**
+ * Apply a parsed laydown object directly without a confirmation modal or
+ * FileReader. Identical logic to importLaydown's reader.onload body.
+ *
+ * @param {object} data - parsed laydown JSON (same schema as defaults.json)
+ * @returns {{ targetsUpdated: number, warnings: string[] }}
+ */
+function _importLaydownDirect(data) {
+  if (!data.defaults || typeof data.defaults !== 'object' || Array.isArray(data.defaults)) {
+    throw new Error('Laydown data must contain a "defaults" object.');
+  }
+
+  // Clear all existing defenses and magazine state
+  for (const t of appTargetCatalog) {
+    t.defenses                = [];
+    delete t.enabledCoverageDefIds;
+    delete t.disabledCoverageDefIds;
+  }
+  globalMagState = {};
+
+  const warnings      = [];
+  let   targetsUpdated = 0;
+
+  for (const [targetId, entries] of Object.entries(data.defaults)) {
+    const target = getTarget(targetId);
+    if (!target) {
+      warnings.push(`Unknown target ID: "${targetId}"`);
+      continue;
+    }
+    if (!Array.isArray(entries)) {
+      warnings.push(`Expected array for target "${targetId}" — skipped`);
+      continue;
+    }
+
+    const applied = [];
+    for (const d of entries) {
+      if (!d.system) {
+        warnings.push(`Entry missing "system" field for target "${targetId}" — skipped`);
+        continue;
+      }
+      if (!DEFENSE_CATALOG[d.system]) {
+        warnings.push(`Unknown system "${d.system}" at target "${targetId}" — skipped`);
+        continue;
+      }
+      const qty = parseInt(d.quantity, 10);
+      if (!Number.isInteger(qty) || qty < 1) {
+        warnings.push(`Invalid quantity for system "${d.system}" at target "${targetId}" — skipped`);
+        continue;
+      }
+      const sysData   = appDefenseSystems.find(s => s.id === d.system);
+      const scaledQty = qty * (sysData?.batteries ?? 1);
+      applied.push({
+        ...d,
+        quantity: scaledQty,
+        operator: d.operator || target.country || ''
+      });
+    }
+
+    target.defenses = applied;
+    targetsUpdated++;
+  }
+
+  saveToStorage();
+  saveMagStateToStorage();
+
+  // Reset all live simulation state
+  _resetSimulationHistory();
+  perTargetState     = {};
+  attackManifest     = [];
+  lastSimResults     = null;
+  lastSimTarget      = null;
+  lastSimDefenses    = [];
+  preSimMagState     = {};
+  manualOverrides    = {};
+  _manifestUnchanged = false;
+
+  if (warnings.length) console.warn('[_importLaydownDirect] warnings:', warnings);
+  return { targetsUpdated, warnings };
+}
+
+/**
+ * Apply a parsed attack-queue object directly without a confirmation modal or
+ * FileReader. Identical validation logic to importAttackQueue's reader.onload
+ * body. Also resets magazine state and simulation history for a clean run.
+ *
+ * @param {object} data - parsed attacks JSON ({ attacks: [...] })
+ * @returns {{ queueLength: number, warnings: string[] }}
+ */
+function _importAttackQueueDirect(data) {
+  if (!Array.isArray(data.attacks)) {
+    throw new Error('Attack data must contain an "attacks" array.');
+  }
+
+  const warnings = [];
+  const newQueue  = [];
+
+  for (let ai = 0; ai < data.attacks.length; ai++) {
+    const attack    = data.attacks[ai];
+    const attackNum = ai + 1;
+
+    if (!attack.targetId) {
+      warnings.push(`Attack #${attackNum}: missing "targetId" — skipped`);
+      continue;
+    }
+    const target = getTarget(attack.targetId);
+    if (!target) {
+      warnings.push(`Attack #${attackNum}: unknown targetId "${attack.targetId}" — skipped`);
+      continue;
+    }
+    if (!Array.isArray(attack.platforms) || attack.platforms.length === 0) {
+      warnings.push(`Attack #${attackNum} (${attack.targetId}): "platforms" must be a non-empty array — skipped`);
+      continue;
+    }
+
+    const manifest = [];
+    for (const p of attack.platforms) {
+      if (!p.platformId) {
+        warnings.push(`Attack #${attackNum} (${attack.targetId}): platform entry missing "platformId" — skipped`);
+        continue;
+      }
+      if (!PLATFORM_CATALOG[p.platformId]) {
+        warnings.push(`Attack #${attackNum} (${attack.targetId}): unknown platformId "${p.platformId}" — skipped`);
+        continue;
+      }
+      const qty = parseInt(p.quantity, 10);
+      if (!Number.isInteger(qty) || qty < 1) {
+        warnings.push(`Attack #${attackNum} (${attack.targetId}): invalid quantity for "${p.platformId}" — skipped`);
+        continue;
+      }
+      if (p.type !== undefined) {
+        const normType    = p.type.toLowerCase().replace(/[\s-]+/g, '_');
+        const catalogType = PLATFORM_CATALOG[p.platformId].type;
+        if (normType !== catalogType) {
+          warnings.push(`Attack #${attackNum} (${attack.targetId}): type "${p.type}" does not match catalog type "${catalogType}" for "${p.platformId}" — using catalog type`);
+        }
+      }
+      manifest.push({ platformId: p.platformId, count: qty });
+    }
+
+    if (manifest.length === 0) {
+      warnings.push(`Attack #${attackNum} (${attack.targetId}): no valid platforms after validation — skipped`);
+      continue;
+    }
+
+    newQueue.push({
+      id:            `q_${Date.now()}_${ai}`,
+      targetId:      attack.targetId,
+      targetName:    target.name,
+      targetCountry: target.country || '',
+      manifest
+    });
+  }
+
+  // Apply — reset magazine and history for a clean run
+  attackQueue    = newQueue;
+  globalMagState = {};
+  saveMagStateToStorage();
+
+  _resetSimulationHistory();
+  perTargetState     = {};
+  attackManifest     = [];
+  lastSimResults     = null;
+  lastSimTarget      = null;
+  lastSimDefenses    = [];
+  preSimMagState     = {};
+  manualOverrides    = {};
+  _manifestUnchanged = false;
+
+  if (warnings.length) console.warn('[_importAttackQueueDirect] warnings:', warnings);
+  return { queueLength: newQueue.length, warnings };
+}
+
+/**
+ * Execute the current attack queue without any confirmation modal or UI update.
+ * Magazine depletion carries across entries exactly as in the interactive path.
+ *
+ * @returns {number}  number of attacks executed
+ */
+function _simulateQueueDirect() {
+  if (attackQueue.length === 0) return 0;
+  const queueToRun = [...attackQueue];
+  attackQueue = [];
+  for (const entry of queueToRun) {
+    _runOneQueuedAttack(entry);
+  }
+  return queueToRun.length;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Attack queue
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -3416,6 +3585,8 @@ async function init() {
   populatePlatformSelect();
   renderDefenseLayers(null);
   wireEvents();
+  // Signal to the batch runner (and any other automation) that the app is ready
+  window._appReady = true;
 }
 
 document.addEventListener('DOMContentLoaded', init);
