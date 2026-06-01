@@ -2737,7 +2737,17 @@ function renderLaydownBadge(name) {
  * Fully replaces all target defense assignments — targets not listed in the
  * file are left with empty defense arrays.
  */
-function importLaydown(file) {
+async function importLaydown(file) {
+  const confirmed = await showModal({
+    title:   'Replace Laydown?',
+    message: 'This will replace all defensive laydowns and reset all interceptor loadouts to default. Continue?',
+    buttons: [
+      { label: 'Continue', value: true,  style: 'danger'    },
+      { label: 'Cancel',   value: false, style: 'secondary' }
+    ]
+  });
+  if (!confirmed) return;
+
   const reader = new FileReader();
 
   reader.onload = function (e) {
@@ -2840,6 +2850,128 @@ function importLaydown(file) {
     if (hasWarnings) {
       msg += ` ${warnings.length} warning${warnings.length !== 1 ? 's' : ''} (see console).`;
       console.warn('[importLaydown] warnings:', warnings);
+    }
+    showToast(msg, hasWarnings);
+  };
+
+  reader.readAsText(file);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Attack queue import
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Parse and apply an attack queue JSON file.
+ * Schema: { version, attacks: [{ targetId, platforms: [{ platformId, type?, quantity }] }] }
+ * Fully replaces the existing queue. Resets all interceptor loadouts to default.
+ */
+async function importAttackQueue(file) {
+  const confirmed = await showModal({
+    title:   'Replace Attack Queue?',
+    message: 'This will replace the current attack queue and reset all interceptor loadouts to default. Continue?',
+    buttons: [
+      { label: 'Continue', value: true,  style: 'danger'    },
+      { label: 'Cancel',   value: false, style: 'secondary' }
+    ]
+  });
+  if (!confirmed) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function (e) {
+    // ── Parse ────────────────────────────────────────────────────────────────
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch (err) {
+      showToast('Import failed — invalid JSON: ' + err.message, true);
+      return;
+    }
+
+    if (!Array.isArray(data.attacks)) {
+      showToast('Import failed — file must contain an "attacks" array.', true);
+      return;
+    }
+
+    // ── Validate and build new queue ──────────────────────────────────────────
+    const warnings = [];
+    const newQueue  = [];
+
+    for (let ai = 0; ai < data.attacks.length; ai++) {
+      const attack    = data.attacks[ai];
+      const attackNum = ai + 1;
+
+      if (!attack.targetId) {
+        warnings.push(`Attack #${attackNum}: missing "targetId" — skipped`);
+        continue;
+      }
+      const target = getTarget(attack.targetId);
+      if (!target) {
+        warnings.push(`Attack #${attackNum}: unknown targetId "${attack.targetId}" — skipped`);
+        continue;
+      }
+      if (!Array.isArray(attack.platforms) || attack.platforms.length === 0) {
+        warnings.push(`Attack #${attackNum} (${attack.targetId}): "platforms" must be a non-empty array — skipped`);
+        continue;
+      }
+
+      const manifest = [];
+      for (const p of attack.platforms) {
+        if (!p.platformId) {
+          warnings.push(`Attack #${attackNum} (${attack.targetId}): platform entry missing "platformId" — skipped`);
+          continue;
+        }
+        if (!PLATFORM_CATALOG[p.platformId]) {
+          warnings.push(`Attack #${attackNum} (${attack.targetId}): unknown platformId "${p.platformId}" — skipped`);
+          continue;
+        }
+        const qty = parseInt(p.quantity, 10);
+        if (!Number.isInteger(qty) || qty < 1) {
+          warnings.push(`Attack #${attackNum} (${attack.targetId}): invalid quantity for "${p.platformId}" — skipped`);
+          continue;
+        }
+
+        // Optional type field — normalise and validate against catalog
+        if (p.type !== undefined) {
+          const normType   = p.type.toLowerCase().replace(/[\s-]+/g, '_');
+          const catalogType = PLATFORM_CATALOG[p.platformId].type;
+          if (normType !== catalogType) {
+            warnings.push(`Attack #${attackNum} (${attack.targetId}): type "${p.type}" does not match catalog type "${catalogType}" for "${p.platformId}" — using catalog type`);
+          }
+        }
+
+        manifest.push({ platformId: p.platformId, count: qty });
+      }
+
+      if (manifest.length === 0) {
+        warnings.push(`Attack #${attackNum} (${attack.targetId}): no valid platforms after validation — skipped`);
+        continue;
+      }
+
+      newQueue.push({
+        id:            `q_${Date.now()}_${ai}`,
+        targetId:      attack.targetId,
+        targetName:    target.name,
+        targetCountry: target.country || '',
+        manifest
+      });
+    }
+
+    // ── Apply ─────────────────────────────────────────────────────────────────
+    attackQueue    = newQueue;
+    globalMagState = {};
+    saveMagStateToStorage();
+
+    renderQueuePanel();
+    if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    const hasWarnings = warnings.length > 0;
+    let msg = `Attack queue loaded — ${newQueue.length} attack${newQueue.length !== 1 ? 's' : ''} staged.`;
+    if (hasWarnings) {
+      msg += ` ${warnings.length} warning${warnings.length !== 1 ? 's' : ''} (see console).`;
+      console.warn('[importAttackQueue] warnings:', warnings);
     }
     showToast(msg, hasWarnings);
   };
@@ -3234,6 +3366,17 @@ function wireEvents() {
     const file = e.target.files[0];
     if (!file) return;
     importLaydown(file);
+    e.target.value = '';   // reset so the same file can be re-imported
+  });
+
+  // Import attack queue — button triggers the hidden file input
+  document.getElementById('btn-import-attacks').addEventListener('click', () => {
+    document.getElementById('import-attacks-input').click();
+  });
+  document.getElementById('import-attacks-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    importAttackQueue(file);
     e.target.value = '';   // reset so the same file can be re-imported
   });
 

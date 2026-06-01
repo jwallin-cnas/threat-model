@@ -21,7 +21,8 @@
       </div>
       <div class="header-controls">
         <button id="btn-history"        class="btn btn-secondary">History</button>
-        <button id="btn-import-laydown" class="btn btn-secondary">Import Laydown</button>
+        <button id="btn-import-laydown"  class="btn btn-secondary">Import Laydown</button>
+        <button id="btn-import-attacks" class="btn btn-secondary">Import Attacks</button>
         <button id="btn-export-pdf"     class="btn btn-secondary">Export PDF</button>
         <button id="btn-export"     class="btn btn-secondary">Export JSON</button>
         <button id="btn-reset"      class="btn btn-danger">Reset to Default</button>
@@ -236,8 +237,9 @@
     </div>
   </div>
 
-  <!-- Hidden file input for laydown import — triggered programmatically -->
-  <input type="file" id="import-laydown-input" accept=".json" style="display:none">
+  <!-- Hidden file inputs — triggered programmatically by their respective buttons -->
+  <input type="file" id="import-laydown-input"  accept=".json" style="display:none">
+  <input type="file" id="import-attacks-input"  accept=".json" style="display:none">
 
   <!-- Scripts — load in dependency order -->
   <script src="js/leaflet.js"></script>
