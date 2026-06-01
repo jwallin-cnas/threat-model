@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+
+  "defaults": {
+
+    "manama": [
+      { "id": "manama_d1", "system": "patriot", "quantity": 2, "notes": "", "operator": "Bahrain" }
+    ]
+
+  }
+}

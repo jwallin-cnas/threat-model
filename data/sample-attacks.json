@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+
+  "attacks": [
+
+    {
+      "targetId": "manama",
+      "platforms": [
+        { "platformId": "shahed_136", "type": "drone", "quantity": 20 }
+      ]
+    }
+
+  ]
+}
