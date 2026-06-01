@@ -5,8 +5,6 @@
  *   1. On load: fetch data.json as the baseline
  *   2. Merge with any user modifications stored in localStorage
  *   3. All mutations are saved to localStorage immediately
- *   4. "Export JSON" lets the user download the full modified dataset
- *      to commit back into their repo
  */
 
 const STORAGE_KEY      = 'threatmodel_targets_v2';
@@ -210,17 +208,6 @@ function saveToStorage() {
   }
 }
 
-
-function exportData() {
-  const payload = JSON.stringify({ $schema: './schemas/schema.json', version: '1.0', targets: appTargets }, null, 2);
-  const blob    = new Blob([payload], { type: 'application/json' });
-  const url     = URL.createObjectURL(blob);
-  const a       = document.createElement('a');
-  a.href        = url;
-  a.download    = 'data.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 async function resetData() {
   const confirmed = await showModal({
@@ -3551,9 +3538,6 @@ function wireEvents() {
 
   // Export PDF (print)
   document.getElementById('btn-export-pdf').addEventListener('click', exportHistoryPDF);
-
-  // Export JSON
-  document.getElementById('btn-export').addEventListener('click', exportData);
 
   // Reset to default
   document.getElementById('btn-reset').addEventListener('click', resetData);
