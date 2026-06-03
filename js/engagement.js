@@ -334,26 +334,44 @@ const ENGAGEMENT_FUNCTIONS = {
   },
 
   // ── F-15E Patrol ×2 (f15e_patrol) ────────────────────────────────────────
-  f15e_patrol: function(threatType) {
+  // Pk = 1.0 on the first 20 threats; drops to 0.5 for threats beyond that.
+  // Effective Pk is the weighted average so the deterministic kill calculation
+  // stays correct. tieredPkCap / pkLow are stored so override re-walks can
+  // recompute effective Pk against the adjusted remaining count.
+  f15e_patrol: function(threatType, quantity, magazineRemaining, salvoSize) {
     if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
+    const CAP    = 20;
+    const PK_LOW = 0.5;
+    const pk = (salvoSize != null && salvoSize > CAP)
+      ? (CAP + (salvoSize - CAP) * PK_LOW) / salvoSize
+      : 1.0;
     return {
-      pk:                     1.0,
-      pkTier:                 'high',
+      pk,
+      pkTier:                 pk === 1.0 ? 'high' : null,
       pkIsFixed:              true,
       shotsPerEngagement:     1,
-      shotsPerEngagementTier: null
+      shotsPerEngagementTier: null,
+      tieredPkCap:            CAP,
+      pkLow:                  PK_LOW
     };
   },
 
   // ── F/A-18 Patrol ×2 (fa18_patrol) ───────────────────────────────────────
-  fa18_patrol: function(threatType) {
+  fa18_patrol: function(threatType, quantity, magazineRemaining, salvoSize) {
     if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;
+    const CAP    = 20;
+    const PK_LOW = 0.5;
+    const pk = (salvoSize != null && salvoSize > CAP)
+      ? (CAP + (salvoSize - CAP) * PK_LOW) / salvoSize
+      : 1.0;
     return {
-      pk:                     1.0,
-      pkTier:                 'high',
+      pk,
+      pkTier:                 pk === 1.0 ? 'high' : null,
       pkIsFixed:              true,
       shotsPerEngagement:     1,
-      shotsPerEngagementTier: null
+      shotsPerEngagementTier: null,
+      tieredPkCap:            CAP,
+      pkLow:                  PK_LOW
     };
   },
 

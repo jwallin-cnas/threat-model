@@ -10,6 +10,7 @@
 const STORAGE_KEY      = 'threatmodel_targets_v2';
 const MAG_STORAGE_KEY  = 'threatmodel_mag_v2';
 const LAYDOWN_NAME_KEY = 'threatmodel_laydown_name_v2';
+const ATTACK_NAME_KEY  = 'threatmodel_attack_name_v2';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
@@ -199,6 +200,12 @@ async function loadData() {
     const storedName = localStorage.getItem(LAYDOWN_NAME_KEY);
     renderLaydownBadge(storedName || null);
   } catch { /* non-critical */ }
+
+  // Restore attack strategy badge
+  try {
+    const storedAttackName = localStorage.getItem(ATTACK_NAME_KEY);
+    renderAttackBadge(storedAttackName || null);
+  } catch { /* non-critical */ }
 }
 
 function loadFromStorage() {
@@ -231,6 +238,7 @@ async function resetData() {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(MAG_STORAGE_KEY);
   localStorage.removeItem(LAYDOWN_NAME_KEY);
+  localStorage.removeItem(ATTACK_NAME_KEY);
   location.reload();
 }
 
@@ -1616,9 +1624,18 @@ function computeAdjustedResults(originalResults, overrides) {
       }
 
       // ── Re-apply engagement with updated remaining and adjusted magazine ─────
+      // Tiered-Pk systems (patrol CAP) must recompute effective Pk from the
+      // current adjusted remaining count rather than reusing the stored value,
+      // which was calculated for the original salvo size.
+      let rePk = eng.pk ?? 0;
+      if (eng.tieredPkCap != null && eng.pkLow != null) {
+        rePk = remaining <= eng.tieredPkCap
+          ? 1.0
+          : (eng.tieredPkCap + (remaining - eng.tieredPkCap) * eng.pkLow) / remaining;
+      }
       const result = applyEngagement(
         remaining,
-        eng.pk ?? 0,
+        rePk,
         magBefore,
         eng.shotsPerEngagement ?? 2
       );
@@ -2466,11 +2483,20 @@ function _buildPrintDocument() {
     hour: '2-digit', minute: '2-digit'
   });
 
+  const laydownBadgeEl  = document.getElementById('laydown-badge');
+  const laydownName     = laydownBadgeEl?.textContent?.trim();
+  const isDefaultLaydown = !laydownName || laydownName === 'Default';
+  const attackBadgeEl   = document.getElementById('attack-badge');
+  const attackName      = attackBadgeEl?.textContent?.trim();
+  const hasAttackName   = !!attackName && attackName !== '—';
+
   let html = `
     <div class="pr-header">
       <div class="pr-title">Strike Assessment Tool</div>
       <div class="pr-subtitle">Layered Air Defense Adjudicator — Middle East</div>
       <div class="pr-meta">Simulation History Report &nbsp;·&nbsp; Generated ${now}</div>
+      ${!isDefaultLaydown ? `<div class="pr-meta">Laydown: ${laydownName}</div>` : ''}
+      ${hasAttackName     ? `<div class="pr-meta">Attack Strategy: ${attackName}</div>` : ''}
       <div class="pr-meta">${attacks.length} attack${attacks.length !== 1 ? 's' : ''} &nbsp;·&nbsp; ${uniqueTargets} target${uniqueTargets !== 1 ? 's' : ''} engaged</div>
     </div>
     <hr class="pr-rule pr-rule--heavy">
@@ -2569,12 +2595,28 @@ function _buildAttackSection(snap, index) {
     `;
   }
 
-  // ── Page-level summary line ────────────────────────────────────────────────
+  // ── Page-level summary line — per-type breakdown ─────────────────────────
+  const SHORT_TYPE_LABELS = {
+    mrbm:           'MRBM',
+    srbm:           'SRBM',
+    cruise_missile: 'Cruise Missile',
+    drone:          'Drone',
+    fpv:            'FPV',
+    hypersonic:     'Hypersonic'
+  };
+
+  const typeParts = snap.results.byThreatType
+    .filter(g => g.initialCount > 0)
+    .map(g => {
+      const lbl     = SHORT_TYPE_LABELS[g.threatType] || g.threatType;
+      const leakers = g.finalCount;
+      return `${lbl} ${g.initialCount} incoming → <strong>${leakers} leaker${leakers !== 1 ? 's' : ''}</strong>`;
+    });
+
   const summaryClass = totalOut > 0 ? 'pr-attack-summary pr-attack-summary--leak' : 'pr-attack-summary';
   const summaryHtml = `
     <div class="${summaryClass}">
-      ${totalIn} inbound &nbsp;·&nbsp; ${totalKilled} killed &nbsp;·&nbsp;
-      <strong>${totalOut} penetrated</strong>
+      ${typeParts.join(' &nbsp;·&nbsp; ')}
     </div>
   `;
 
@@ -2705,6 +2747,15 @@ function renderLaydownBadge(name) {
   const isDefault = !name;
   badge.textContent = isDefault ? 'Default' : name;
   badge.classList.toggle('laydown-badge--custom', !isDefault);
+}
+
+/** Update the header badge to reflect the active attack strategy. */
+function renderAttackBadge(name) {
+  const badge = document.getElementById('attack-badge');
+  if (!badge) return;
+  const hasName = !!name;
+  badge.textContent = hasName ? name : '—';
+  badge.classList.toggle('attack-badge--active', hasName);
 }
 
 /**
@@ -3044,6 +3095,14 @@ function _importLaydownDirect(data) {
   saveToStorage();
   saveMagStateToStorage();
 
+  // Update laydown badge from the file's optional "name" field
+  const laydownDisplayName = data.name || null;
+  try {
+    if (laydownDisplayName) localStorage.setItem(LAYDOWN_NAME_KEY, laydownDisplayName);
+    else localStorage.removeItem(LAYDOWN_NAME_KEY);
+  } catch { /* non-critical */ }
+  renderLaydownBadge(laydownDisplayName);
+
   // Reset all live simulation state
   _resetSimulationHistory();
   perTargetState     = {};
@@ -3136,6 +3195,14 @@ function _importAttackQueueDirect(data) {
   attackQueue    = newQueue;
   globalMagState = {};
   saveMagStateToStorage();
+
+  // Update attack strategy badge from the file's optional "name" field
+  const attackDisplayName = data.name || null;
+  try {
+    if (attackDisplayName) localStorage.setItem(ATTACK_NAME_KEY, attackDisplayName);
+    else localStorage.removeItem(ATTACK_NAME_KEY);
+  } catch { /* non-critical */ }
+  renderAttackBadge(attackDisplayName);
 
   _resetSimulationHistory();
   perTargetState     = {};

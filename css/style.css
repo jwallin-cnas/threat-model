@@ -113,6 +113,37 @@ header {
   border-color: var(--warn);
 }
 
+.attack-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.attack-indicator-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}
+
+.attack-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+.attack-badge--active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ── Main layout ─────────────────────────────────────────────────────────── */
 
 .main-grid {
@@ -1557,6 +1588,12 @@ select option, select optgroup {
 }
 
 @media print {
+  /* Force white page background — prevents the dark app body from bleeding
+     through on the last page when print content doesn't fill the full sheet */
+  body.is-printing {
+    background: #fff !important;
+  }
+
   /* Hide the entire app UI; show only the print root */
   body.is-printing > header,
   body.is-printing > main,

@@ -296,7 +296,7 @@ function runSimulationCore(
       // gets an independent Math.random() draw before any killing occurs.
       const entryParams = entries.map(entry => ({
         entry,
-        params: engFn(threatType, entry.def.quantity, entry.magazineRemaining)
+        params: engFn(threatType, entry.def.quantity, entry.magazineRemaining, remaining)
       }));
 
       // Record "Cannot engage" for entries whose engFn returned null
@@ -364,7 +364,9 @@ function runSimulationCore(
           interceptorsUsed:       magazineBefore - entry.magazineRemaining,
           magazineRemaining:      entry.magazineRemaining,
           isPlaceholder:          result.isPlaceholder,
-          note:                   result.note
+          note:                   result.note,
+          tieredPkCap:            params.tieredPkCap ?? null,
+          pkLow:                  params.pkLow       ?? null
         });
 
         remaining = result.survived;

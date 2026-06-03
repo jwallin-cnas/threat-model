@@ -202,6 +202,13 @@ async function main() {
         continue;
       }
 
+      // Dismiss any lingering toast (e.g. "Changes saved to local storage.")
+      // before capturing the PDF so it doesn't appear in the output.
+      await page.evaluate(() => {
+        const toast = document.getElementById('toast');
+        if (toast) toast.remove();
+      });
+
       // Build the print document and capture as PDF
       const printHtml = await page.evaluate(() => {
         return window._buildPrintDocument();
