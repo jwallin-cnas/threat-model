@@ -136,6 +136,8 @@ async function main() {
   // Navigate and wait for the app to finish initialising
   await page.goto(url);
   await page.waitForFunction(() => window._appReady === true, { timeout: 20_000 });
+  // Reset to the fixed seed so the full batch is reproducible from this point
+  await page.evaluate(() => window._setSeed(window.FIXED_SEED));
   console.log('[batch] App ready\n');
 
   // ── Run all combinations ──────────────────────────────────────────────────
