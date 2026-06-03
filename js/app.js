@@ -2847,9 +2847,10 @@ async function importLaydown(file) {
     saveMagStateToStorage();
 
     // ── Update badge ──────────────────────────────────────────────────────────
-    const displayName = file.name.replace(/\.json$/i, '');
-    try { localStorage.setItem(LAYDOWN_NAME_KEY, displayName); } catch { /* non-critical */ }
-    renderLaydownBadge(displayName);
+    const laydownDisplayName = data.name || null;
+    if (laydownDisplayName) localStorage.setItem(LAYDOWN_NAME_KEY, laydownDisplayName);
+    else localStorage.removeItem(LAYDOWN_NAME_KEY);
+    renderLaydownBadge(laydownDisplayName);
 
     // ── Reset live simulation state ───────────────────────────────────────────
     perTargetState     = {};
@@ -3000,6 +3001,12 @@ async function importAttackQueue(file) {
       console.warn('[importAttackQueue] warnings:', warnings);
     }
     showToast(msg, hasWarnings);
+
+    // Update attack badge from the file's optional "name" field
+    const attackDisplayName = data.name || null;
+    if (attackDisplayName) localStorage.setItem(ATTACK_NAME_KEY, attackDisplayName);
+    else localStorage.removeItem(ATTACK_NAME_KEY);
+    renderAttackBadge(attackDisplayName);
   };
 
   reader.readAsText(file);
