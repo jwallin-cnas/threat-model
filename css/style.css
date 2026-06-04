@@ -568,6 +568,13 @@ select option, select optgroup {
   font-style: italic;
 }
 
+.defense-reloads {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
 .mag-count-editable {
   cursor: text;
   border-bottom: 1px dashed var(--border);

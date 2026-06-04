@@ -7,14 +7,16 @@
         "system": "patriot",
         "quantity": 3,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       },
       {
         "id": "doha_d2",
         "system": "nasams",
         "quantity": 1,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       }
     ],
     "ras_laffan_lng": [
@@ -23,28 +25,32 @@
         "system": "merops",
         "quantity": 2,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       },
       {
         "id": "s1_raslaffan_patriot",
         "system": "patriot",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_raslaffan_ifpc2",
         "system": "ifpc2",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_raslaffan_tjammer",
         "system": "tactical_jammer",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "hamad_port": [
@@ -53,14 +59,16 @@
         "system": "patriot",
         "quantity": 3,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       },
       {
         "id": "hamad_port_d2",
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       }
     ],
     "us_fifth_fleet": [
@@ -69,28 +77,32 @@
         "system": "patriot",
         "quantity": 1,
         "notes": "",
-        "operator": "Bahrain"
+        "operator": "Bahrain",
+        "reloads": 1
       },
       {
         "id": "s1_5thfleet_hpm",
         "system": "high_powered_microwave",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_5thfleet_cram",
         "system": "phalanx_cram",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_5thfleet_tjammer",
         "system": "tactical_jammer",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "jebel_ali_port": [
@@ -99,35 +111,40 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "jebel_ali_port_d2",
         "system": "cheongung2",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "jebel_ali_port_d3",
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "s1_jebel_ali_thaad",
         "system": "thaad",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_jebel_ali_mshorad",
         "system": "m_shorad",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "al_dhafra_ab": [
@@ -136,14 +153,16 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "al_dhafra_ab_d2",
         "system": "cheongung2",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       }
     ],
     "dubai": [
@@ -152,7 +171,8 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       }
     ],
     "abu_dhabi": [
@@ -161,7 +181,8 @@
         "system": "thaad",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       }
     ],
     "ruwais_refinery": [
@@ -170,28 +191,32 @@
         "system": "thaad",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "ruwais_refinery_d2",
         "system": "patriot",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "s1_ruwais_merops",
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_ruwais_fslids",
         "system": "fslids",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "fujairah_port": [
@@ -200,35 +225,40 @@
         "system": "patriot",
         "quantity": 3,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "fujairah_port_d2",
         "system": "fslids",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       },
       {
         "id": "s1_fujairah_ifpc2",
         "system": "ifpc2",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_fujairah_mshorad",
         "system": "m_shorad",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_fujairah_tjammer",
         "system": "tactical_jammer",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "murban_bab_hashah": [
@@ -237,7 +267,8 @@
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "United Arab Emirates"
+        "operator": "United Arab Emirates",
+        "reloads": 1
       }
     ],
     "prince_sultan_ab": [
@@ -246,21 +277,24 @@
         "system": "patriot",
         "quantity": 4,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       },
       {
         "id": "prince_sultan_ab_d2",
         "system": "fslids",
         "quantity": 1,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       },
       {
         "id": "prince_sultan_ab_d3",
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       }
     ],
     "king_khalid_ab": [
@@ -269,51 +303,58 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       },
       {
         "id": "king_khalid_ab_d2",
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       }
     ],
     "aramco_persian_gulf_corridor": [
       {
         "id": "aramco_persian_gulf_corridor_d1",
         "system": "patriot",
-        "quantity": 5,
+        "quantity": 4,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       },
       {
         "id": "s1_aramcogulf_merops",
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_aramcogulf_fslids",
         "system": "fslids",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_aramcogulf_cram",
         "system": "phalanx_cram",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_aramcogulf_tjammer",
         "system": "tactical_jammer",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "aramco_riyadh": [
@@ -322,7 +363,8 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       }
     ],
     "dammam": [
@@ -331,7 +373,8 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       }
     ],
     "aramco_red_sea_corridor": [
@@ -340,7 +383,8 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       }
     ],
     "riyadh": [
@@ -349,7 +393,8 @@
         "system": "thaad",
         "quantity": 1,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       }
     ],
     "jeddah": [
@@ -358,7 +403,8 @@
         "system": "thaad",
         "quantity": 1,
         "notes": "",
-        "operator": "Saudi Arabia"
+        "operator": "Saudi Arabia",
+        "reloads": 1
       }
     ],
     "ali_al_salem_ab": [
@@ -367,7 +413,8 @@
         "system": "patriot",
         "quantity": 1,
         "notes": "",
-        "operator": "Kuwait"
+        "operator": "Kuwait",
+        "reloads": 1
       }
     ],
     "camp_arifjan": [
@@ -376,14 +423,16 @@
         "system": "patriot",
         "quantity": 2,
         "notes": "",
-        "operator": "Kuwait"
+        "operator": "Kuwait",
+        "reloads": 1
       },
       {
         "id": "s1_arifjan_laser",
         "system": "containerized_laser",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "thumrait_ab": [
@@ -392,7 +441,8 @@
         "system": "nasams",
         "quantity": 1,
         "notes": "",
-        "operator": "Oman"
+        "operator": "Oman",
+        "reloads": 1
       }
     ],
     "al_udeid_ab": [
@@ -401,28 +451,32 @@
         "system": "patriot",
         "quantity": 3,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       },
       {
         "id": "al_udeid_ab_d2",
         "system": "nasams",
         "quantity": 1,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       },
       {
         "id": "al_udeid_ab_d3",
         "system": "fslids",
         "quantity": 1,
         "notes": "",
-        "operator": "Qatar"
+        "operator": "Qatar",
+        "reloads": 1
       },
       {
         "id": "s1_udeid_thaad",
         "system": "thaad",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "muscat": [
@@ -431,7 +485,8 @@
         "system": "nasams",
         "quantity": 1,
         "notes": "",
-        "operator": "Oman"
+        "operator": "Oman",
+        "reloads": 1
       }
     ],
     "tel_nof_ab": [
@@ -440,7 +495,8 @@
         "system": "davids_sling",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "ramat_david_ab": [
@@ -449,7 +505,8 @@
         "system": "arrow",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "nevatim_ab": [
@@ -458,7 +515,8 @@
         "system": "arrow",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "tel_aviv": [
@@ -467,14 +525,16 @@
         "system": "arrow",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       },
       {
         "id": "tel_aviv_d2",
         "system": "iron_dome",
         "quantity": 2,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "haifa": [
@@ -483,21 +543,24 @@
         "system": "arrow",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       },
       {
         "id": "haifa_d2",
         "system": "iron_dome",
         "quantity": 2,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       },
       {
         "id": "haifa_d3",
         "system": "iron_beam",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "jerusalem": [
@@ -506,14 +569,16 @@
         "system": "arrow",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       },
       {
         "id": "jerusalem_d2",
         "system": "iron_dome",
         "quantity": 2,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "beer_sheva": [
@@ -522,14 +587,16 @@
         "system": "davids_sling",
         "quantity": 1,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       },
       {
         "id": "beer_sheva_d2",
         "system": "iron_dome",
         "quantity": 2,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "hatzerim_ab": [
@@ -538,7 +605,8 @@
         "system": "iron_dome",
         "quantity": 2,
         "notes": "",
-        "operator": "Israel"
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "isa_ab": [
@@ -547,7 +615,8 @@
         "system": "patriot",
         "quantity": 1,
         "notes": "",
-        "operator": "Bahrain"
+        "operator": "Bahrain",
+        "reloads": 1
       }
     ],
     "shuaiba_port": [
@@ -556,14 +625,16 @@
         "system": "merops",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_shuaiba_tjammer",
         "system": "tactical_jammer",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "mohammed_al_ahmed_naval_base": [
@@ -572,7 +643,8 @@
         "system": "high_powered_microwave",
         "quantity": 1,
         "notes": "",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "persian_gulf_place_point": [
@@ -581,7 +653,8 @@
         "system": "f15e_patrol",
         "quantity": 1,
         "notes": "DCA",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ],
     "gulf_of_oman_place_point": [
@@ -590,49 +663,56 @@
         "system": "fa18_patrol",
         "quantity": 1,
         "notes": "CSG CAP",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_goo_csg_sm3",
         "system": "aegis_sm3",
         "quantity": 1,
         "notes": "CSG",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_goo_csg_sm6",
         "system": "aegis_sm6",
         "quantity": 1,
         "notes": "CSG",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_goo_csg_sm2",
         "system": "aegis_sm2",
         "quantity": 1,
         "notes": "CSG",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_goo_sag_sm3",
         "system": "aegis_sm3",
         "quantity": 1,
         "notes": "SAG",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_goo_sag_sm6",
         "system": "aegis_sm6",
         "quantity": 1,
         "notes": "SAG",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       },
       {
         "id": "s1_goo_sag_sm2",
         "system": "aegis_sm2",
         "quantity": 1,
         "notes": "SAG",
-        "operator": "United States"
+        "operator": "United States",
+        "reloads": 1
       }
     ]
   }

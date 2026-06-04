@@ -607,6 +607,10 @@ function buildSharedDefenseCard(def, targetId) {
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 
+  const reloadHtml = (def.reloads != null)
+    ? `<div class="defense-reloads">↻ ${def.reloads} reload${def.reloads !== 1 ? 's' : ''}</div>`
+    : '';
+
   const card = document.createElement('div');
   card.className = `defense-card patrol-card${isDisabled ? ' defense-card--disabled' : ''}`;
 
@@ -625,6 +629,7 @@ function buildSharedDefenseCard(def, targetId) {
       <span class="defense-name">${catalog?.name || def.system}</span>
     </div>
     ${magHtml}
+    ${reloadHtml}
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
     <div class="defense-threats">${effectList}</div>
   `;
@@ -718,6 +723,10 @@ function buildCrossTargetDefenseCard(def, targetId) {
     }
   }
 
+  const reloadHtml = (def.reloads != null)
+    ? `<div class="defense-reloads">↻ ${def.reloads} reload${def.reloads !== 1 ? 's' : ''}</div>`
+    : '';
+
   const card = document.createElement('div');
   card.className = `defense-card cross-target-card${isDisabled ? ' defense-card--disabled' : ''}`;
   card.style.setProperty('--tier-color', color);
@@ -741,6 +750,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
       <span class="defense-quantity"><span ${qAttr}>${def.quantity}</span> batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
     </div>
     ${magHtml}
+    ${reloadHtml}
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
     <div class="defense-threats">${effectList}</div>
     ${rangeNoteHtml}
@@ -849,6 +859,10 @@ function buildDefenseCard(def, targetId) {
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 
+  const reloadHtml = (def.reloads != null)
+    ? `<div class="defense-reloads">↻ ${def.reloads} reload${def.reloads !== 1 ? 's' : ''}</div>`
+    : '';
+
   const qAttr = `class="qty-count-editable" data-defense-id="${def.id}" data-target-id="${targetId}" data-system="${def.system}"`;
 
   // const tierBadgeHtml = `<span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>`;
@@ -867,6 +881,7 @@ function buildDefenseCard(def, targetId) {
       <span class="defense-quantity"><span ${qAttr}>${def.quantity}</span> batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
     </div>
     ${magHtml}
+    ${reloadHtml}
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
     <div class="defense-threats">${effectList}</div>
   `;
