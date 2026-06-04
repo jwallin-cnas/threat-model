@@ -193,6 +193,14 @@
         "notes": "",
         "operator": "United Arab Emirates",
         "reloads": 1
+      },
+      {
+        "id": "s1_ruwais_refinery_fslids",
+        "system": "fslids",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "reloads": 1
       }
     ],
     "fujairah_port": [
@@ -287,6 +295,14 @@
       {
         "id": "s5_aramcogulf_ifpc2",
         "system": "ifpc2",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
+        "reloads": 1
+      },
+      {
+        "id": "s6_aramcogulf_merops",
+        "system": "merops",
         "quantity": 1,
         "notes": "",
         "operator": "United States",
