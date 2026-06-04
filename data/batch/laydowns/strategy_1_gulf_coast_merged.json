@@ -1,6 +1,5 @@
 {
   "version": "1.0",
-  "name": "Gulf Coast Countries and Infrastructure",
   "defaults": {
     "doha": [
       {
@@ -52,7 +51,7 @@
       {
         "id": "hamad_port_d1",
         "system": "patriot",
-        "quantity": 2,
+        "quantity": 3,
         "notes": "",
         "operator": "Qatar"
       },
@@ -68,7 +67,7 @@
       {
         "id": "us_fifth_fleet_d1",
         "system": "patriot",
-        "quantity": 2,
+        "quantity": 1,
         "notes": "",
         "operator": "Bahrain"
       },
@@ -232,11 +231,20 @@
         "operator": "United States"
       }
     ],
+    "murban_bab_hashah": [
+      {
+        "id": "murban_bab_hashah_d1",
+        "system": "merops",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates"
+      }
+    ],
     "prince_sultan_ab": [
       {
         "id": "prince_sultan_ab_d1",
         "system": "patriot",
-        "quantity": 2,
+        "quantity": 4,
         "notes": "",
         "operator": "Saudi Arabia"
       },
@@ -321,7 +329,7 @@
       {
         "id": "dammam_d1",
         "system": "patriot",
-        "quantity": 1,
+        "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia"
       }
@@ -385,15 +393,6 @@
         "quantity": 1,
         "notes": "",
         "operator": "Oman"
-      }
-    ],
-    "camp_as_sayliyah": [
-      {
-        "id": "camp_as_sayliyah_d1",
-        "system": "patriot",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Qatar"
       }
     ],
     "al_udeid_ab": [
@@ -473,7 +472,7 @@
       {
         "id": "tel_aviv_d2",
         "system": "iron_dome",
-        "quantity": 1,
+        "quantity": 2,
         "notes": "",
         "operator": "Israel"
       }
@@ -489,7 +488,7 @@
       {
         "id": "haifa_d2",
         "system": "iron_dome",
-        "quantity": 1,
+        "quantity": 2,
         "notes": "",
         "operator": "Israel"
       },
@@ -508,6 +507,13 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel"
+      },
+      {
+        "id": "jerusalem_d2",
+        "system": "iron_dome",
+        "quantity": 2,
+        "notes": "",
+        "operator": "Israel"
       }
     ],
     "beer_sheva": [
@@ -521,7 +527,16 @@
       {
         "id": "beer_sheva_d2",
         "system": "iron_dome",
-        "quantity": 1,
+        "quantity": 2,
+        "notes": "",
+        "operator": "Israel"
+      }
+    ],
+    "hatzerim_ab": [
+      {
+        "id": "hatzerim_d1",
+        "system": "iron_dome",
+        "quantity": 2,
         "notes": "",
         "operator": "Israel"
       }
@@ -533,22 +548,6 @@
         "quantity": 1,
         "notes": "",
         "operator": "Bahrain"
-      }
-    ],
-    "muwaffaq_al_salti_ab": [
-      {
-        "id": "muwaffaq_al_salti_ab_d1",
-        "system": "thaad",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Jordan"
-      },
-      {
-        "id": "muwaffaq_al_salti_ab_d2",
-        "system": "patriot",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Jordan"
       }
     ],
     "shuaiba_port": [
