@@ -283,7 +283,7 @@ const ENGAGEMENT_FUNCTIONS = {
       pk:                     pks[pkTier],
       pkTier,
       pkIsFixed:              false,
-      shotsPerEngagement:     2,
+      shotsPerEngagement:     1,
       shotsPerEngagementTier: null
     };
   },
