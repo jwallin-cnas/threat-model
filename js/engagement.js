@@ -255,7 +255,7 @@ const ENGAGEMENT_FUNCTIONS = {
       pk:                     pk,
       pkTier,
       pkIsFixed:              false,
-      shotsPerEngagement:     150,
+      shotsPerEngagement:     pk * 150,
       shotsPerEngagementTier: null
     };
   },
