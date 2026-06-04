@@ -103,7 +103,7 @@
       {
         "id": "al_dhafra_ab_d1",
         "system": "patriot",
-        "quantity": 3,
+        "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
         "reloads": 1
@@ -201,6 +201,16 @@
       {
         "id": "murban_bab_hashah_d1",
         "system": "merops",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "reloads": 1
+      }
+    ],
+    "muwaffaq_al_salti_ab": [
+      {
+        "id": "muwaffaq_al_salti_d1",
+        "system": "patriot",
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
