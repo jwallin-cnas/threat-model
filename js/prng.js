@@ -25,4 +25,8 @@ const FIXED_SEED = 0xDEAD1234;
     s = (n >>> 0);
   };
 
+  window._getSeed = function () {
+    return s;
+  };
+
 }(FIXED_SEED));

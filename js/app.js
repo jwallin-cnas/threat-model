@@ -11,6 +11,9 @@ const STORAGE_KEY      = 'threatmodel_targets_v2';
 const MAG_STORAGE_KEY  = 'threatmodel_mag_v2';
 const LAYDOWN_NAME_KEY = 'threatmodel_laydown_name_v2';
 const ATTACK_NAME_KEY  = 'threatmodel_attack_name_v2';
+const SESSION_KEY      = 'threatmodel_session_v2';
+const HISTORY_KEY      = 'threatmodel_history_v2';
+const SEED_KEY         = 'threatmodel_seed_v2';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
@@ -87,6 +90,54 @@ function loadMagStateFromStorage() {
     const raw = localStorage.getItem(MAG_STORAGE_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
+}
+
+// ── Session state (selectedTarget, manifest, queue, per-target cache) ─────────
+
+function saveSessionState() {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      selectedTargetId,
+      attackManifest,
+      attackQueue,
+      perTargetState
+    }));
+  } catch (e) { /* non-critical */ }
+}
+
+function loadSessionStateFromStorage() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+// ── Simulation history ────────────────────────────────────────────────────────
+
+function saveHistoryState() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify({
+      simHistory,
+      simHistoryCursor
+    }));
+  } catch (e) {
+    console.warn('[saveHistoryState] localStorage write failed:', e.message);
+  }
+}
+
+function loadHistoryStateFromStorage() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+// ── PRNG seed ─────────────────────────────────────────────────────────────────
+
+function saveSeedState() {
+  try {
+    if (window._getSeed) localStorage.setItem(SEED_KEY, String(window._getSeed()));
+  } catch { /* non-critical */ }
 }
 
 let _minimap       = null;        // Leaflet map instance
@@ -207,6 +258,34 @@ async function loadData() {
     const storedAttackName = localStorage.getItem(ATTACK_NAME_KEY);
     renderAttackBadge(storedAttackName || null);
   } catch { /* non-critical */ }
+
+  // ── Restore PRNG seed so the next simulation continues the saved sequence ──
+  try {
+    const savedSeed = localStorage.getItem(SEED_KEY);
+    if (savedSeed != null && window._setSeed) window._setSeed(parseInt(savedSeed, 10));
+  } catch { /* non-critical */ }
+
+  // ── Restore simulation history (replaces the initial snapshot if valid) ────
+  const storedHistory = loadHistoryStateFromStorage();
+  if (storedHistory && Array.isArray(storedHistory.simHistory) && storedHistory.simHistory.length > 0) {
+    simHistory       = storedHistory.simHistory;
+    simHistoryCursor = typeof storedHistory.simHistoryCursor === 'number'
+      ? storedHistory.simHistoryCursor
+      : simHistory.length - 1;
+  }
+
+  // ── Restore session state (manifest, queue, per-target cache, target id) ──
+  const storedSession = loadSessionStateFromStorage();
+  if (storedSession) {
+    if (Array.isArray(storedSession.attackManifest))
+      attackManifest = storedSession.attackManifest;
+    if (Array.isArray(storedSession.attackQueue))
+      attackQueue = storedSession.attackQueue;
+    if (storedSession.perTargetState && typeof storedSession.perTargetState === 'object')
+      perTargetState = storedSession.perTargetState;
+    if (storedSession.selectedTargetId)
+      selectedTargetId = storedSession.selectedTargetId;
+  }
 }
 
 function loadFromStorage() {
@@ -240,6 +319,9 @@ async function resetData() {
   localStorage.removeItem(MAG_STORAGE_KEY);
   localStorage.removeItem(LAYDOWN_NAME_KEY);
   localStorage.removeItem(ATTACK_NAME_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(HISTORY_KEY);
+  localStorage.removeItem(SEED_KEY);
   location.reload();
 }
 
@@ -1198,18 +1280,21 @@ function addPlatformToManifest(platformId, count) {
   }
   _manifestUnchanged = false;
   renderAttackManifest();
+  saveSessionState();
 }
 
 function removePlatformFromManifest(platformId) {
   attackManifest = attackManifest.filter(e => e.platformId !== platformId);
   _manifestUnchanged = false;
   renderAttackManifest();
+  saveSessionState();
 }
 
 function clearManifest() {
   attackManifest = [];
   _manifestUnchanged = false;
   renderAttackManifest();
+  saveSessionState();
 }
 
 function renderAttackManifest() {
@@ -1530,6 +1615,10 @@ async function simulate() {
 
     renderSimulationResults(results, target);
 
+    // Snapshot current target state so it can be restored after a page reload
+    // even when the user never switched away from this target.
+    _saveTargetState(selectedTargetId);
+
     // Record this attack in the simulation history
     if (simHistoryCursor >= 0) {
       simHistory.push(_createSnapshot({
@@ -1546,7 +1635,11 @@ async function simulate() {
         attackManifest
       }));
       simHistoryCursor = simHistory.length - 1;
+      saveHistoryState();
     }
+
+    saveSeedState();
+    saveSessionState();
 
     document.getElementById('simulation-results').classList.remove('hidden');
     document.getElementById('simulation-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2280,6 +2373,7 @@ function _saveTargetState(targetId) {
     manualOverrides:    JSON.parse(JSON.stringify(manualOverrides)),
     _manifestUnchanged: _manifestUnchanged
   };
+  saveSessionState();
 }
 
 /**
@@ -2366,7 +2460,10 @@ async function _confirmTruncate() {
       { label: 'Cancel',   value: false, style: 'secondary' }
     ]
   });
-  if (proceed) simHistory = simHistory.slice(0, simHistoryCursor + 1);
+  if (proceed) {
+    simHistory = simHistory.slice(0, simHistoryCursor + 1);
+    saveHistoryState();
+  }
   return !!proceed;
 }
 
@@ -2429,6 +2526,8 @@ function navigateToSnapshot(index) {
   attackManifest   = JSON.parse(JSON.stringify(snap.attackManifest));
   simHistoryCursor = index;
   _manifestUnchanged = !!snap.results;
+  saveHistoryState();
+  saveSessionState();
 
   // For reload snapshots, keep the currently-selected target in view rather
   // than snapping to null (reload events have no associated target).
@@ -2950,6 +3049,8 @@ async function importLaydown(file) {
     manualOverrides    = {};
     _manifestUnchanged = false;
     renderAttackManifest();
+    saveSessionState();
+    saveHistoryState();
     document.getElementById('simulation-results').classList.add('hidden');
     document.getElementById('override-notice')?.classList.add('hidden');
 
@@ -3077,6 +3178,7 @@ async function importAttackQueue(file) {
     attackQueue    = newQueue;
     globalMagState = {};
     saveMagStateToStorage();
+    saveSessionState();
 
     renderQueuePanel();
     if (selectedTargetId) renderDefenseLayers(selectedTargetId);
@@ -3209,6 +3311,8 @@ function _importLaydownDirect(data) {
   preSimMagState     = {};
   manualOverrides    = {};
   _manifestUnchanged = false;
+  saveSessionState();
+  saveHistoryState();
 
   if (warnings.length) console.warn('[_importLaydownDirect] warnings:', warnings);
   return { targetsUpdated, warnings };
@@ -3354,6 +3458,7 @@ function addToQueue() {
 function removeFromQueue(id) {
   attackQueue = attackQueue.filter(e => e.id !== id);
   renderQueuePanel();
+  saveSessionState();
 }
 
 /** Move a queue entry up (dir = -1) or down (dir = +1). */
@@ -3364,6 +3469,7 @@ function moveQueueEntry(id, dir) {
   if (newIdx < 0 || newIdx >= attackQueue.length) return;
   [attackQueue[idx], attackQueue[newIdx]] = [attackQueue[newIdx], attackQueue[idx]];
   renderQueuePanel();
+  saveSessionState();
 }
 
 function renderQueuePanel() {
@@ -3477,6 +3583,9 @@ async function simulateQueue() {
     }
   }
 
+  saveHistoryState();
+  saveSeedState();
+  saveSessionState();
   showToast(`Queue complete — ${queueToRun.length} attack${queueToRun.length !== 1 ? 's' : ''} simulated`);
 }
 
@@ -3615,6 +3724,8 @@ async function performGlobalReload() {
 
   saveMagStateToStorage();
   saveToStorage();
+  saveHistoryState();
+  saveSessionState();
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
   document.getElementById('override-notice')?.classList.add('hidden');
@@ -3658,6 +3769,7 @@ function wireEvents() {
     simBtn.disabled = !selectedTargetId || attackManifest.length === 0;
     document.getElementById('btn-reset-loadouts').disabled       = !selectedTargetId;
     document.getElementById('btn-reset-target-default').disabled = !selectedTargetId;
+    saveSessionState();
   });
 
   // Add defense toggle
@@ -3775,6 +3887,7 @@ function wireEvents() {
     if (!confirmed) return;
     attackQueue = [];
     renderQueuePanel();
+    saveSessionState();
   });
 
   // Clear results
@@ -3831,6 +3944,54 @@ function wireEvents() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Session restore — applied after all catalogs and DOM are ready
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Re-hydrate the UI from the session variables that loadData() populated from
+ * localStorage. Called at the end of init() once the DOM and catalogs are ready.
+ */
+function _restoreSession() {
+  // ── Restore target selection ──────────────────────────────────────────────
+  if (selectedTargetId) {
+    const sel = document.getElementById('target-select');
+    if (sel) sel.value = selectedTargetId;
+    const target = getTarget(selectedTargetId);
+    renderTargetInfo(target);
+    renderDefenseLayers(selectedTargetId);
+    document.getElementById('btn-add-defense').disabled           = false;
+    document.getElementById('btn-reset-loadouts').disabled        = false;
+    document.getElementById('btn-reset-target-default').disabled  = false;
+  }
+
+  // ── Restore simulation result globals from per-target cache ───────────────
+  const pts = selectedTargetId ? perTargetState[selectedTargetId] : null;
+  if (pts) {
+    lastSimResults     = pts.lastSimResults  ? JSON.parse(JSON.stringify(pts.lastSimResults))  : null;
+    lastSimTarget      = pts.lastSimTarget   || null;
+    lastSimDefenses    = JSON.parse(JSON.stringify(pts.lastSimDefenses  || []));
+    preSimMagState     = JSON.parse(JSON.stringify(pts.preSimMagState   || {}));
+    manualOverrides    = JSON.parse(JSON.stringify(pts.manualOverrides  || {}));
+    _manifestUnchanged = pts._manifestUnchanged || false;
+  }
+
+  // ── Re-render attack manifest ─────────────────────────────────────────────
+  renderAttackManifest();
+
+  // ── Re-render attack queue ────────────────────────────────────────────────
+  renderQueuePanel();
+
+  // ── Show simulation results if available ─────────────────────────────────
+  if (lastSimResults) {
+    rerenderWithOverrides();
+    document.getElementById('simulation-results').classList.remove('hidden');
+    if (manualOverrides && Object.keys(manualOverrides).length > 0) {
+      document.getElementById('override-notice')?.classList.remove('hidden');
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -3841,6 +4002,7 @@ async function init() {
   populatePlatformSelect();
   renderDefenseLayers(null);
   wireEvents();
+  _restoreSession();
   // Signal to the batch runner (and any other automation) that the app is ready
   window._appReady = true;
 }
