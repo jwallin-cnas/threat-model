@@ -290,7 +290,7 @@
       "shared": true,
       "armament": {
         "type": "aircraft",
-        "name": "AIM-120 AMRAAM",
+        "name": "Mixed",
         "payload_kg": 22,
         "kill_modality": "fragmentation",
         "standard_loadout": 200

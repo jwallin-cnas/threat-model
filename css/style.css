@@ -166,6 +166,9 @@ header {
 }
 
 .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-soft);
@@ -313,6 +316,13 @@ select option, select optgroup {
   color: var(--danger);
 }
 .btn-danger:not(:disabled):hover { background: #5a1e1e; }
+
+.btn-success {
+  background: #0d2b0d;
+  border-color: var(--success);
+  color: var(--success);
+}
+.btn-success:not(:disabled):hover { background: #1a3a1a; }
 
 .btn-simulate {
   width: 100%;
@@ -1816,6 +1826,9 @@ select option, select optgroup {
 .history-entry--initial {
   opacity: 0.85;
 }
+
+.history-entry--reload .history-entry-indicator { color: var(--success); }
+.history-entry--reload .history-entry-label     { color: var(--success); }
 
 .history-entry-indicator {
   font-size: 13px;

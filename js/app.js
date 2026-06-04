@@ -189,6 +189,7 @@ async function loadData() {
     label:          'Initial State',
     magStateBefore: {},
     magStateAfter:  globalMagState,
+    reloadsState:   _captureReloadsState(),
     results:        null,
     allDefenses:    [],
     manualOverrides:{},
@@ -607,8 +608,9 @@ function buildSharedDefenseCard(def, targetId) {
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 
-  const reloadHtml = (def.reloads != null)
-    ? `<div class="defense-reloads">↻ ${def.reloads} reload${def.reloads !== 1 ? 's' : ''}</div>`
+  const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
+  const reloadHtml = _rd != null
+    ? `<div class="defense-reloads">↻ ${_rd} reload${_rd !== '1' ? 's' : ''}</div>`
     : '';
 
   const card = document.createElement('div');
@@ -639,7 +641,8 @@ function buildSharedDefenseCard(def, targetId) {
   });
 
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
+      if (!await _confirmTruncate()) return;
       deleteMagEntry(btn.dataset.defenseId);
       saveMagStateToStorage();
       _manifestUnchanged = false;
@@ -723,8 +726,9 @@ function buildCrossTargetDefenseCard(def, targetId) {
     }
   }
 
-  const reloadHtml = (def.reloads != null)
-    ? `<div class="defense-reloads">↻ ${def.reloads} reload${def.reloads !== 1 ? 's' : ''}</div>`
+  const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
+  const reloadHtml = _rd != null
+    ? `<div class="defense-reloads">↻ ${_rd} reload${_rd !== '1' ? 's' : ''}</div>`
     : '';
 
   const card = document.createElement('div');
@@ -765,7 +769,8 @@ function buildCrossTargetDefenseCard(def, targetId) {
   });
 
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
+      if (!await _confirmTruncate()) return;
       deleteMagEntry(btn.dataset.defenseId);
       saveMagStateToStorage();
       _manifestUnchanged = false;
@@ -859,8 +864,9 @@ function buildDefenseCard(def, targetId) {
     .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
     .join('');
 
-  const reloadHtml = (def.reloads != null)
-    ? `<div class="defense-reloads">↻ ${def.reloads} reload${def.reloads !== 1 ? 's' : ''}</div>`
+  const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
+  const reloadHtml = _rd != null
+    ? `<div class="defense-reloads">↻ ${_rd} reload${_rd !== '1' ? 's' : ''}</div>`
     : '';
 
   const qAttr = `class="qty-count-editable" data-defense-id="${def.id}" data-target-id="${targetId}" data-system="${def.system}"`;
@@ -895,7 +901,8 @@ function buildDefenseCard(def, targetId) {
   });
 
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
+      if (!await _confirmTruncate()) return;
       deleteMagEntry(btn.dataset.defenseId);
       saveMagStateToStorage();
       _manifestUnchanged = false;
@@ -1339,7 +1346,7 @@ function activateMagazineEdit(span) {
     if (e.key === 'Escape') { cancelled = true; input.blur(); }
   });
 
-  input.addEventListener('blur', () => {
+  input.addEventListener('blur', async () => {
     if (cancelled) {
       input.replaceWith(span);
       return;
@@ -1360,6 +1367,12 @@ function activateMagazineEdit(span) {
     }
     if (val > maxVal) {
       showToast(`Invalid value — cannot exceed the default loadout of ${maxVal} interceptors.`, true);
+      input.replaceWith(span);
+      return;
+    }
+
+    // Guard: discard forward history if cursor is behind the tail
+    if (!await _confirmTruncate()) {
       input.replaceWith(span);
       return;
     }
@@ -1463,20 +1476,8 @@ async function simulate() {
     if (!proceed) return;
   }
 
-  // If the cursor is behind the tail, warn that forward history will be overwritten
-  if (simHistoryCursor >= 0 && simHistoryCursor < simHistory.length - 1) {
-    const lostCount = simHistory.length - 1 - simHistoryCursor;
-    const proceed = await showModal({
-      title:   'Overwrite History?',
-      message: `Simulating from this point in the history will discard ${lostCount} subsequent attack${lostCount !== 1 ? 's' : ''}. Continue?`,
-      buttons: [
-        { label: 'Continue', value: true,  style: 'primary'   },
-        { label: 'Cancel',   value: false, style: 'secondary' }
-      ]
-    });
-    if (!proceed) return;
-    simHistory = simHistory.slice(0, simHistoryCursor + 1);
-  }
+  // If the cursor is behind the tail, confirm before discarding forward states
+  if (!await _confirmTruncate()) return;
 
   // New run — discard any overrides from the previous result
   manualOverrides = {};
@@ -1538,6 +1539,7 @@ async function simulate() {
         targetName:     target.name,
         magStateBefore: preSimSnap,
         magStateAfter:  globalMagState,
+        reloadsState:   _captureReloadsState(),
         results,
         allDefenses,
         manualOverrides: {},
@@ -2313,11 +2315,67 @@ function _loadTargetState(targetId) {
  * Create a deep-cloned snapshot object. All mutable inputs are defensively
  * copied so later mutations to globalMagState etc. don't affect the record.
  */
-function _createSnapshot({ isInitial, label, targetId, targetName,
-                            magStateBefore, magStateAfter,
+// ─────────────────────────────────────────────────────────────────────────────
+// Reload state helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Capture { defId: reloads } for every defense entry across all targets. */
+function _captureReloadsState() {
+  const state = {};
+  for (const target of appTargetCatalog) {
+    for (const def of target.defenses || []) {
+      if (def.reloads != null) state[def.id] = def.reloads;
+    }
+  }
+  return state;
+}
+
+/** Write a previously-captured reloads state back onto the live defense entries. */
+function _restoreReloadsState(reloadsState) {
+  if (!reloadsState) return;
+  for (const target of appTargetCatalog) {
+    for (const def of target.defenses || []) {
+      if (reloadsState[def.id] !== undefined) def.reloads = reloadsState[def.id];
+    }
+  }
+}
+
+/** Format a (potentially fractional) reload count for display: 1.0→"1", 0.5→"0.5". */
+function fmtReloads(n) {
+  return parseFloat(n.toFixed(2)).toString();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Forward-history truncation guard
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * If the cursor is behind the tail of simHistory, show a confirmation modal
+ * and, on approval, truncate everything ahead of the cursor.
+ * Returns true if the caller may proceed, false if the user cancelled.
+ * Returns true immediately when no forward states exist.
+ */
+async function _confirmTruncate() {
+  if (simHistoryCursor < 0 || simHistoryCursor >= simHistory.length - 1) return true;
+  const lostCount = simHistory.length - 1 - simHistoryCursor;
+  const proceed = await showModal({
+    title:   'Discard future states?',
+    message: `This action will permanently delete ${lostCount} state${lostCount !== 1 ? 's' : ''} ahead of the current position in history. This cannot be undone.`,
+    buttons: [
+      { label: 'Continue', value: true,  style: 'danger'    },
+      { label: 'Cancel',   value: false, style: 'secondary' }
+    ]
+  });
+  if (proceed) simHistory = simHistory.slice(0, simHistoryCursor + 1);
+  return !!proceed;
+}
+
+function _createSnapshot({ isInitial, type, label, targetId, targetName,
+                            magStateBefore, magStateAfter, reloadsState,
                             results, allDefenses, manualOverrides, attackManifest }) {
   const snap = {
     id:             `snap_${Date.now()}_${simHistory.length}`,
+    type:           type || (isInitial ? 'initial' : 'attack'),
     label,
     timestamp:      Date.now(),
     isInitial:      !!isInitial,
@@ -2326,6 +2384,7 @@ function _createSnapshot({ isInitial, label, targetId, targetName,
     targetName:     targetName || null,
     magStateAfter:  JSON.parse(JSON.stringify(magStateAfter   || {})),
     preSimMagState: JSON.parse(JSON.stringify(magStateBefore  || {})),
+    reloadsState:   JSON.parse(JSON.stringify(reloadsState    || {})),
     results:        results    ? JSON.parse(JSON.stringify(results))        : null,
     allDefenses:    JSON.parse(JSON.stringify(allDefenses     || [])),
     manualOverrides:JSON.parse(JSON.stringify(manualOverrides || {})),
@@ -2360,6 +2419,8 @@ function navigateToSnapshot(index) {
   // Restore simulation state from snapshot
   globalMagState   = JSON.parse(JSON.stringify(snap.magStateAfter));
   saveMagStateToStorage();
+  _restoreReloadsState(snap.reloadsState);
+  saveToStorage();
   lastSimResults   = snap.results  ? JSON.parse(JSON.stringify(snap.results))    : null;
   lastSimTarget    = snap.targetId ? getTarget(snap.targetId)                    : null;
   lastSimDefenses  = JSON.parse(JSON.stringify(snap.allDefenses));
@@ -2369,14 +2430,14 @@ function navigateToSnapshot(index) {
   simHistoryCursor = index;
   _manifestUnchanged = !!snap.results;
 
-  // Persist restored state as the active per-target state for the destination
-  // so switching away and back keeps the history-navigated view intact.
-  _saveTargetState(snap.targetId);
-
-  // Auto-switch to the target that was attacked
-  selectedTargetId = snap.targetId || null;
-  document.getElementById('target-select').value = snap.targetId || '';
-  renderTargetInfo(snap.targetId ? getTarget(snap.targetId) : null);
+  // For reload snapshots, keep the currently-selected target in view rather
+  // than snapping to null (reload events have no associated target).
+  if (snap.type !== 'reload') {
+    _saveTargetState(snap.targetId);
+    selectedTargetId = snap.targetId || null;
+    document.getElementById('target-select').value = snap.targetId || '';
+    renderTargetInfo(snap.targetId ? getTarget(snap.targetId) : null);
+  }
 
   // Refresh defence cards, manifest, and button states
   renderDefenseLayers(selectedTargetId);
@@ -2395,7 +2456,9 @@ function navigateToSnapshot(index) {
   }
 
   renderHistoryDialogBody();
-  showToast(snap.isInitial ? 'Restored to initial state' : `Viewing Attack #${index}`);
+  showToast(snap.isInitial ? 'Restored to initial state'
+          : snap.type === 'reload' ? 'Restored to post-reload state'
+          : `Viewing Attack #${index}`);
 }
 
 function openHistoryDialog() {
@@ -2430,26 +2493,36 @@ function renderHistoryDialogBody() {
       statsHtml = `<div class="history-entry-stats">${killed} killed · ${snap.stats.totalOut} leaked</div>`;
     }
 
+    const isReload = snap.type === 'reload';
+
     const item = document.createElement('div');
     item.className = [
       'history-entry',
       isCurrent      ? 'history-entry--current' : '',
-      snap.isInitial ? 'history-entry--initial'  : ''
+      snap.isInitial ? 'history-entry--initial'  : '',
+      isReload       ? 'history-entry--reload'   : ''
     ].filter(Boolean).join(' ');
 
+    let entryLabel, entryDetail;
+    if (snap.isInitial) {
+      entryLabel  = 'Initial State';
+      entryDetail = '<div class="history-entry-attack">Full magazine · 0 attacks</div>';
+    } else if (isReload) {
+      entryLabel  = `↻ Reload · ${timeStr}`;
+      entryDetail = `<div class="history-entry-attack">${snap.label}</div>`;
+    } else {
+      entryLabel  = `Attack #${i} · ${timeStr}`;
+      entryDetail = `<div class="history-entry-attack">${snap.label}</div>${statsHtml}`;
+    }
+
     item.innerHTML = `
-      <div class="history-entry-indicator">${isCurrent ? '◉' : snap.isInitial ? '⚓' : '○'}</div>
+      <div class="history-entry-indicator">${isCurrent ? '◉' : snap.isInitial ? '⚓' : isReload ? '↻' : '○'}</div>
       <div class="history-entry-content">
         <div class="history-entry-header">
-          <span class="history-entry-label">${
-            snap.isInitial ? 'Initial State' : `Attack #${i} · ${timeStr}`
-          }</span>
+          <span class="history-entry-label">${entryLabel}</span>
           ${isCurrent ? '<span class="history-entry-badge">VIEWING</span>' : ''}
         </div>
-        ${snap.isInitial
-          ? '<div class="history-entry-attack">Full magazine · 0 attacks</div>'
-          : `<div class="history-entry-attack">${snap.label}</div>${statsHtml}`
-        }
+        ${entryDetail}
       </div>
     `;
 
@@ -2471,7 +2544,7 @@ function renderHistoryDialogBody() {
  * then calls window.print().  The afterprint event cleans up.
  */
 function exportHistoryPDF() {
-  const attacks = simHistory.slice(1);  // exclude initial-state entry
+  const attacks = simHistory.slice(1).filter(s => s.type !== 'reload');
   if (attacks.length === 0) {
     showToast('No attacks in history to export.', true);
     return;
@@ -2491,7 +2564,7 @@ function exportHistoryPDF() {
 
 /** Assemble the full print-document HTML from simHistory. */
 function _buildPrintDocument() {
-  const attacks = simHistory.slice(1);
+  const attacks = simHistory.slice(1).filter(s => s.type !== 'reload');
   const uniqueTargets = new Set(attacks.map(s => s.targetId).filter(Boolean)).size;
   const now = new Date().toLocaleString([], {
     year: 'numeric', month: 'long', day: 'numeric',
@@ -2517,8 +2590,8 @@ function _buildPrintDocument() {
     <hr class="pr-rule pr-rule--heavy">
   `;
 
-  for (let i = 1; i < simHistory.length; i++) {
-    html += _buildAttackSection(simHistory[i], i);
+  for (let i = 0; i < attacks.length; i++) {
+    html += _buildAttackSection(attacks[i], i + 1);
   }
 
   html += _buildFinalMagSection();
@@ -3045,6 +3118,7 @@ function _resetSimulationHistory() {
     label:           'Initial State',
     magStateBefore:  {},
     magStateAfter:   globalMagState,
+    reloadsState:    _captureReloadsState(),
     results:         null,
     allDefenses:     [],
     manualOverrides: {},
@@ -3345,20 +3419,8 @@ function renderQueuePanel() {
 async function simulateQueue() {
   if (attackQueue.length === 0) return;
 
-  // Forward-history overwrite check (same pattern as simulate())
-  if (simHistoryCursor >= 0 && simHistoryCursor < simHistory.length - 1) {
-    const lostCount = simHistory.length - 1 - simHistoryCursor;
-    const proceed = await showModal({
-      title:   'Overwrite History?',
-      message: `Simulating the queue from this point will discard ${lostCount} subsequent attack${lostCount !== 1 ? 's' : ''}. Continue?`,
-      buttons: [
-        { label: 'Continue', value: true,  style: 'primary'   },
-        { label: 'Cancel',   value: false, style: 'secondary' }
-      ]
-    });
-    if (!proceed) return;
-    simHistory = simHistory.slice(0, simHistoryCursor + 1);
-  }
+  // Forward-history overwrite check
+  if (!await _confirmTruncate()) return;
 
   // Build confirmation HTML list
   let listItems = '';
@@ -3463,6 +3525,7 @@ function _runOneQueuedAttack(entry) {
       targetName:     target.name,
       magStateBefore: preSimSnap,
       magStateAfter:  { ...globalMagState },
+      reloadsState:   _captureReloadsState(),
       results,
       allDefenses,
       manualOverrides: {},
@@ -3481,6 +3544,83 @@ function _runOneQueuedAttack(entry) {
     manualOverrides:    {},
     _manifestUnchanged: true
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Global reload
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Reload all defense systems across all targets.
+ * Consumes reloads fractionally: cost = missiles_needed / full_loadout.
+ * Creates a 'reload' history snapshot and guards against discarding forward states.
+ */
+async function performGlobalReload() {
+  if (!await _confirmTruncate()) return;
+
+  const magBefore     = { ...globalMagState };
+  let   refilledCount = 0;
+  let   missilesAdded = 0;
+
+  for (const target of appTargetCatalog) {
+    for (const def of target.defenses || []) {
+      if (def.reloads == null || def.reloads <= 0) continue;
+
+      const catalog    = DEFENSE_CATALOG[def.system];
+      const perBattery = catalog?.magazinePerBattery || 0;
+      if (perBattery === 0) continue;   // directed-energy / no magazine
+
+      const isShared = catalog?.isShared || false;
+      const fullMag  = isShared ? perBattery : perBattery * def.quantity;
+      const current  = globalMagState[def.id] ?? fullMag;
+      const needed   = fullMag - current;
+      if (needed <= 0) continue;        // already at full capacity
+
+      const costFraction = needed / fullMag;
+
+      if (def.reloads >= costFraction) {
+        // Full refill
+        globalMagState[def.id] = fullMag;
+        def.reloads = Math.round((def.reloads - costFraction) * 1e6) / 1e6;
+      } else {
+        // Partial refill — add as many whole missiles as the remaining reloads allow
+        const toAdd = Math.floor(def.reloads * fullMag);
+        if (toAdd > 0) globalMagState[def.id] = current + toAdd;
+        def.reloads = 0;
+      }
+      missilesAdded += globalMagState[def.id] - current;
+      refilledCount++;
+    }
+  }
+
+  if (refilledCount === 0) {
+    showToast('Nothing to reload — all magazines full or no reloads remaining.', true);
+    return;
+  }
+
+  // Record reload as a history snapshot
+  simHistory.push(_createSnapshot({
+    isInitial:      false,
+    type:           'reload',
+    label:          `Reload — ${refilledCount} system${refilledCount !== 1 ? 's' : ''}, +${missilesAdded} missile${missilesAdded !== 1 ? 's' : ''}`,
+    magStateBefore: magBefore,
+    magStateAfter:  { ...globalMagState },
+    reloadsState:   _captureReloadsState(),
+    results:        null,
+    allDefenses:    [],
+    manualOverrides:{},
+    attackManifest: []
+  }));
+  simHistoryCursor = simHistory.length - 1;
+
+  saveMagStateToStorage();
+  saveToStorage();
+  _manifestUnchanged = false;
+  document.getElementById('simulation-results').classList.add('hidden');
+  document.getElementById('override-notice')?.classList.add('hidden');
+  if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+
+  showToast(`Reload complete — ${refilledCount} system${refilledCount !== 1 ? 's' : ''} refilled, ${missilesAdded} missile${missilesAdded !== 1 ? 's' : ''} restored.`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3669,6 +3809,7 @@ function wireEvents() {
 
   // Export PDF (print)
   document.getElementById('btn-export-pdf').addEventListener('click', exportHistoryPDF);
+  document.getElementById('btn-reload-all').addEventListener('click', performGlobalReload);
 
   // Reset to default
   document.getElementById('btn-reset').addEventListener('click', resetData);
