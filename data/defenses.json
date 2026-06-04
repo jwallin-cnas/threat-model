@@ -39,7 +39,7 @@
         "name": "Standard Missile 3 (SM-3)",
         "payload_kg": 0,
         "kill_modality": "hit-to-kill",
-        "standard_loadout": 25
+        "standard_loadout": 75
       },
       "threats": ["srbm", "mrbm"]
     },
@@ -96,7 +96,7 @@
         "name": "Standard Missile 2 (SM-2)",
         "payload_kg": 0,
         "kill_modality": "hit-to-kill",
-        "standard_loadout": 25
+        "standard_loadout": 75
       },
       "threats": ["cruise_missile", "drone", "fpv"]
     },
@@ -110,7 +110,7 @@
         "name": "Standard Missile 6 (SM-6)",
         "payload_kg": 0,
         "kill_modality": "hit-to-kill",
-        "standard_loadout": 25
+        "standard_loadout": 75
       },
       "threats": ["srbm", "cruise_missile"]
     },
