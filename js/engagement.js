@@ -244,13 +244,15 @@ const ENGAGEMENT_FUNCTIONS = {
   },
 
   // ── Phalanx C-RAM (phalanx_cram) ──────────────────────────────────────────
-  phalanx_cram: function(threatType) {
+  phalanx_cram: function(threatType, quantity, magazineRemaining, salvoSize) {
     if (!['drone', 'fpv'].includes(threatType)) return null;
-    const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
-    const roll   = Math.random();
-    const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
+    //const pks    = { low: 0.70, medium: 0.85, high: 1.0 };
+    //const roll   = Math.random();
+    //const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
+    const pk = (1.0 / salvoSize);
+    const pkTier = 'low';
     return {
-      pk:                     pks[pkTier],
+      pk:                     pk,
       pkTier,
       pkIsFixed:              false,
       shotsPerEngagement:     150,
