@@ -23,8 +23,8 @@
     {
       "targetId": "us_fifth_fleet",
       "platforms": [
-        { "platformId": "zulfagher_e_basir", "quantity": 50 },
-        { "platformId": "abu_mahdi",         "quantity": 50 }
+        { "platformId": "qaem_1", "quantity": 50 },
+        { "platformId": "paveh_quds", "quantity": 50 }
       ]
     },
 
