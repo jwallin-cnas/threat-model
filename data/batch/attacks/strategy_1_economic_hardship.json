@@ -39,8 +39,8 @@
     {
       "targetId": "jebel_ali_port",
       "platforms": [
-        { "platformId": "abu_mahdi",      "quantity": 50  },
-        { "platformId": "khalij_e_fars",  "quantity": 50  },
+        { "platformId": "paveh_quds",      "quantity": 50  },
+        { "platformId": "fateh-110",  "quantity": 50  },
         { "platformId": "shahed_238",     "quantity": 100 }
       ]
     }

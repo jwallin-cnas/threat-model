@@ -24,7 +24,7 @@
       "targetId": "us_fifth_fleet",
       "platforms": [
         { "platformId": "qaem_1", "quantity": 50 },
-        { "platformId": "paveh_quds", "quantity": 50 }
+        { "platformId": "shahed_101", "quantity": 50 }
       ]
     },
 

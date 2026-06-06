@@ -31,9 +31,8 @@
     {
       "targetId": "hamad_port",
       "platforms": [
-        { "platformId": "khalij_e_fars",    "quantity": 50 },
-        { "platformId": "zulfagher_e_basir","quantity": 50 },
-        { "platformId": "abu_mahdi",        "quantity": 50 }
+        { "platformId": "fateh-110",    "quantity": 50 },
+        { "platformId": "shahed_136","quantity": 100 }
       ]
     },
 

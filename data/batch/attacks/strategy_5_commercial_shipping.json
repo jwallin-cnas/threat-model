@@ -31,7 +31,7 @@
     {
       "targetId": "haifa",
       "platforms": [
-        { "platformId": "dji_fpv",        "quantity": 100 },
+        { "platformId": "shahed_101",        "quantity": 100 },
         { "platformId": "fateh_110",      "quantity": 250 }
       ]
     },
