@@ -1692,6 +1692,7 @@ select option, select optgroup {
   .pr-italic { font-style: italic; color: #777; }
   .pr-leaked { font-weight: bold; }
   .pr-row-dim td { color: #999; }
+  .pr-notes  { font-style: italic; color: #555; }
 
   /* ── Sub-summary / attack summary ─────────────────────────────────────── */
   .pr-sub-summary {

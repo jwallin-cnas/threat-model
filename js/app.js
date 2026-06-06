@@ -2730,22 +2730,24 @@ function _buildAttackSection(snap, index) {
     for (const eng of group.engagements) {
       const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—';
 
+      const sysCell = `${eng.systemName}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}`;
+
       if (eng.note === 'Cannot engage') {
         engRows += `<tr class="pr-row-dim">
-          <td>${eng.systemName}</td><td>${loc || '—'}</td>
+          <td>${sysCell}</td><td>${loc || '—'}</td>
           <td colspan="5" class="pr-italic">Cannot engage this threat type</td></tr>`;
         continue;
       }
       if (eng.note === 'Magazine exhausted') {
         engRows += `<tr class="pr-row-dim">
-          <td>${eng.systemName}</td><td>${loc || '—'}</td>
+          <td>${sysCell}</td><td>${loc || '—'}</td>
           <td class="pr-num">${eng.threatsIn}</td>
           <td colspan="4" class="pr-italic">Magazine exhausted</td></tr>`;
         continue;
       }
       if (eng.isPlaceholder) {
         engRows += `<tr class="pr-row-dim">
-          <td>${eng.systemName}</td><td>${loc || '—'}</td>
+          <td>${sysCell}</td><td>${loc || '—'}</td>
           <td class="pr-num">${eng.threatsIn}</td>
           <td colspan="4" class="pr-italic">Placeholder — Pk not modelled</td></tr>`;
         continue;
@@ -2759,7 +2761,7 @@ function _buildAttackSection(snap, index) {
         : pkTierLabel;
 
       engRows += `<tr>
-        <td>${eng.systemName}</td>
+        <td>${sysCell}</td>
         <td>${loc || '—'}</td>
         <td class="pr-num">${eng.threatsIn}</td>
         <td>${pkDisplay}</td>
