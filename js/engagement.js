@@ -358,6 +358,21 @@ const ENGAGEMENT_FUNCTIONS = {
     };
   },
 
+  f15i_patrol: function(threatType, quantity, magazineRemaining, salvoSize) {
+    if (!['drone', 'fpv'].includes(threatType)) return null;
+    const CAP    = 25;
+    const pk = (salvoSize != null && salvoSize <= CAP) ? 1.0 : 25 / salvoSize;
+    return {
+      pk,
+      pkTier:                 pk === 1.0 ? 'high' : null,
+      pkIsFixed:              true,
+      shotsPerEngagement:     1,
+      shotsPerEngagementTier: null,
+      tieredPkCap:            CAP,
+      pkLow:                  null
+    };
+  },
+
   // ── F/A-18 Patrol ×2 (fa18_patrol) ───────────────────────────────────────
   fa18_patrol: function(threatType, quantity, magazineRemaining, salvoSize) {
     if (!['cruise_missile', 'drone', 'fpv'].includes(threatType)) return null;

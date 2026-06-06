@@ -298,6 +298,21 @@
       "threats": ["drone", "cruise_missile", "fpv"]
     },
     {
+      "id": "f15i_patrol",
+      "name": "F-15I Patrol (×4)",
+      "range_km": 200,
+      "batteries": 1,
+      "shared": true,
+      "armament": {
+        "type": "aircraft",
+        "name": "Mixed",
+        "payload_kg": 22,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 100
+      },
+      "threats": ["drone", "fpv"]
+    },
+    {
       "id": "fa18_patrol",
       "name": "F/A-18 Patrol (×4)",
       "range_km": 100,

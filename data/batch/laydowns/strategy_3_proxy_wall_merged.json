@@ -417,6 +417,14 @@
         "notes": "",
         "operator": "Israel",
         "reloads": 1
+      },
+      {
+        "id": "tel_nof_ab_d2",
+        "system": "f15i_patrol",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Israel",
+        "reloads": 1
       }
     ],
     "ramat_david_ab": [
