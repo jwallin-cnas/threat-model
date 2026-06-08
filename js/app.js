@@ -3231,6 +3231,30 @@ function _resetSimulationHistory() {
 }
 
 /**
+ * Return serialised simulation results for the current history.
+ * Called by batch-sim.js via page.evaluate() after _simulateQueueDirect().
+ * Returns one entry per attack (skips the initial-state and reload entries).
+ */
+function _getSimulationResults() {
+  return simHistory
+    .filter(s => !s.isInitial && s.type !== 'reload' && s.results)
+    .map(s => ({
+      targetId:    s.targetId,
+      targetName:  s.targetName,
+      manifest:    s.attackManifest.map(p => ({
+        platformId:   p.platformId,
+        platformName: PLATFORM_CATALOG[p.platformId]?.name || p.platformId,
+        count:        p.count,
+      })),
+      byThreatType: s.results.byThreatType.map(g => ({
+        threatType:   g.threatType,
+        initialCount: g.initialCount,
+        finalCount:   g.finalCount,
+      })),
+    }));
+}
+
+/**
  * Apply a parsed laydown object directly without a confirmation modal or
  * FileReader. Identical logic to importLaydown's reader.onload body.
  *

@@ -8,7 +8,13 @@
       "platforms": [
         { "platformId": "zulfagher",    "quantity": 50 },
         { "platformId": "soumar",       "quantity": 50 }
-      ]
+      ],
+      "narratives": {
+        "None":     "Al Dhafra air base was unaffected by the combined salvo of short-range ballistic missiles and cruise missiles launched by Iran.",
+        "Mild":     "The attack on Al Dhafra air base caused only limited damage to the base, hitting one unoccupied hanger. No aircraft were lost and the runway and parking ramp remain fully operational.",
+        "Moderate": "Iran's attack on al Dhafra caused moderate levels of damage. The base's runways were crated, halting air operations for at least 12 hours-if not longer.",
+        "Severe":   "The attack on Al Dhafra caused significant damage in part because a THAAD radar was hit, making the rest of the base vulnerable. One Emirati fighter aircraft was struck. The base's air operations are on hold for 72 hours while crews work to clear the runways of explosives and repair them so that air operations can resume."
+      }
     },
 
     {
@@ -16,7 +22,13 @@
       "platforms": [
         { "platformId": "geran_2",      "quantity": 250 },
         { "platformId": "zulfagher",    "quantity": 50  }
-      ]
+      ],
+      "narratives": {
+        "None":     "The refinery at Ruwais was unaffected by the massive drone attack and salvo of short-range ballistic missiles that coincided with the drone attack.",
+        "Mild":     "While some drones and missiles hit Ruwais, they had little lasting impact on operations. Ruwais is the largest oil refinery in the Middle East and the sheer size of the facility worked in its favor as there is redundancy and the few impacts were contained. The facility's output remains unaffected.",
+        "Moderate": "Iran's drone and short-range ballistic missile attack on Ruwais caused moderate damage at several key incoming and out coming pipeline nodes and caused a precautionary shutdown of adjacent units, though a majority of these connections remain intact. Facility managers estimate that the refinery will be operating at 75% capacity for the next week.",
+        "Severe":   "The drone and short-range ballistic missile attack on Ruwais caused significant damage and it is not known will operations will be able to resume. The Iranian strike hit the residue fluid catalytic cracking complex, igniting a large fire and forcing an emergency shutdown. As the Middle East's largest refinery this attack will have an immediate effect on global oil markets."
+      }
     },
 
     {
@@ -25,22 +37,40 @@
         { "platformId": "shahed_238",   "quantity": 100 },
         { "platformId": "paveh_quds",   "quantity": 100 },
         { "platformId": "haj_qasem",    "quantity": 100 }
-      ]
+      ],
+      "narratives": {
+        "None":     "Despite the massive size of the attack on Al Udeid launched by Iran, the combination of drones, cruise missiles, and medium-range ballistic missiles did not cause any damage to base operations, personnel, or infrastructure.",
+        "Mild":     "The attack on Al Udeid air base caused limited damage and did not disrupt operations. A few weapons hit two warehouses, with no known casualties.",
+        "Moderate": "The attack on Al Udeid air base by a mixed salvo of drones, medium-range ballistic missiles, and cruise missiles temporarily halted air operations and damaged one Qatari fighter aircraft parked on the ramp. Cluster munitions scattered across the runway and operating areas. It will take crews around 24 hours to repair the runways resume operations.",
+        "Severe":   "The large mixed salvo attack caused significant damage on the airbase. The attack destroyed multiple Qatari aircraft on the ground including several in hardened aircraft shelters, while fuel storage and key maintenance facilities sustained heavy damage. Several air defense radars were also destroyed. The base's air defenses are badly degraded, leaving it potentially exposed to follow-on attacks."
+      }
     },
 
     {
       "targetId": "hamad_port",
       "platforms": [
-        { "platformId": "fateh-110",    "quantity": 50 },
+        { "platformId": "fateh_110",    "quantity": 50 },
         { "platformId": "shahed_136","quantity": 100 }
-      ]
+      ],
+      "narratives": {
+        "None":     "The mixed salvo attack on commercial shipping transiting in and out of Hamad port did not result in any commercial ships being hit.",
+        "Mild":     "The mixed salvo attack on Hamad port resulted in limited damage to the port's infrastructure. While several loading and unloading areas were hit, most weapons were intercepted or hit unoccupied areas, port officials have reported that they remain at full capacity.",
+        "Moderate": "The mixed salvo attack on Hamad port resulted in limited damage to the port's infrastructure. Numerous bulk cargo handling facilities were damaged in the attack and port officials have reported that cargo operations will be disrupted for at least a few days.",
+        "Severe":   "The mixed salvo attack on Hamad port caused significant damage to the port's container handling terminals. Many gantry cranes and vehicles were disabled or destroyed, effectively disabling the port's automated handling systems. Port officials report that the three container terminals will be closed for an indefinite period of time."
+      }
     },
 
     {
       "targetId": "doha",
       "platforms": [
         { "platformId": "geran_2",      "quantity": 250 }
-      ]
+      ],
+      "narratives": {
+        "None":     "The large salvo of Geran-2 UAVs did not cause any damage to Hamad International Airport, and despite a brief pause in air traffic during the attack, the airport remains fully operational.",
+        "Mild":     "The drone attack on Doha's airport had a limited impact. A few drones struck taxiways however the attacks were contained and no terminals or air operations infrastructure was affected. Air operations continued throughout most of the unaffected areas of the airport.",
+        "Moderate": "The drone attack on Doha's airport causing structural damage in one of the concourses of the terminal. Air operations will continue on a limited basis using the unaffected parts of the terminal, while the damage portion will remain closed indefinitely. Airport officials expect to be operating at 75% capacity for the time being.",
+        "Severe":   "The drone attack caused serious damage to Doha's airport with at least 4 civilian casualties reported and dozens more injured. Several concourses within the airport's main terminal were hit, destroying the roof and collapsing walls. The cargo handling terminal also was struck, with significant damage to the climate controlled facility and automated storage and retrieval system, halting cargo operations. Passenger operations will continue on a heavily limited basis through the airport one undamaged concourse at the main terminal."
+      }
     }
 
   ]

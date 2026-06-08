@@ -13,6 +13,8 @@
     "vitest": "^1.6.0"
   },
   "dependencies": {
-    "playwright": "^1.44.0"
+    "pdf-lib":   "^1.17.1",
+    "playwright": "^1.44.0",
+    "xlsx":      "^0.18.5"
   }
 }

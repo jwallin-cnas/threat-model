@@ -8,7 +8,13 @@
       "platforms": [
         { "platformId": "soumar",       "quantity": 50  },
         { "platformId": "khorramshahr", "quantity": 100 }
-      ]
+      ],
+      "narratives": {
+        "None":     "The mixed salvo of medium-range ballstic missiles and cruise missiles did not cause any damage to Israel's Tel Nof's air base and the bases operations remain fully active.",
+        "Mild":     "An Iranian strike on Tel Nof Airbase caused minimal damage. Several impacts fell on open ground and along the perimeter, cratering unpaved areas and damaging fencing and minor ground equipment, but no buildings, hangars, aircraft shelters, or runways were hit. Airfield operations continued largely uninterrupted.",
+        "Moderate": "The cruise and ballistic missile attack on Tel Nof Air Base caused modest damage. Several hardened aircraft shelters were struck, but the aircraft inside were protected. One of the base's four runways was closed to clear cluster munitions and repair craters, while the others remained in use, allowing air operations to continue on a reduced basis.",
+        "Severe":   "The cruise and ballistic missile attack on Tel Nof was highly damaging. Several hardened aircraft shelters were destroyed along with the aircraft inside them, and the strike also hit the base's fuel storage and maintenance facilities, igniting fires and crippling the base's ability to sustain and turn around aircraft. The base's air operations are on hold while crews work to clear its four runways and repair holes so operations can resume."
+      }
     },
 
     {
@@ -16,7 +22,13 @@
       "platforms": [
         { "platformId": "geran_2",      "quantity": 250 },
         { "platformId": "ghadr",        "quantity": 100 }
-      ]
+      ],
+      "narratives": {
+        "None":     "The large salvo of drones and medium range ballstic missiles was unable to cause any damage to Tel Aviv's civilian infrastructure, its population, or the air and missile defense sites protecting the city.",
+        "Mild":     "The Iranian strike on Tel Aviv caused little damage. Most incoming threats were intercepted, and the few that leaked through fell on the urban periphery or struck open ground. Damage was limited to blown-out windows and scattered debris. A small number of civilians were treated for light injuries, most caused by flying glass or falling debris rather than direct blast effects.",
+        "Moderate": "The Iranian strike on Tel Aviv caused moderate damage with hits on a shopping mall and an IDF radar. The Azrieli Center Mall is closed for the time being while it assesses damage to portions of its shopping area. One Arrow missile defense fire control radar also was destroyed in the attack.",
+        "Severe":   "The large drone and missile attack on Tel Aviv caused significant damage. Several missiles penetrated the city's defenses, knocking out a major electrical substation and leaving portions of the city are without power, while numerous commercial buildings sustained significant damage. In the attack one Arrow missile defense fire control radar was destroyed as well as several Iron Dome launchers."
+      }
     },
 
     {
@@ -24,7 +36,13 @@
       "platforms": [
         { "platformId": "shahed_101",   "quantity": 100 },
         { "platformId": "fateh_110",    "quantity": 150 }
-      ]
+      ],
+      "narratives": {
+        "None":     "Hezbollah's attack combined drones and short-range ballistic missiles to target Haifa's water desalination plant and nearby port infrastructure, however, it was unable to cause any damage to these facilities or surrounding locations.",
+        "Mild":     "The Hezbollah rocket and drone attack on Haifa caused only little damage. Most weapons were intercepted or fell short, with a few impacts striking open quayside areas and the perimeter of the desalination facility. Several weapons struck the Bazan Oil Refinery, but damage was limited to cratered pavement, damaged fencing, and minor harm to pipes and ancillary equipment. Operations were uninterrupted at both locations.",
+        "Moderate": "The Hezbollah rocket and drone attack on Haifa caused moderate damage. Several weapons struck the port, damaging a portion of one berth, forcing a temporary shutdown in the affected area. At the desalination facility, a hit to the pretreatment area and associated piping took part of the plant offline, cutting water output while repairs are underway. The city's desalination plant will be operating at 50% capacity for at least 24 hours while they assess the damage and begin repairs.",
+        "Severe":   "The Hezbollah rocket and drone attack on Haifa was highly destructive. Multiple weapons struck the port's main cargo terminal, destroying cranes and damaging berths and fuel storage, halting most maritime operations and igniting fires along the waterfront. The desalination facility sustained severe damage to its reverse-osmosis trains and intake infrastructure, knocking the plant offline indefinitely and removing a major source of the region's drinking water. Authorities have imposed water rationing and are rerouting shipping to alternate ports while damage is assessed, with recovery for both facilities measured in weeks to months."
+      }
     },
 
     {
@@ -32,14 +50,26 @@
       "platforms": [
         { "platformId": "paveh_quds",   "quantity": 100 },
         { "platformId": "geran_2",      "quantity": 150 }
-      ]
+      ],
+      "narratives": {
+        "None":     "The combined attack of cruise missiles and Geran-2 drones was unable to cause any damage to Ramat David air base.",
+        "Mild":     "The drone and cruise missile attack on Ramat David Air Base caused only limited damage. A few weapons reached the base, but Israeli forces lost no aircraft and air operations were unaffected, with key facilities spared thanks to extensive hardening. The base's network of underground tunnels for movement between hardened locations further limited the effect of the strike, protecting many aircraft and support facilities.",
+        "Moderate": "The drone and cruise missile attack on Ramat David Air Base temporarily disrupted operations but damage was limited due to base's extensive hardening. The base's runways and taxiways sustained enough damage to place a temporary hold on air operations, with several buildings taking hits and craters across the airfield. Because the strike relied on individual impacts rather than cluster munitions, crews were able to repair the runways and clear the base within roughly 12 hours.",
+        "Severe":   "The attack on Ramat David Air Base caused significant damage. Strikes across the aircraft parking area caught one Israeli F-16 returning from operations and scored a direct hit on a shelter, destroying the aircraft inside. Air operations are on hold while crews fight fires, clear the runways, and repair them enough to resume flights. The base's network of underground tunnels for movement between hardened locations limited the wider damage, sparing many other aircraft and support facilities, but hits on the tunnels openings means that they are trapped until the entrances are repaired. This base is home to Israel's highly-secretive reconnaissance UAV forces that it relies on for long-range stealthy reconnaissance of Iranian military facilities—these aircraft were undamaged but cannot be repositioned to continue operations for the time being."
+      }
     },
 
     {
       "targetId": "beer_sheva",
       "platforms": [
         { "platformId": "shahed_238",   "quantity": 100 }
-      ]
+      ],
+      "narratives": {
+        "None":     "The drone attack on Be'er Sheva's technology infrastructure was unsuccessful.",
+        "Mild":     "Damage to civilian infrastructure and economic activity was limited following the drone attack. Be'er Sheva's technology campuses and data centers were not hit. Most of the drones hit unoccupied areas, but a few struck buildings, causing some falling debris.",
+        "Moderate": "Damage to economic activity and civilian infrastructure was moderate following the drone attack. The Gav Yam Negev Advanced Technologies park sustained considerable damage, putting the regional operations of international firms with offices at the site, including Microsoft, on hold for the time being. The disruption has idled a significant share of the city's high-tech workforce and stalled business activity across the campus while assessments and repairs proceed.",
+        "Severe":   "The drone attacks on Be'er Sheva caused serious damage to the to the city's civilian and economic infrastructure. The Gav Yam Negev Advanced Technologies park suffered devastating damage, halting the regional operations for international firms located at the site, like Microsoft, for the foreseeable future. Damaged power and communications networks have left parts of the city without electricity or connectivity."
+      }
     }
 
   ]
