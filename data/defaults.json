@@ -5,7 +5,7 @@
     "format": {
       "id": "Stable unique string for this entry, e.g. manama_d1, manama_d2. Never reuse IDs across targets.",
       "system": "System ID from defenses.json (see available_systems below).",
-      "quantity": "Number of batteries / systems (integer \u2265 1).",
+      "quantity": "Number of batteries / systems (integer ≥ 1).",
       "notes": "Optional free-text annotation. Use empty string for none.",
       "operator": "Nation or organisation operating this system at this location. Used to determine cross-target default enable/disable state: US-operated systems are enabled by default when they can cover a neighbouring target; all others are disabled by default."
     },
@@ -101,7 +101,7 @@
         "quantity": 3,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 3
       },
       {
         "id": "doha_d2",
@@ -109,7 +109,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 5
       }
     ],
     "ras_laffan_lng": [
@@ -119,7 +119,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 6
       }
     ],
     "hamad_port": [
@@ -129,7 +129,7 @@
         "quantity": 3,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 3
       },
       {
         "id": "hamad_port_d2",
@@ -137,7 +137,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 3
       }
     ],
     "us_fifth_fleet": [
@@ -165,7 +165,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 3
       },
       {
         "id": "jebel_ali_port_d3",
@@ -183,7 +183,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "al_dhafra_ab_d2",
@@ -191,7 +191,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 3
       }
     ],
     "dubai": [
@@ -201,7 +201,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "abu_dhabi": [
@@ -239,7 +239,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "fujairah_port_d2",
@@ -247,7 +247,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "murban_bab_hashah": [
@@ -267,7 +267,7 @@
         "quantity": 4,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "prince_sultan_ab_d2",
@@ -275,7 +275,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "prince_sultan_ab_d3",
@@ -283,7 +283,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "king_khalid_ab": [
@@ -293,7 +293,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "king_khalid_ab_d2",
@@ -301,7 +301,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "aramco_persian_gulf_corridor": [
@@ -311,7 +311,7 @@
         "quantity": 4,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "aramco_riyadh": [
@@ -321,7 +321,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "dammam": [
@@ -331,7 +331,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "aramco_red_sea_corridor": [
@@ -341,7 +341,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "riyadh": [
@@ -391,7 +391,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Oman",
-        "reloads": 1
+        "reloads": 5
       }
     ],
     "al_udeid_ab": [
@@ -401,7 +401,7 @@
         "quantity": 3,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "al_udeid_ab_d2",
@@ -409,7 +409,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 5
       },
       {
         "id": "al_udeid_ab_d3",
@@ -417,7 +417,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "muscat": [
@@ -427,7 +427,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Oman",
-        "reloads": 1
+        "reloads": 5
       }
     ],
     "tel_nof_ab": [
@@ -437,7 +437,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 3
       },
       {
         "id": "tel_nof_ab_d2",
@@ -455,7 +455,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 3
       }
     ],
     "nevatim_ab": [
@@ -465,7 +465,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 3
       }
     ],
     "tel_aviv": [
@@ -475,7 +475,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 3
       },
       {
         "id": "tel_aviv_d2",
@@ -483,7 +483,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 6
       }
     ],
     "haifa": [
@@ -493,7 +493,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 3
       },
       {
         "id": "haifa_d2",
@@ -501,7 +501,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 6
       },
       {
         "id": "haifa_d3",
@@ -519,7 +519,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 3
       },
       {
         "id": "jerusalem_d2",
@@ -527,7 +527,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 6
       }
     ],
     "beer_sheva": [
@@ -555,7 +555,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 6
       }
     ],
     "isa_ab": [
