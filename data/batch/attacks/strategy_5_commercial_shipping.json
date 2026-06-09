@@ -10,10 +10,10 @@
         { "platformId": "geran_2",        "quantity": 250 }
       ],
       "narratives": {
-        "None":     "Using a mix of high- and low-end interceptors, you were able to destroy all incoming threats, preventing any damage on the ground.",
-        "Mild":     "While Blue was able to intercept many of the incoming threats, several {drones, drones and missiles} hit oil a few storage tanks and pipelines incidentally damaging them. Offshore filling operations were temporarily disrupted to allow for repairs.",
-        "Moderate": "While Blue was able to intercept some of the missiles, many {drones, drones and missiles} caused dispersed damage to storage tanks and pipelines. Offshore filling operations have been shut down for at least 72 hours while damage is assessed and ground crews undertake repairs.",
-        "Severe":   "With few defenses most of the incoming weapons hit the port, causing widespread damage to oil storage tanks and pipelines. Repairs and rebuilding are likely to take weeks at a minimum, at major cost to port maintainers and causing ripple effects to planned oil exports."
+        "None":     "Red's attack failed to do any damage. Using a mix of high- and low-end interceptors, Blue was able to destroy all incoming threats, preventing any damage on the ground.",
+        "Mild":     "Red's attack dealt minimal damage to the port. While Blue was able to intercept many of the incoming threats, several {drones, drones and missiles} hit oil storage tanks and pipelines, barely damaging them. Offshore filling operations were temporarily disrupted to allow for repairs.",
+        "Moderate": "Red's attack significantly disrupted port operations in the short-term. While Blue was able to intercept some of the missiles, many {drones, drones and missiles} caused dispersed damage to storage tanks and pipelines. Offshore filling operations have been shut down for at least 72 hours while damage is assessed and ground crews undertake repairs.",
+        "Severe":   "Red's attack severely disrupted the port's operations. With few defenses, most of the incoming weapons hit the port, causing widespread damage to oil storage tanks and pipelines. Repairs and rebuilding are likely to take weeks at a minimum, at major cost to port maintainers and causing ripple effects to planned oil exports."
       }
     },
 
@@ -25,10 +25,10 @@
         { "platformId": "shahed_238",        "quantity": 100 }
       ],
       "narratives": {
-        "None":     "At the cost of many high-end interceptors, you were able to destroy {all, almost all} incoming threats. {While some managed to penetrate your air defenses, they failed to close in on their moving ship targets.}",
-        "Mild":     "While Blue was able to intercept much of the salvo, several {drones, drones and missiles} targeted, but narrowly missed ships transiting out of the port. As fears that attacks on commercial ships will resume, insurance costs have risen significantly.",
-        "Moderate": "While Blue was able to intercept some of the missiles, many {drones, drones and missiles} hit ships transiting in and out of the port, causing limited damage to most of the vessels. At least one ship was stranded as it undertakes repairs. Shipping insurance costs have skyrocketed.",
-        "Severe":   "The salvo targeted ships transiting in and out of the port and caused significant damage, strandeding several of the ships in the Gulf. One ship that was hit by multiple missiles sunk. Shipping insurance costs have skyrocketed and shipping out of the port has come to a standstill as damage is assessed. Global crude prices are already reflecting severe economic distress."
+        "None":     "Red's attack failed to do any damage. At the cost of many high-end interceptors, Blue was able to destroy {all, almost all} incoming threats. {While some managed to penetrate Blue air defenses, they failed to close in on their moving ship targets.}",
+        "Mild":     "Red's attack dealt minimal damage to the port. While Blue was able to intercept much of the salvo, several {drones, drones and missiles} targeted, but narrowly missed, ships transiting out of the port. Amid fear that attacks on commercial ships will resume, insurance costs have risen significantly.",
+        "Moderate": "Red's attack dealt a significant blow to the port. While Blue was able to intercept some of the missiles, many {drones, drones and missiles} hit ships transiting in and out of the port, causing limited damage to most of the vessels. At least one ship was stranded as it undertakes repairs. Shipping insurance costs have skyrocketed.",
+        "Severe":   "Red's attack dealt a severe blow to the port. The salvo targeted ships transiting in and out of the port and caused significant damage, stranding several of the ships in the Gulf. One ship that was hit by multiple missiles sank. Shipping insurance costs have skyrocketed and shipping out of the port has come to a standstill as damage is assessed. Global crude prices are already reflecting severe economic distress."
       }
     },
 
@@ -39,24 +39,24 @@
         { "platformId": "ghadr",          "quantity": 50 }
       ],
       "narratives": {
-        "None":     "(Not possible now) Your air defenses were able to intercept all of the incoming missiles, with many of the drones missing their targets and striking unused land and sea around the port.",
-        "Mild":     "While Blue was able to intercept many of the incoming threats, several still managed to hit inside the port, but fell along the periphery and did not damage important infrastructure. The attack temporarily disrupted cargo loading operations while crews sought shelter.",
-        "Moderate": "Incoming MRBMs caused significant damage to the port's breakwater, slowing cargo loading operations. Damage to exposed cargo loading cranes further reduced port throughput and the port is expected to operate at reduced capacity until repairs can be undertake or replacements secured, which is likely to take months if not years.",
-        "Severe":   "Incoming MRBMs and drones caused severe damage to the port's breakwater and loading infrastructure. Many of the exposed cargo loading cranes have been destroyed or damaged. Cargo loading operations are indefinitely stopped while repairs and reconstruction are underway."
+        "None":     "(Not possible now) Red's attack failed to do any damage. Blue air defenses were able to intercept all of the incoming missiles, with many of the drones missing their targets and striking unused land and sea around the port.",
+        "Mild":     "Red's attack dealt minimal damage to the port. While Blue was able to intercept many of the incoming threats, several still managed to hit inside the port, but fell along the periphery and did not damage important infrastructure. The attack temporarily disrupted cargo loading operations while crews sought shelter.",
+        "Moderate": "Red's attack dealt significant damage to the port. Incoming MRBMs caused major damage to the port's breakwater, slowing cargo loading operations. Damage to exposed cargo loading cranes further reduced port throughput and the port is expected to operate at reduced capacity until repairs can be undertaken or replacements secured, which is likely to take months if not years.",
+        "Severe":   "Red's attack dealt long-term damage to the port. Incoming MRBMs and drones caused severe damage to the port's breakwater and loading infrastructure. Many of the exposed cargo loading cranes have been destroyed or damaged. Cargo loading operations are indefinitely stopped while repairs and reconstruction are underway."
       }
     },
 
     {
       "targetId": "haifa",
       "platforms": [
-        { "platformId": "shahed_101",        "quantity": 100 },
+        { "platformId": "shahed_101",     "quantity": 100 },
         { "platformId": "fateh_110",      "quantity": 250 }
       ],
       "narratives": {
-        "None":     "American and Israeli air defenses were able to intercept almost all of the incoming threats, though at the cost of a significant depletion of available interceptors in the area. While some drones managed to penetrate your area defenses, they failed to cause more than superficial damage to port infrastructure.",
-        "Mild":     "While American and Israeli air defenses intercepted most of the incoming threats, port storage facilities sustained some damage from incoming SRBMs. This temporarily halted cargo loading operations but was repaired within hours.",
-        "Moderate": "While many incoming threats were intercepted by American and Israeli threats, some of the incoming SRBMs reached the port and caused significant damage to freight rail lines and one of the two cargo container terminals. A few dockworker casualties have been reported throughout the port. Port operations have been shut down for 48 hours while repairs are made and emergency crews treat victims.",
-        "Severe":   "{Many, most} of the incoming SRBMs were able to reach their targets, penetrating American and Israeli air defenses. The port was severely damaged, with cargo transport and storage indefinitely shut down. Damage to industrial chemical storage facilities have created a toxic environment, slowing emergency workers. Casualties are widespread, creating both a mass casualty event and severe worker shortage for port operations."
+        "None":     "Red's attack failed to cause any damage to the port. American and Israeli air defenses were able to intercept almost all of the incoming threats, though at the cost of a significant depletion of available interceptors in the area. {While some drones managed to penetrate Blue area defenses, they failed to cause more than superficial damage to port infrastructure.}",
+        "Mild":     "Red's attack dealt minimal damage to the port. While American and Israeli air defenses intercepted most of the incoming threats, port storage facilities sustained some damage from incoming SRBMs. This temporarily halted cargo loading operations but was repaired within hours.",
+        "Moderate": "Red's attack dealt significant damage to the port. While many incoming threats were intercepted by American and Israeli threats, some of the incoming SRBMs reached the port and damaged freight rail lines and one of the two cargo container terminals. A few dockworker casualties have been reported throughout the port. Port operations have been shut down for 48 hours while repairs are made and emergency crews treat victims.",
+        "Severe":   "Red's attack dealt major damage to the port. {Many, most} of the incoming SRBMs were able to reach their targets, penetrating American and Israeli air defenses. The port was severely damaged, with cargo transport and storage indefinitely shut down. Damage to industrial chemical storage facilities have created a toxic environment, slowing emergency workers. Casualties are widespread, creating both a mass casualty event and severe worker shortage for port operations."
       }
     },
 
@@ -67,10 +67,10 @@
         { "platformId": "paveh_quds",     "quantity": 100 }
       ],
       "narratives": {
-        "None":     "Blue was able to destroy {all, most} of the incoming threats, though at the cost of many of your high-end interceptors. The port and surrounding industrial plants did not sustain any meaningful damage.",
-        "Mild":     "Blue's air defenses intercepted many of the missiles, but several of the drones {and cruise missiles} penetrated the defenses and hit the port. Minor damage to transport systems for cargo loading have temporarily delayed shipping from the port.",
-        "Moderate": "Many of the incoming threats managed to penetrate Blue's air defenses, dealing significant damage to transport systems for cargo loading and moderate damage to the petrochemical plant at the facility. This has caused temporary, but significant, damage to oil exports from the area.",
-        "Severe":   "{Most, all} of the incoming threats penetrated Blue's air defenses, severely damaging the port and industrial facilities in the area. Cargo loading has come to a halt, while damage to petrochemical facilities has exposed hazardous waste to workers and emergency personnel. Port operations have come to a standstill while damage is assessed and repairs are made."
+        "None":     "Red's attack failed to damage the port. Blue was able to destroy {all, most} of the incoming threats, though at the cost of many high-end interceptors. The port and surrounding industrial plants did not sustain any meaningful damage.",
+        "Mild":     "Red's attack dealt minor damage to the port. Blue's air defenses intercepted many of the missiles, but several of the drones {and cruise missiles} penetrated the defenses and hit the port. Limited damage to transport systems for cargo loading have temporarily delayed shipping from the port.",
+        "Moderate": "Red's attack dealt significant damage to the port. Many of the incoming threats managed to penetrate Blue's air defenses, dealing damaging transport systems for cargo loading and hitting the petrochemical plant at the facility. This has caused temporary, but significant, effects on oil exports from the area.",
+        "Severe":   "Red's attack dealt severe damage to the port. {Most, all} of the incoming threats penetrated Blue's air defenses, severely damaging the port and industrial facilities in the area. Cargo loading has come to a halt, while damage to petrochemical facilities has exposed hazardous waste to workers and emergency personnel. Port operations have come to a standstill while damage is assessed and repairs are made."
       }
     }
 

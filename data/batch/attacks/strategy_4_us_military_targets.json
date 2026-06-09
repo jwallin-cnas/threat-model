@@ -10,10 +10,10 @@
         { "platformId": "arash_2",      "quantity": 50 }
       ],
       "narratives": {
-        "None":     "Against a relatively light mixed SRBM/drone salvo, you were able to destroy all incoming threats primarily via your higher-end air defense systems.",
-        "Mild":     "Your air defenses performed well, but some {SRBMs and drones} leaked through. The impacts were on the periphery of the base and air operations were not significantly impacted.",
-        "Moderate": "With limited air defense systems engaging incoming threats, MSAB sustained significant damage to runways, requiring at least 24hrs for ground crews to clear explosives, debris, and repair the craters caused by cluster munitions.",
-        "Severe":   "With {limited, no} air defense systems available to target incoming threats, MSAB sustained major damage from incoming Iranian drones and missiles. Runways suffered significant damage that will take ground crews upwards of 24hrs to repair. A fuel storage facility on the ground was severely damaged, causing a large fire. Additionally, a drone hit a U.S. F-15EX parked in the open."
+        "None":     "Red's attack failed to do any damage. Against a relatively light mixed SRBM/drone salvo, Blue was able to destroy {all, almost all} incoming threats, primarily via higher-end air defense systems.",
+        "Mild":     "Red's attack was sharply blunted, as Blue's air defenses performed well, though some {SRBMs and drones} leaked through. The impacts were on the periphery of the base and air operations were not significantly impacted.",
+        "Moderate": "With limited air defense systems engaging incoming threats, MSAB sustained significant damage to runways from Red's attack, requiring at least 24hrs for ground crews to clear explosives and debris and repair the craters caused by cluster munitions.",
+        "Severe":   "Red's attack was highly successful. With {limited, no} air defense systems available to target incoming threats, MSAB sustained major damage from incoming Iranian drones and missiles. Runways suffered significant damage that will take ground crews upwards of 24hrs to repair. A fuel storage facility on the ground was severely damaged, causing a large fire. Additionally, a drone hit a U.S. F-15EX parked in the open."
       }
     },
 
@@ -25,24 +25,24 @@
         { "platformId": "khorramshahr", "quantity": 100 }
       ],
       "narratives": {
-        "None":     "At the cost of many of your available higher-end interceptors, you were able to destroy all incoming threats and prevent any damage on the ground.",
-        "Mild":     "Blue defenses intercepted most, but not all of the incoming threats. Most of the weapons seemed to miss their target and fell in unoccupied parts of the base. Air operations were halted for a few hours while damage was assessed and ground crews made minor repairs.",
-        "Moderate": "Because there were few ballistic and cruise missile interceptors remaining, much of the salvo hit the base, causing significant damage to runways and destroying a Patriot radar. Air operations will be halted for at least 24hrs while ground crews perform repairs. Given its degraded air defenses, the base is vulnerable to follow on attacks.",
-        "Severe":   "With almost no air defense systems available to stop incoming threats, PSAB sustained major damage. Widespread craters across both runways have fully halted any air operations for at least 48hrs, while many weapons targeted air defenses destroying both two Patriot radars. The base is incredibly vulnerable to follow on strikes."
+        "None":     "Red's attack failed to do any damage. At the cost of many higher-end interceptors, Blue was able to destroy all incoming threats and prevent any damage on the ground.",
+        "Mild":     "Red's attack managed to mildly disrupt air base operations. Blue defenses intercepted most, but not all of the incoming threats. Several of the weapons seemed to miss their target and fell in unoccupied parts of the base. Air operations were halted for a few hours while damage was assessed and ground crews made minor repairs.",
+        "Moderate": "Red's attack penetrated Blue's air defenses and disrupted air base operations. Because there were few ballistic and cruise missile interceptors remaining, much of the salvo hit the base, causing significant damage to runways and destroying a Patriot radar. Air operations will be halted for at least 24hrs while ground crews perform repairs. Given its degraded air defenses, the base is vulnerable to follow on attacks.",
+        "Severe":   "With almost no air defense systems available to stop incoming threats, Red's attack caused major damage. Widespread craters across both runways have fully halted any air operations for at least 48hrs, while many weapons targeted air defenses, destroying both two Patriot radars. The base is incredibly vulnerable to follow on strikes."
       }
     },
 
     {
       "targetId": "us_fifth_fleet",
       "platforms": [
-        { "platformId": "qaem_1", "quantity": 50 },
-        { "platformId": "shahed_101", "quantity": 50 }
+        { "platformId": "qaem_1",       "quantity": 50 },
+        { "platformId": "shahed_101",   "quantity": 50 }
       ],
       "narratives": {
-        "None":     "Using available higher-end interceptors, you were able to destroy all incoming threats and prevent any damage on the ground.",
-        "Mild":     "Blue's sophisticated ballistic and air defenses shot down almost all of the incoming missiles. Most of these missiles failed to strike their presumed targets, though some incidental damage was done to a residential building on base.",
-        "Moderate": "While Blue was able to destroy a portion of the incoming missiles using its high-end interceptors, a significant fraction leaked, causing widespread, but minor, damage to the naval base. Access to several command buildings has been temporarily restricted while damage is assessed and minor repairs are executed. Port operations and Fifth fleet command functions continue, though at a reduced tempo while the base works through the disruption.",
-        "Severe":   "With limited interceptors available, {almost all, all} of the incoming missiles penetrated Blue's air defenses. They caused widespread damage on the ground, including indefinite closure of several command buildings, damage to power distribution causing a temporary blackout to some buildings, damage to fuel storage, igniting fires, and several casualties. Command for operations in the region has temporarily been moved off base while repairs are made."
+        "None":     "Red's attack failed to do any damage. Using available higher-end interceptors, Blue was able to destroy {all, almost all} incoming threats and prevent any damage on the ground.",
+        "Mild":     "Red's attack had limited impact on the headquarters. Blue's sophisticated ballistic missile and air defenses shot down almost all of the incoming missiles. Most of these missiles failed to strike their presumed targets, though some incidental damage was done to a residential building on base.",
+        "Moderate": "Red's attack caused some damage and disruption on the ground. While Blue was able to destroy a portion of the incoming missiles using its high-end interceptors, a significant fraction leaked, causing widespread, but minor, damage to the naval base. Access to several command buildings has been temporarily restricted while damage is assessed and minor repairs are executed. Port operations and Fifth fleet command functions continue, though at a reduced tempo while the base works through the disruption.",
+        "Severe":   "Red's attack dealt major damage to the naval base. With limited interceptors available, {almost all, all} of the incoming missiles penetrated Blue's air defenses. They caused widespread damage on the ground, including indefinite closure of several command buildings, damage to power distribution causing a temporary blackout to some buildings, damage to fuel storage, igniting fires, and several casualties. Command for operations in the region has temporarily been moved off base while repairs are made."
       }
     },
 
@@ -53,10 +53,10 @@
         { "platformId": "shahed_136",   "quantity": 100 }
       ],
       "narratives": {
-        "None":     "Using high-end interceptors, you were able to destroy all incoming threats and prevent any damage on the ground.",
-        "Mild":     "Blue's higher-end interceptors available to intercepted incoming threats but could not destroy all of them. Most weapons fell in unoccupied parts of the base. Air operations were halted for a few hours while damage was assessed and ground crews made minor repairs.",
-        "Moderate": "With limited availability of interceptors, many of the incoming threats leaked through, causing significant damage to runways and destroying a Patriot radar. Air operations will be halted for at least 24hrs while ground crews perform repairs. Given the ongoing conflict, a replacement radar is not immediately available, so the base is vulnerable to follow on attacks.",
-        "Severe":   "With almost no air defense systems available to stop incoming threats, Isa AB sustained major damage. Widespread craters across Isa's runway have fully halted any air operations indefinitely, while a large salvo {ballistic missile, Shahed-136s} targeted known air defense emplacements destroyed both a Patriot radar and its associated launchers. Bahrani officials report damage to several F-16s stationed at the base."
+        "None":     "Red's attack failed to do any damage. Using high-end interceptors, Blue was able to destroy {all, almost all} incoming threats and prevent any damage on the ground.",
+        "Mild":     "Red's attack dealt minimal damage to the air base. Blue's higher-end interceptors intercepted incoming threats but could not destroy all of them. Most weapons fell in unoccupied parts of the base. Air operations were halted for a few hours while damage was assessed and ground crews made minor repairs.",
+        "Moderate": "Red's attack caused short-term disruption to the air base. With limited availability of interceptors, many of the incoming threats leaked through, causing significant damage to runways and destroying a Patriot radar. Air operations will be halted for at least 24hrs while ground crews perform repairs. Given the ongoing conflict, a replacement radar is not immediately available, so the base is vulnerable to follow on attacks.",
+        "Severe":   "Red's attack dealt severe damage to Isa's air defenses and flight operations. With almost no interceptors available to stop incoming threats, Isa AB sustained major damage. Widespread craters across Isa's runway have fully halted any air operations indefinitely, while a large salvo of {ballistic missiles, Shahed-136s} targeting known air defense emplacements destroyed both a Patriot radar and its associated launchers. Bahrani officials report damage to several F-16s stationed at the base."
       }
     },
 
@@ -68,10 +68,10 @@
         { "platformId": "geran_2",      "quantity": 250 }
       ],
       "narratives": {
-        "None":     "Despite the size of the incoming salvo, you were able to destroy {all, almost all} incoming threats and prevent any damage on the ground, though at the cost of many of your higher-end interceptors.",
-        "Mild":     "Blue had interceptors available to tackle incoming threats but could not destroy all of them. The primary control tower suffered minor damage and air operations were temporarily halted while damage was assessed and repaired. Support personnel exposed during the attack suffered minor injuries but no casualties have been reported.",
-        "Moderate": "While Blue was able to destroy a portion of the incoming missiles using its high-end interceptors, a significant fraction leaked. These threats were centered on both air operations support infrastructure and personnel housing, causing significant damage to operating surfaces, destruction of a repair depot, and several casualties. Air operations will be halted for at least 24 hours while damage is assessed and repaired.",
-        "Severe":   "With almost no air defense systems available to stop incoming threats, Al Udeid sustained major damage. Widespread craters across runways have fully halted any air operations for at least 48hrs, while the main control tower has been indefinitely closed amid major structural damage. Devastation of a building housing primarily support personnel has caused several deaths and debilitating injuries, placing strain on available staff to support further air operations."
+        "None":     "Red's attack failed to do any damage. Despite the size of the incoming salvo, Blue was able to destroy {all, almost all} incoming threats and prevent any damage on the ground, though at the cost of many higher-end interceptors.",
+        "Mild":     "Red's attack dealt minimal damage to the air base. Blue had interceptors available to tackle incoming threats but could not destroy all of them. The primary control tower suffered minor damage and air operations were temporarily halted while damage was assessed and repaired. Support personnel exposed during the attack suffered minor injuries, but no casualties have been reported.",
+        "Moderate": "Red's attack dealt significant damage to the air base. While Blue was able to destroy a portion of the incoming missiles using its high-end interceptors, a significant fraction leaked. These threats were centered on both air operations support infrastructure and personnel housing, causing significant damage to operating surfaces, destruction of a repair depot, and several casualties. Air operations will be halted for at least 24 hours while damage is assessed and repaired.",
+        "Severe":   "Red's attack dealt a severe blow to Al Udeid. With almost no air defense systems available to stop incoming threats, the air base sustained major damage. Widespread craters across runways have fully halted any air operations for at least 48hrs, while the main control tower has been indefinitely closed amid major structural damage. Devastation of a building housing primarily support personnel has caused several deaths and debilitating injuries, placing strain on available staff to support further air operations."
       }
     }
 

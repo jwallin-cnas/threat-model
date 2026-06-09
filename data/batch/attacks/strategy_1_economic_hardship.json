@@ -10,10 +10,10 @@
         { "platformId": "qaem_1",       "quantity": 50  }
       ],
       "narratives": {
-        "None":     "Many of the drones and missiles launched by Iran were intercepted??, malfunctioned and failed to reach Dubai, the ones that did impact missed hitting anything important.",
-        "Mild":     "Damage to civilian infrastructure and economic activity was limited during the combined drone and missile attack. Dubai's data centers were not hit during the attack. However, there is some limited damage to building throughout the city and falling debris caused around a dozen injuries.",
+        "None":     "The attack on Dubai's data centers and infrastructure did not cause any damage due to the drones and ballistic missiles [being intercepted, malfunctioning, or missing their targets].",
+        "Mild":     "Damage to civilian infrastructure and economic activity was limited during the combined drone and missile attack. Dubai's data centers were not hit during the attack. However, there is some limited damage to buildings throughout the city and falling debris caused around a dozen injuries.",
         "Moderate": "Damage to economic activity and civilian infrastructure was moderate following the combined drone and missile attack. One of the government-backed Moro Hub datacenters was hit in the attack and several buildings in Business Bay were also struck, igniting fires and disrupting economic activity in the city's main commercial district.",
-        "Severe":   "The combined drone and missile attack on Dubai's datacenters was incredibly successful and there is also widespread damage to the city's electric grid. One Moro Hub government-backed datacenter suffered significant damage to its solar park along with moderate damage to two Khazna datacenters currently under construction. Several portions of the city are without power and government officials estimate it could take days to restore power to the entire city."
+        "Severe":   "The combined drone and missile attack on Dubai's datacenters caused significant damage and there is also widespread damage to the city's electric grid. One Moro Hub government-backed datacenter suffered significant damage to its solar park along with moderate damage to two Khazna datacenters currently under construction. Several portions of the city are without power and government officials estimate it could take days to restore power to the entire city."
       }
     },
 
@@ -24,10 +24,10 @@
         { "platformId": "qaem_1",       "quantity": 100 }
       ],
       "narratives": {
-        "None":     "Riyadh international airport was not damaged in the attack despite the high number of short-range ballistic missiles launched in combination with the Shahed-136 salvo.",
-        "Mild":     "The attack on Riyadh airport was relatively unsuccessful despite the size of the combined drone and short-range ballistic missile salvo. Several explosions occurred near the passenger terminals, however no terminals were directly impacted and repair crews were able to quickly clear the debris from the gate areas and the airport remains fully operational.",
+        "None":     "Riyadh international airport was not damaged in the attack despite the high number of short-range ballistic missiles launched in combination with the Shahed-136 salvo. The incoming drones and missiles [were intercepted, malfunctioned, or failed to hit their targets accurately].",
+        "Mild":     "The attack on Riyadh airport caused limited damage despite the size of the combined drone and short-range ballistic missile salvo. Several explosions occurred near the passenger terminals, however no terminals were directly impacted and repair crews were able to quickly clear the debris from the gate areas and the airport remains fully operational.",
         "Moderate": "The combined drone and short-range ballistic missile attack on Riyadh airport caused moderate damage. One of the airport's terminals was hit by multiple weapons, but damage assessments are ongoing. Airport officials have temporarily closed that terminal to passenger traffic and rerouted all flights to the remaining four terminals.",
-        "Severe":   "The combined drone and short-range ballistic missile attack on Riyadh airport was highly successful, damaging buildings and critical infrastructure at the airport. At least two of the airport's main passenger terminals and portions of its cargo handling operations are closed at this time. The airport's remaining three terminals remain intact but power and water service to those areas is intermittent at this time. Passenger operations are indefinitely suspended, but cargo operations have resumed."
+        "Severe":   "The combined drone and short-range ballistic missile attack on Riyadh airport caused widespread damage to buildings and critical infrastructure at the airport. At least two of the airport's main passenger terminals and portions of its cargo handling operations are closed at this time. The airport's remaining three terminals remain intact but power and water service to those areas is intermittent at this time. Passenger operations are indefinitely suspended, but cargo operations have resumed."
       }
     },
 
@@ -39,8 +39,8 @@
         { "platformId": "paveh_quds",   "quantity": 50  }
       ],
       "narratives": {
-        "None":     "Saudi Aramco's oil facility outside Riyadh was unaffected despite the relatively large mixed salvo of medium-range ballistic missiles, drones, and cruise missiles.",
-        "Mild":     "The attack on the Saudi Aramco refinery outside Riyadh was largely unsuccessful. Several weapons hit the refinery but the damage was contained and operations were quickly routed around the affected areas of the sprawling facility.",
+        "None":     "Saudi Aramco's oil facility outside Riyadh was unaffected despite the relatively large mixed salvo of medium-range ballistic missiles, drones, and cruise missiles which were [intercepted, malfunctioned, or failed to accurately reach their targets].",
+        "Mild":     "The attack on the Saudi Aramco refinery outside Riyadh caused only limited damage. Several weapons hit the refinery but the damage was contained and operations were quickly routed around the affected areas of the sprawling facility.",
         "Moderate": "The mixed-salvo attack made up of medium-range ballistic missiles, drones, and cruise missiles on the Saudi Aramco refinery outside Riyadh caused moderate damage. The facility received damage at several key incoming and outgoing pipeline nodes, but others survived unscathed. Managers estimate that the refinery will be operating at 50% capacity for one week before full operations resume.",
         "Severe":   "The mixed-salvo attack made up of medium-range ballistic missiles, drones, and cruise missiles on the Saudi Aramco refinery outside Riyadh was catastrophic. The facility took heavy damage at several key incoming and out coming pipeline nodes, its one fluid catalytic cracking unit and vacuum distillation column were also destroyed, halting all operations. There is no estimate for how long repairs will take to bring it back online."
       }
@@ -53,7 +53,7 @@
         { "platformId": "samad_3",      "quantity": 50  }
       ],
       "narratives": {
-        "None":     "The Houthi attack on Fujairah port was unsuccessful. A combination of defensive interceptions and the reliability of the Houthi missiles and drones resulted in no damage.",
+        "None":     "The Houthi attack on Fujairah port did not cause any damage. A combination of defensive interceptions and the reliability of the Houthi missiles and drones resulted in no damage.",
         "Mild":     "The Houthi attack inflicted light damage on the port's facilities, incidentally damaging several pipelines, temporarily halting refueling operations. Local ground crews handled the repairs. There was no lasting impact on port operations.",
         "Moderate": "The Houthi attack on Fujairah caused moderate damage to storage tanks and pipelines. Offshore filling operations have been shut down for at least 72 hours while damage is assessed, and ground crews undertake repairs.",
         "Severe":   "Most of the Houthi weapons hit the port, causing widespread damage to oil storage tanks and pipelines. There is major and lasting disruption to port operations with repairs likely to at a minimum take weeks."
@@ -63,14 +63,14 @@
     {
       "targetId": "jebel_ali_port",
       "platforms": [
-        { "platformId": "paveh_quds",      "quantity": 50  },
-        { "platformId": "fateh_110",  "quantity": 50  },
-        { "platformId": "shahed_238",     "quantity": 100 }
+        { "platformId": "paveh_quds",   "quantity": 50  },
+        { "platformId": "fateh_110",    "quantity": 50  },
+        { "platformId": "shahed_238",   "quantity": 100 }
       ],
       "narratives": {
         "None":     "The air and missile defenses in the region were able to stave off any damage from the mixed salvo of missiles and drones.",
         "Mild":     "Iran's attack on Jebel Ali port had few effects on operations. Several of the weapons caused light damage to a dock and transfer facility but port leaders do not estimate that there will be an effect on shipping capacity at the port as they shift operations away from the damaged areas.",
-        "Moderate": "The attack on Jebel Ali's port infrastructure was moderately successful. Several of the weapons struck the port's docks and transfer facilities, but the damage was not severe, and the facilities are repairable. Port authorities have suspended operations for 48 hours while they conduct emergency repairs.",
+        "Moderate": "The attack on Jebel Ali's port infrastructure caused moderate damage. Several of the weapons struck the port's docks and transfer facilities, but the damage was not severe, and the facilities are repairable. Port authorities have suspended operations for 48 hours while they conduct emergency repairs.",
         "Severe":   "The attack on Jebel Ali's port infrastructure was devastating. Dozens of quay cranes at two of the terminals were destroyed, while petroleum and petrochemical storage facilities were struck, causing widespread fires. Operations will be halted indefinitely as the damage is assessed."
       }
     }

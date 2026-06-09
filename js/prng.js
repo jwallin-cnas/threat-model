@@ -9,7 +9,8 @@
  * batch runner at the start of each batch to ensure consistent output.
  */
 
-const FIXED_SEED = 0xDEAD1234;
+const FIXED_SEED = 0;
+window.FIXED_SEED = FIXED_SEED;
 
 (function (seed) {
   let s = seed >>> 0;
