@@ -306,13 +306,14 @@ const ENGAGEMENT_FUNCTIONS = {
   },
 
   // ── Containerized Laser (containerized_laser) ─────────────────────────────
-  containerized_laser: function(threatType) {
+  containerized_laser: function(threatType, quantity, magazineRemaining, salvoSize) {
     if (!['drone', 'drone_jet', 'fpv'].includes(threatType)) return null;
     const pks    = { low: 0.2, medium: 0.3, high: 0.4 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
+    const pk = min(pks[pkTier] * salvoSize, 10)
     return {
-      pk:                     pks[pkTier],
+      pk:                     pk,
       pkTier,
       pkIsFixed:              false,
       shotsPerEngagement:     0,
