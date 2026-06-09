@@ -444,6 +444,7 @@ async function main() {
   let pdfCount    = 0;
   const combinations  = [];  // track successful combos in order for combined PDF
   const spreadsheetRows = []; // track simulation results for spreadsheet
+  const simData = {};         // { "laydownName__attackName": [simResult, ...] }
 
   for (const laydownFile of laydownFiles) {
     const laydownName        = laydownFile.replace(/\.json$/i, '');
@@ -555,6 +556,8 @@ async function main() {
         attackDisplayName,
         attacks: simResults,
       });
+
+      simData[`${laydownName}__${attackName}`] = simResults;
     }
 
     console.log('');
@@ -594,6 +597,11 @@ async function main() {
   if (spreadsheetRows.length > 0) {
     buildSpreadsheet(spreadsheetRows, outDir);
   }
+
+  // ── Save simulation data (interceptors, manifests) ────────────────────────
+  const simDataPath = path.join(outDir, 'sim_data.json');
+  fs.writeFileSync(simDataPath, JSON.stringify(simData, null, 2));
+  console.log(`[batch] Sim data    → ${simDataPath}`);
 
   console.log(`[batch] Done — ${pdfCount} / ${total} PDF(s) written to:\n        ${outDir}`);
 }

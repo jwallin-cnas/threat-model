@@ -3236,22 +3236,43 @@ function _resetSimulationHistory() {
  * Returns one entry per attack (skips the initial-state and reload entries).
  */
 function _getSimulationResults() {
+  const TRACKED_SYSTEMS = ['thaad', 'patriot', 'aegis_sm2', 'aegis_sm3', 'aegis_sm6'];
+
   return simHistory
     .filter(s => !s.isInitial && s.type !== 'reload' && s.results)
-    .map(s => ({
-      targetId:    s.targetId,
-      targetName:  s.targetName,
-      manifest:    s.attackManifest.map(p => ({
-        platformId:   p.platformId,
-        platformName: PLATFORM_CATALOG[p.platformId]?.name || p.platformId,
-        count:        p.count,
-      })),
-      byThreatType: s.results.byThreatType.map(g => ({
-        threatType:   g.threatType,
-        initialCount: g.initialCount,
-        finalCount:   g.finalCount,
-      })),
-    }));
+    .map(s => {
+      // Build defId → operator map from the snapshot's allDefenses
+      const operatorMap = {};
+      for (const d of (s.allDefenses || [])) operatorMap[d.id] = d.operator || '';
+
+      // Tally interceptors expended per system, split US vs. allied
+      const interceptors = { us: {}, allied: {} };
+      for (const g of s.results.byThreatType) {
+        for (const eng of g.engagements) {
+          if (!TRACKED_SYSTEMS.includes(eng.systemId)) continue;
+          const used = eng.interceptorsUsed || 0;
+          if (used <= 0) continue;
+          const bucket = operatorMap[eng.defId] === 'United States' ? 'us' : 'allied';
+          interceptors[bucket][eng.systemId] = (interceptors[bucket][eng.systemId] || 0) + used;
+        }
+      }
+
+      return {
+        targetId:    s.targetId,
+        targetName:  s.targetName,
+        manifest:    s.attackManifest.map(p => ({
+          platformId:   p.platformId,
+          platformName: PLATFORM_CATALOG[p.platformId]?.name || p.platformId,
+          count:        p.count,
+        })),
+        byThreatType: s.results.byThreatType.map(g => ({
+          threatType:   g.threatType,
+          initialCount: g.initialCount,
+          finalCount:   g.finalCount,
+        })),
+        interceptors,
+      };
+    });
 }
 
 /**

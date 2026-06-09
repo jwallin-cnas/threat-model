@@ -379,6 +379,16 @@
         "reloads": 1
       }
     ],
+    "muwaffaq_al_salti_ab": [
+      {
+        "id": "muwaffaq_al_salti_ab_d1",
+        "system": "patriot",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
+        "reloads": 1
+      }
+    ],
     "ramat_david_ab": [
       {
         "id": "ramat_david_ab_d1",
