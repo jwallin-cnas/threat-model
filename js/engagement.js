@@ -311,7 +311,7 @@ const ENGAGEMENT_FUNCTIONS = {
     const pks    = { low: 0.2, medium: 0.3, high: 0.4 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
-    const pk = min(pks[pkTier] * salvoSize, 10)
+    const pk = Math.min(pks[pkTier] * salvoSize, 10)
     return {
       pk:                     pk,
       pkTier,
