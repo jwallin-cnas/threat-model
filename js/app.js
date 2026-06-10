@@ -3268,8 +3268,9 @@ function _getSimulationResults() {
               exhaustedSeen.add(dedupeKey);
               magazineExhausted.push({
                 systemName: eng.systemName || eng.systemId,
-                location:   loc || '',
-                threatsIn:  eng.threatsIn ?? null,
+                notes:      eng.notes      || '',
+                location:   loc            || '',
+                threatsIn:  eng.threatsIn  ?? null,
               });
             }
           }

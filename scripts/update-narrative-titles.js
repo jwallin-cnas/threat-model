@@ -469,7 +469,10 @@ function buildNarrativeHtml(laydownFormatted, attackFormatted, items) {
     ${intTable(item.interceptors)}
     ${item.magazineExhausted && item.magazineExhausted.length
       ? `<p class="mag-exhausted"><span class="mag-label">Magazine Exhausted:</span> ${
-          item.magazineExhausted.map(e => esc(e.location ? `${e.systemName} (${e.location})` : e.systemName)).join(', ')
+          item.magazineExhausted.map(e => {
+              const label = e.notes ? `${e.systemName} ${e.notes}` : e.systemName;
+              return esc(e.location ? `${label} (${e.location})` : label);
+            }).join(', ')
         }</p>`
       : ''}
   </div>`).join('');
