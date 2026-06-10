@@ -467,6 +467,11 @@ function buildNarrativeHtml(laydownFormatted, attackFormatted, items) {
     <div class="comp-line">${esc(item.attackComposition)} &rarr; ${esc(item.penetrators)}</div>
     <p class="narrative">${esc(item.text)}</p>
     ${intTable(item.interceptors)}
+    ${item.magazineExhausted && item.magazineExhausted.length
+      ? `<p class="mag-exhausted"><span class="mag-label">Magazine Exhausted:</span> ${
+          item.magazineExhausted.map(e => esc(e.location ? `${e.systemName} (${e.location})` : e.systemName)).join(', ')
+        }</p>`
+      : ''}
   </div>`).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -510,6 +515,10 @@ function buildNarrativeHtml(laydownFormatted, attackFormatted, items) {
     font-family: 'Courier New', monospace;
   }
   p.narrative { margin: 0 0 5px; line-height: 1.5; }
+
+  .mag-exhausted { margin: 4px 0 0; font-size: 8pt; line-height: 1.5;
+                   font-family: 'Helvetica Neue', sans-serif; color: #444; }
+  .mag-label     { font-weight: bold; color: #222; }
 
   /* Interceptor table */
   .int-wrap  { margin-top: 5px; }
@@ -706,9 +715,10 @@ async function main() {
         attackComposition = cellValue;
       }
 
-      // Interceptors from sim data
-      const simEntry   = simByTarget[entry.targetId] || {};
-      const interceptors = simEntry.interceptors || { us: {}, allied: {} };
+      // Interceptors + magazine-exhausted from sim data
+      const simEntry        = simByTarget[entry.targetId] || {};
+      const interceptors    = simEntry.interceptors    || { us: {}, allied: {} };
+      const magazineExhausted = simEntry.magazineExhausted || [];
 
       // Coordinates
       const coords = targetCoords[entry.targetId] || {};
@@ -720,6 +730,7 @@ async function main() {
         attackComposition,
         penetrators,
         interceptors,
+        magazineExhausted,
         lat: coords.lat ?? null,
         lon: coords.lon ?? null,
       });

@@ -3247,13 +3247,32 @@ function _getSimulationResults() {
 
       // Tally interceptors expended per system, split US vs. allied
       const interceptors = { us: {}, allied: {} };
+      // Collect magazine-exhausted engagements (could have engaged but out of rounds)
+      const magazineExhausted = [];
+      const exhaustedSeen = new Set();
       for (const g of s.results.byThreatType) {
         for (const eng of g.engagements) {
-          if (!TRACKED_SYSTEMS.includes(eng.systemId)) continue;
-          const used = eng.interceptorsUsed || 0;
-          if (used <= 0) continue;
-          const bucket = operatorMap[eng.defId] === 'United States' ? 'us' : 'allied';
-          interceptors[bucket][eng.systemId] = (interceptors[bucket][eng.systemId] || 0) + used;
+          // Interceptor tally (tracked systems only)
+          if (TRACKED_SYSTEMS.includes(eng.systemId)) {
+            const used = eng.interceptorsUsed || 0;
+            if (used > 0) {
+              const bucket = operatorMap[eng.defId] === 'United States' ? 'us' : 'allied';
+              interceptors[bucket][eng.systemId] = (interceptors[bucket][eng.systemId] || 0) + used;
+            }
+          }
+          // Magazine-exhausted: system could engage this threat type but had no rounds left
+          if (eng.note === 'Magazine exhausted') {
+            const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ');
+            const dedupeKey = `${eng.systemId}::${eng.defId}`;
+            if (!exhaustedSeen.has(dedupeKey)) {
+              exhaustedSeen.add(dedupeKey);
+              magazineExhausted.push({
+                systemName: eng.systemName || eng.systemId,
+                location:   loc || '',
+                threatsIn:  eng.threatsIn ?? null,
+              });
+            }
+          }
         }
       }
 
@@ -3271,6 +3290,7 @@ function _getSimulationResults() {
           finalCount:   g.finalCount,
         })),
         interceptors,
+        magazineExhausted,
       };
     });
 }
