@@ -14,7 +14,8 @@
  * an accidental reload doesn't lose work. Nothing here touches app.js state.
  */
 
-const BLUE_STORAGE_KEY = 'threatmodel_blue_builder_v1';
+const BLUE_STORAGE_KEY   = 'threatmodel_blue_builder_v1';
+const BLUE_DEFAULT_NAME  = 'Blue Laydown';   // used when the name field is left blank
 const RELOAD_OPTIONS   = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 let laydown     = {};   // { [targetId]: [ { system, quantity, notes, operator, reloads } ] }
@@ -509,12 +510,7 @@ function buildLaydownExport(name) {
 
 function exportLaydown() {
   const input = document.getElementById('laydown-name');
-  const name  = (input.value || '').trim();
-  if (!name) {
-    showToast('Enter a laydown name before exporting.', true);
-    input.focus();
-    return;
-  }
+  const name  = (input.value || '').trim() || BLUE_DEFAULT_NAME;
   if (totalEntries() === 0) {
     showToast('Add at least one defense system before exporting.', true);
     return;

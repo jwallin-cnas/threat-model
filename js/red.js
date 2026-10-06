@@ -10,7 +10,8 @@
  * an accidental reload doesn't lose work. Nothing here touches app.js state.
  */
 
-const RED_STORAGE_KEY = 'threatmodel_red_builder_v1';
+const RED_STORAGE_KEY   = 'threatmodel_red_builder_v1';
+const RED_DEFAULT_NAME  = 'Red Attacks';   // used when the name field is left blank
 const ATTACK_SLOTS    = 5;
 
 // Same ordering the main tool uses for its manifest rows
@@ -375,12 +376,7 @@ function buildAttacksExport(name) {
 
 function exportAttacks() {
   const input = document.getElementById('attacks-name');
-  const name  = (input.value || '').trim();
-  if (!name) {
-    showToast('Enter an attack set name before exporting.', true);
-    input.focus();
-    return;
-  }
+  const name  = (input.value || '').trim() || RED_DEFAULT_NAME;
   const complete = completeAttacks().length;
   if (complete === 0) {
     showToast('Each attack needs a target and at least one platform before exporting.', true);
