@@ -193,7 +193,7 @@ function magazineInfoText(systemId, qty) {
   const q         = Math.max(1, qty || 1);
   const total     = perBattery * batteries * q;
   if (batteries === 1) {
-    return `${perBattery} interceptors/battery × ${q} batter${q !== 1 ? 'ies' : 'y'} = ${total} total interceptors`;
+    return `${perBattery} interceptors/system × ${q} system${q !== 1 ? 's' : ''} = ${total} total interceptors`;
   }
   return `${perBattery} interceptors/battery × ${batteries} batteries/system × ${q} system${q !== 1 ? 's' : ''} = ${total} total interceptors`;
 }

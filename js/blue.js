@@ -142,7 +142,7 @@ function fillCard(card, target) {
       </div>
 
       <div class="form-group">
-        <label>Quantity (batteries / systems)</label>
+        <label>Quantity (systems)</label>
         <input type="number" class="tc-qty" min="1" value="1">
       </div>
 
@@ -252,7 +252,7 @@ function buildRow(targetId, entry, index) {
   row.className = 'tc-defense-row';
   row.style.setProperty('--tier-color', TIER_COLORS[catalog?.tier] || '#888');
 
-  const qtyLabel = catalog?.isShared ? 'patrol asset' : `× ${entry.quantity}`;
+  const qtyLabel = catalog?.isShared ? 'patrol asset' : `${entry.quantity} system${entry.quantity !== 1 ? 's' : ''}`;
   const reloads  = entry.reloads;
   row.innerHTML = `
     <div class="tc-defense-main">
