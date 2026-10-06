@@ -15,6 +15,15 @@ const SESSION_KEY      = 'threatmodel_session_v2';
 const HISTORY_KEY      = 'threatmodel_history_v2';
 const SEED_KEY         = 'threatmodel_seed_v2';
 
+// ── Basemap ──────────────────────────────────────────────────────────────────
+// CARTO stopped serving its raster basemaps without an API key (Sept 2026).
+// Request a free key at https://carto.com/basemaps/apikey/ (no account needed;
+// 5M tiles/month non-commercial) and paste it here. Restrict the key to
+// jwallin-cnas.github.io (plus localhost / 127.0.0.1 for local testing).
+// While the key is empty, the minimap falls back to Esri's World Dark Gray
+// basemap, which needs no key.
+const CARTO_API_KEY = '';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
 // ─────────────────────────────────────────────────────────────────────────────
@@ -471,6 +480,30 @@ const COUNTRY_ZOOM = {
   'United Arab Emirates':  7
 };
 
+/**
+ * Dark basemap tile layer for the minimap.
+ * With a CARTO key: CARTO dark_all raster tiles (retina via {r}).
+ * Without one:      Esri World Dark Gray Base (no key required, max zoom 16).
+ */
+function _buildBasemapLayer(cartoKey) {
+  if (cartoKey) {
+    return L.tileLayer(
+      `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
+      {
+        maxZoom:     19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      }
+    );
+  }
+  return L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    {
+      maxZoom:     16,
+      attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
+    }
+  );
+}
+
 function updateMinimap(target) {
   const container = document.getElementById('target-minimap');
 
@@ -499,7 +532,7 @@ function updateMinimap(target) {
     // First initialisation — create the map instance
     _minimap = L.map('target-minimap', {
       zoomControl:       false,
-      attributionControl: false,
+      attributionControl: true,    // CARTO and Esri both require visible credit
       dragging:          false,
       scrollWheelZoom:   false,
       doubleClickZoom:   false,
@@ -508,10 +541,9 @@ function updateMinimap(target) {
       keyboard:          false,
       tap:               false
     }).setView([lat, lon], zoom);
+    _minimap.attributionControl.setPrefix(false);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19
-    }).addTo(_minimap);
+    _buildBasemapLayer(CARTO_API_KEY).addTo(_minimap);
 
     _minimapMarker = L.circleMarker([lat, lon], {
       radius:      7,

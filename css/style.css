@@ -403,6 +403,16 @@ select option, select optgroup {
 
 /* ── Mini-map ────────────────────────────────────────────────────────────── */
 
+/* Compact attribution inside the 200px minimap (required by the tile providers) */
+.target-minimap .leaflet-control-attribution {
+  font-size: 9px;
+  line-height: 1.2;
+  padding: 1px 4px;
+  background: rgba(13, 17, 23, 0.75);
+  color: var(--text-dim);
+}
+.target-minimap .leaflet-control-attribution a { color: var(--text-dim); }
+
 .target-minimap {
   height: 200px;
   border-radius: var(--radius);
