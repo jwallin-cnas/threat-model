@@ -15,6 +15,17 @@ const SESSION_KEY      = 'threatmodel_session_v2';
 const HISTORY_KEY      = 'threatmodel_history_v2';
 const SEED_KEY         = 'threatmodel_seed_v2';
 
+// ── Basemap ──────────────────────────────────────────────────────────────────
+// CARTO stopped serving its raster basemaps without an API key (Sept 2026).
+// Request a free key at https://carto.com/basemaps/apikey/ (no account needed;
+// 5M tiles/month non-commercial) and paste it here. Restrict the key to
+// jwallin-cnas.github.io (plus localhost / 127.0.0.1 for local testing).
+// The minimap falls back to Esri's World Dark Gray basemap (no key needed)
+// when the key is empty, or automatically when CARTO rejects the key for the
+// current origin — e.g. when running from localhost, which the key's website
+// restriction does not cover.
+const CARTO_API_KEY = 'cb1_4bua_1_4f879cb3d8b58a26049a60a9';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
 // ─────────────────────────────────────────────────────────────────────────────
@@ -471,6 +482,47 @@ const COUNTRY_ZOOM = {
   'United Arab Emirates':  7
 };
 
+/**
+ * Dark basemap tile layer for the minimap.
+ * With a CARTO key: CARTO dark_all raster tiles (retina via {r}).
+ * Without one:      Esri World Dark Gray Base (no key required, max zoom 16).
+ */
+function _buildBasemapLayer(cartoKey) {
+  if (cartoKey) {
+    return L.tileLayer(
+      `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
+      {
+        maxZoom:     19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      }
+    );
+  }
+  return L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    {
+      maxZoom:     16,
+      attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
+    }
+  );
+}
+
+/**
+ * Add the basemap to the minimap. Starts with CARTO when a key is set; if
+ * the first tile errors (403 — key not authorized for this origin) swaps to
+ * the key-free Esri layer so the map still renders.
+ */
+function _addBasemap(map) {
+  const layer = _buildBasemapLayer(CARTO_API_KEY);
+  if (CARTO_API_KEY) {
+    layer.once('tileerror', () => {
+      console.warn(`[minimap] CARTO tiles unavailable from ${location.hostname} (API key not authorized for this origin) — falling back to Esri World Dark Gray.`);
+      map.removeLayer(layer);
+      _buildBasemapLayer('').addTo(map);
+    });
+  }
+  layer.addTo(map);
+}
+
 function updateMinimap(target) {
   const container = document.getElementById('target-minimap');
 
@@ -499,7 +551,7 @@ function updateMinimap(target) {
     // First initialisation — create the map instance
     _minimap = L.map('target-minimap', {
       zoomControl:       false,
-      attributionControl: false,
+      attributionControl: true,    // CARTO and Esri both require visible credit
       dragging:          false,
       scrollWheelZoom:   false,
       doubleClickZoom:   false,
@@ -508,10 +560,9 @@ function updateMinimap(target) {
       keyboard:          false,
       tap:               false
     }).setView([lat, lon], zoom);
+    _minimap.attributionControl.setPrefix(false);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19
-    }).addTo(_minimap);
+    _addBasemap(_minimap);
 
     _minimapMarker = L.circleMarker([lat, lon], {
       radius:      7,
