@@ -20,9 +20,11 @@ const SEED_KEY         = 'threatmodel_seed_v2';
 // Request a free key at https://carto.com/basemaps/apikey/ (no account needed;
 // 5M tiles/month non-commercial) and paste it here. Restrict the key to
 // jwallin-cnas.github.io (plus localhost / 127.0.0.1 for local testing).
-// While the key is empty, the minimap falls back to Esri's World Dark Gray
-// basemap, which needs no key.
-const CARTO_API_KEY = '';
+// The minimap falls back to Esri's World Dark Gray basemap (no key needed)
+// when the key is empty, or automatically when CARTO rejects the key for the
+// current origin — e.g. when running from localhost, which the key's website
+// restriction does not cover.
+const CARTO_API_KEY = 'cb1_4bua_1_4f879cb3d8b58a26049a60a9';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application state
@@ -504,6 +506,23 @@ function _buildBasemapLayer(cartoKey) {
   );
 }
 
+/**
+ * Add the basemap to the minimap. Starts with CARTO when a key is set; if
+ * the first tile errors (403 — key not authorized for this origin) swaps to
+ * the key-free Esri layer so the map still renders.
+ */
+function _addBasemap(map) {
+  const layer = _buildBasemapLayer(CARTO_API_KEY);
+  if (CARTO_API_KEY) {
+    layer.once('tileerror', () => {
+      console.warn(`[minimap] CARTO tiles unavailable from ${location.hostname} (API key not authorized for this origin) — falling back to Esri World Dark Gray.`);
+      map.removeLayer(layer);
+      _buildBasemapLayer('').addTo(map);
+    });
+  }
+  layer.addTo(map);
+}
+
 function updateMinimap(target) {
   const container = document.getElementById('target-minimap');
 
@@ -543,7 +562,7 @@ function updateMinimap(target) {
     }).setView([lat, lon], zoom);
     _minimap.attributionControl.setPrefix(false);
 
-    _buildBasemapLayer(CARTO_API_KEY).addTo(_minimap);
+    _addBasemap(_minimap);
 
     _minimapMarker = L.circleMarker([lat, lon], {
       radius:      7,
