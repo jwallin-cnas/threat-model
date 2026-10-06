@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Resolve every relative URL against the repo root so css/, js/ and data/
+       paths are identical to index.html whether served from GitHub Pages
+       (/threat-model/red/) or a local static server. -->
+  <base href="../">
+  <title>Attack Builder — Red Team</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <div class="header-title">
+        <h1>Attack Builder</h1>
+        <p class="header-sub">Red Team — Build &amp; Export up to Five Attacks</p>
+      </div>
+      <div class="header-controls builder-controls">
+        <div class="builder-name-field">
+          <label for="attacks-name">Attack set name</label>
+          <input type="text" id="attacks-name" placeholder="e.g., Economic Hardship" autocomplete="off">
+        </div>
+        <button id="btn-import-attacks" class="btn btn-secondary">Import Attacks…</button>
+        <button id="btn-clear-all"      class="btn btn-danger">Clear All</button>
+        <button id="btn-export-attacks" class="btn btn-success">⬇ Export Attacks</button>
+        <a href="./" class="btn btn-secondary btn-link-nav" title="Back to the Strike Assessment Tool">← Tool</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Five attack columns — populated by red.js -->
+  <main class="builder-main">
+    <div class="attack-grid" id="attack-grid">
+      <p class="empty-state">Loading platforms…</p>
+    </div>
+  </main>
+
+  <div class="storage-notice">
+    ⚠ This draft is saved in browser <code>localStorage</code> under its own key and
+    <strong>does not change</strong> the Strike Assessment Tool's queue, magazines, or history.
+    Use <strong>Export Attacks</strong> to download a JSON file for <em>Import Attacks</em> in the tool.
+  </div>
+
+  <!-- Modal overlay — controlled by showModal() / _resolveModal() in ui.js -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal" id="modal-dialog">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title"></span>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <input type="file" id="import-attacks-input" accept=".json" style="display:none">
+
+  <!-- Scripts — load in dependency order -->
+  <script src="js/engine.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/builder-common.js"></script>
+  <script src="js/red.js"></script>
+
+</body>
+</html>

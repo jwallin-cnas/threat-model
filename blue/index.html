@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Resolve every relative URL against the repo root so css/, js/ and data/
+       paths are identical to index.html whether served from GitHub Pages
+       (/threat-model/blue/) or a local static server. -->
+  <base href="../">
+  <title>Laydown Builder — Blue Team</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <div class="header-title">
+        <h1>Laydown Builder</h1>
+        <p class="header-sub">Blue Team — Build &amp; Export a Defensive Laydown</p>
+      </div>
+      <div class="header-controls builder-controls">
+        <div class="builder-name-field">
+          <label for="laydown-name">Laydown name</label>
+          <input type="text" id="laydown-name" placeholder="e.g., Gulf Coast Defense" autocomplete="off">
+        </div>
+        <button id="btn-load-defaults"  class="btn btn-secondary">Load Default Laydown</button>
+        <button id="btn-import-laydown" class="btn btn-secondary">Import Laydown…</button>
+        <button id="btn-clear-all"      class="btn btn-danger">Clear All</button>
+        <button id="btn-export-laydown" class="btn btn-success">⬇ Export Laydown</button>
+        <a href="./" class="btn btn-secondary btn-link-nav" title="Back to the Strike Assessment Tool">← Tool</a>
+      </div>
+    </div>
+    <!-- Country jump pills — populated by blue.js -->
+    <div class="country-pills" id="country-pills"></div>
+  </header>
+
+  <!-- All targets, grouped by country — populated by blue.js -->
+  <main class="builder-main" id="builder-main">
+    <p class="empty-state">Loading targets…</p>
+  </main>
+
+  <div class="storage-notice">
+    ⚠ This draft is saved in browser <code>localStorage</code> under its own key and
+    <strong>does not change</strong> the Strike Assessment Tool's targets, defenses, or history.
+    Use <strong>Export Laydown</strong> to download a JSON file for <em>Import Laydown</em> in the tool.
+  </div>
+
+  <!-- Modal overlay — controlled by showModal() / _resolveModal() in ui.js -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal" id="modal-dialog">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title"></span>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <input type="file" id="import-laydown-input" accept=".json" style="display:none">
+
+  <!-- Scripts — load in dependency order -->
+  <script src="js/engine.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/builder-common.js"></script>
+  <script src="js/blue.js"></script>
+
+</body>
+</html>

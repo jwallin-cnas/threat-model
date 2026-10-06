@@ -1916,3 +1916,273 @@ select option, select optgroup {
     flex-wrap: wrap;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Builder pages — blue/ (Laydown Builder) and red/ (Attack Builder)
+   These pages reuse the header, .btn*, .form-group, .add-defense-form,
+   .manifest-row, .badge, .modal-* and .toast styles above.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.builder-controls {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.builder-name-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.builder-name-field label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.builder-name-field input {
+  width: 240px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-bright);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.builder-name-field input:focus { outline: none; border-color: var(--accent); }
+
+/* Anchor styled as a button (nav between tool and builders) */
+.btn-link-nav {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.builder-main {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ── Country jump pills (second row of the sticky header) ─────────────────── */
+
+.country-pills {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 20px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.country-pill {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.country-pill:hover { color: var(--text); border-color: var(--text-dim); }
+
+.pill-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+}
+
+/* ── Country sections + target cards (blue) ───────────────────────────────── */
+
+.country-section {
+  margin-bottom: 28px;
+  scroll-margin-top: 150px;   /* keep the section title clear of the sticky header */
+}
+
+.country-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.country-header h2 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-bright);
+}
+
+.target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.target-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+
+.target-card.has-defenses { border-color: var(--accent-dim); }
+
+.target-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.target-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.target-card-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.tc-defense-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tc-defense-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--tier-color, #888);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.tc-defense-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tc-defense-name {
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.tc-defense-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.tc-defense-notes {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.tc-add-form { margin-top: 4px; }
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: end;   /* keep both selects level when the Reloads label wraps */
+}
+
+.label-hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+
+/* ── Attack columns (red) ─────────────────────────────────────────────────── */
+
+.attack-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.attack-col {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.attack-col.has-attack { border-color: #602020; }
+
+.attack-col-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.attack-col-head h2 {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--danger);
+}
+
+.red-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.red-add-row .form-group { margin-bottom: 0; }
+.red-add-row .quantity-field { flex: 1; }
+
+@media (max-width: 1400px) {
+  .attack-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .attack-grid { grid-template-columns: 1fr; }
+  .builder-name-field input { width: 160px; }
+}
+
+/* ── Manifest colours for threat types the base rules above don't cover.
+      Used by both the main tool's manifest and the Red builder's columns. ── */
+
+.manifest-row.threat-row-srbm,
+.manifest-row.threat-row-mrbm      { border-left: 3px solid #e07b39; }
+.manifest-row.threat-row-drone_jet,
+.manifest-row.threat-row-fpv       { border-left: 3px solid #4fa8d5; }
+
+.threat-dot-srbm,
+.threat-dot-mrbm      { background-color: #ffa657; }
+.threat-dot-drone_jet,
+.threat-dot-fpv       { background-color: #79c0ff; }
