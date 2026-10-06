@@ -67,6 +67,22 @@
       "salvo_sizes": [2, 10, 50]
     },
     {
+      "id": "geran_4",
+      "name": "Geran-4",
+      "type": "drone_jet",
+      "payload_kg": 50,
+      "range_km": 2500,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
+      "id": "geran_5",
+      "name": "Geran-5",
+      "type": "drone_jet",
+      "payload_kg": 50,
+      "range_km": 2500,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
       "id": "abu_mahdi",
       "name": "Abu Mahdi",
       "type": "cruise_missile",
