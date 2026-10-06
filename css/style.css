@@ -396,7 +396,8 @@ select option, select optgroup {
   font-weight: 600;
   margin: 2px 2px 2px 0;
 }
-.threat-drone             { background: #1a2a3a; color: #79c0ff; border: 1px solid #1f4060; }
+.threat-drone,
+.threat-drone_jet         { background: #1a2a3a; color: #79c0ff; border: 1px solid #1f4060; }
 .threat-cruise_missile    { background: #2a1a2a; color: #d2a8ff; border: 1px solid #4a2060; }
 .threat-ballistic_missile { background: #2a1a1a; color: #ffa657; border: 1px solid #602020; }
 .threat-hypersonic        { background: #2a2a1a; color: #e3b341; border: 1px solid #605020; }
@@ -707,7 +708,8 @@ select option, select optgroup {
   padding: 7px 10px;
 }
 
-.manifest-row.threat-row-drone             { border-left: 3px solid #4fa8d5; }
+.manifest-row.threat-row-drone,
+.manifest-row.threat-row-drone_jet         { border-left: 3px solid #4fa8d5; }
 .manifest-row.threat-row-cruise_missile    { border-left: 3px solid #b28fd4; }
 .manifest-row.threat-row-ballistic_missile { border-left: 3px solid #e07b39; }
 .manifest-row.threat-row-hypersonic        { border-left: 3px solid #d4b84f; }
@@ -722,7 +724,8 @@ select option, select optgroup {
 
 .threat-dot-ballistic_missile { background-color: #ffa657; }
 .threat-dot-cruise_missile    { background-color: #d2a8ff; }
-.threat-dot-drone             { background-color: #79c0ff; }
+.threat-dot-drone,
+.threat-dot-drone_jet         { background-color: #79c0ff; }
 .threat-dot-hypersonic        { background-color: #e3b341; }
 
 .manifest-name-col {

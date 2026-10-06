@@ -1220,6 +1220,7 @@ function populatePlatformSelect() {
     srbm:           { label: 'Short-Range Ballistic Missiles (SRBM)',  items: [] },
     cruise_missile: { label: 'Cruise Missiles',                        items: [] },
     drone:          { label: 'Drones & Loitering Munitions',           items: [] },
+    drone_jet:      { label: 'Jet-Powered Drones',                     items: [] },
     fpv:            { label: 'FPV Drones',                             items: [] },
     hypersonic:     { label: 'Hypersonic Glide Vehicles',              items: [] }
   };

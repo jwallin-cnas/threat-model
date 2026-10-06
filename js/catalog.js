@@ -42,6 +42,7 @@ const TIER_LABELS = {
 const THREAT_TYPE_LABELS = {
   fpv:               'FPV Drone',
   drone:             'Drone / Loitering Munition',
+  drone_jet:         'Jet-Powered Drone',
   cruise_missile:    'Cruise Missile',
   srbm:              'Short-Range Ballistic Missile (SRBM)',
   mrbm:              'Medium-Range Ballistic Missile (MRBM)',
@@ -53,6 +54,7 @@ const THREAT_TYPE_LABELS = {
 const THREAT_TYPE_ICONS = {
   fpv:               '●',
   drone:             '●',
+  drone_jet:         '●',
   cruise_missile:    '●',
   srbm:              '●',
   mrbm:              '●',
