@@ -261,13 +261,14 @@ const ENGAGEMENT_FUNCTIONS = {
   },
 
   // ── Tactical Jammer (tactical_jammer) ─────────────────────────────────────
-  tactical_jammer: function(threatType) {
+  tactical_jammer: function(threatType, quantity, magazineRemaining, salvoSize) {
     if (!['drone', 'fpv'].includes(threatType)) return null;
-    const pks    = { low: 0.3, medium: 0.4, high: 0.5 };
+    const pks    = { low: 0.2, medium: 0.3, high: 0.4 };
     const roll   = Math.random();
     const pkTier = roll >= 0.67 ? 'high' : roll >= 0.33 ? 'medium' : 'low';
+    const ef_pk = Math.min(pks[pkTier] * salvoSize, 5) / salvoSize;
     return {
-      pk:                     pks[pkTier],
+      pk:                     ef_pk,
       pkTier,
       pkIsFixed:              false,
       shotsPerEngagement:     0,
