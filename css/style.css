@@ -2010,45 +2010,54 @@ select option, select optgroup {
 
 .country-header {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 2px solid var(--border);
 }
 
 .country-header h2 {
-  font-size: 13px;
+  font-size: 24px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   color: var(--text-bright);
 }
 
 .target-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, 320px);
+  justify-content: start;
+  align-items: start;
+  gap: 14px;
 }
 
 .target-card {
   background: var(--bg-panel);
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 12px;
+  min-height: 230px;          /* room for one or two defense rows before growing */
   display: flex;
   flex-direction: column;
   gap: 8px;
   transition: border-color 0.15s;
 }
 
-.target-card.has-defenses { border-color: var(--accent-dim); }
+.target-card.has-defenses { border-color: var(--accent); }
+
+.target-card .tc-defense-list { flex: 1; }          /* keeps "+ Add" pinned to the bottom edge */
+.target-card .defense-controls { margin-top: auto; }
 
 .target-card-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .target-card-name {

@@ -28,11 +28,13 @@ function persistBlue() {
   saveBuilderState(BLUE_STORAGE_KEY, { name: laydownName, laydown });
 }
 
+/** Returns true if a saved draft existed (even an empty one). */
 function restoreBlue() {
   const s = loadBuilderState(BLUE_STORAGE_KEY);
-  if (!s) return;
+  if (!s) return false;
   laydownName = typeof s.name === 'string' ? s.name : '';
   laydown     = (s.laydown && typeof s.laydown === 'object' && !Array.isArray(s.laydown)) ? s.laydown : {};
+  return true;
 }
 
 function entriesFor(targetId) { return laydown[targetId] || []; }
@@ -404,19 +406,23 @@ async function confirmDiscardIfNeeded(actionLabel) {
   });
 }
 
-async function loadDefaultLaydown() {
-  if (!await confirmDiscardIfNeeded('Load Default Laydown')) return;
+/** Fetch data/defaults.json into the draft. Returns warnings, or null on failure. */
+async function fetchDefaultsIntoDraft() {
   let data;
   try {
     data = await fetch('data/defaults.json').then(r => r.json());
   } catch (err) {
     showToast('Could not load data/defaults.json: ' + err.message, true);
-    return;
+    return null;
   }
-  let warnings;
-  try { warnings = applyLaydownData(data); }
-  catch (err) { showToast('Load failed — ' + err.message, true); return; }
+  try { return applyLaydownData(data); }
+  catch (err) { showToast('Load failed — ' + err.message, true); return null; }
+}
 
+async function loadDefaultLaydown() {
+  if (!await confirmDiscardIfNeeded('Load Default Laydown')) return;
+  const warnings = await fetchDefaultsIntoDraft();
+  if (warnings === null) return;
   persistBlue();
   renderAll();
   finishImportToast('Default laydown loaded', warnings, '[blue] loadDefaultLaydown');
@@ -552,10 +558,21 @@ function wireBlueEvents() {
 
 async function initBlue() {
   await loadCatalogs();
-  restoreBlue();
+  const hadDraft = restoreBlue();
   document.getElementById('laydown-name').value = laydownName;
   renderAll();
   wireBlueEvents();
+
+  // First visit (no saved draft): start from the tool's default laydown so
+  // facilitators edit the baseline rather than an empty page.
+  if (!hadDraft) {
+    const warnings = await fetchDefaultsIntoDraft();
+    if (warnings !== null) {
+      persistBlue();
+      renderAll();
+      finishImportToast('Default laydown loaded', warnings, '[blue] initBlue');
+    }
+  }
 
   // Automation hooks (used by the Playwright tests)
   window._blueState        = () => ({ name: laydownName, laydown: JSON.parse(JSON.stringify(laydown)) });
