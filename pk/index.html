@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Resolve every relative URL against the repo root so css/, js/ and data/
+       paths are identical to index.html whether served from GitHub Pages
+       (/threat-model/pk/) or a local static server. -->
+  <base href="../">
+  <title>Pk Table Builder</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/pk.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <div class="header-title">
+        <h1>Pk Table Builder</h1>
+        <p class="header-sub">Per-shot probability of kill and shots per engagement for every defense system × attack platform</p>
+      </div>
+      <div class="header-controls builder-controls">
+        <div class="builder-name-field">
+          <label for="pk-name">Table name</label>
+          <input type="text" id="pk-name" placeholder="Custom Pk Table" autocomplete="off">
+        </div>
+        <button id="btn-load-defaults" class="btn btn-secondary">Load Default Table</button>
+        <button id="btn-import-pk"     class="btn btn-secondary">Import Pk Table…</button>
+        <button id="btn-clear-all"     class="btn btn-danger">Clear All</button>
+        <button id="btn-export-pk"     class="btn btn-success">⬇ Export Pk Table</button>
+        <a href="./" class="btn btn-secondary btn-link-nav" title="Back to the Strike Assessment Tool">← Tool</a>
+      </div>
+    </div>
+
+    <!-- Tier multipliers + legend — wired by pk.js -->
+    <div class="pk-toolbar">
+      <div class="pk-tiers" title="Multipliers applied to a cell's pk after a random tier roll. All three at 1.0 make Pk deterministic (no roll).">
+        <span class="pk-toolbar-label">Tier multipliers</span>
+        <label>low <input type="number" id="tier-low" min="0" step="0.01" value="1"></label>
+        <label>medium <input type="number" id="tier-medium" min="0" step="0.01" value="1"></label>
+        <label>high <input type="number" id="tier-high" min="0" step="0.01" value="1"></label>
+      </div>
+      <div class="pk-legend">
+        <span class="pk-legend-item"><span class="pk-swatch pk-swatch-live"></span> engages</span>
+        <span class="pk-legend-item"><span class="pk-swatch pk-swatch-zero"></span> pk 0 = cannot engage</span>
+        <span class="pk-legend-item"><span class="pk-swatch pk-swatch-unused"></span> not in the default doctrine for this type</span>
+        <span class="pk-legend-item pk-legend-note">Each cell: <strong>pk</strong> per shot (0–1) over <strong>shots</strong> per threat (gun: rounds per burst; directed energy: none)</span>
+      </div>
+      <span id="pk-summary" class="badge">—</span>
+    </div>
+  </header>
+
+  <!-- The matrix — populated by pk.js -->
+  <main class="pk-main">
+    <div class="pk-table-wrap" id="pk-table-wrap">
+      <p class="empty-state">Loading catalogs…</p>
+    </div>
+  </main>
+
+  <div class="storage-notice">
+    ⚠ This draft is saved in browser <code>localStorage</code> under its own key and
+    <strong>does not change</strong> the Strike Assessment Tool's active Pk table.
+    Use <strong>Export Pk Table</strong> to download a JSON file for <em>Import Pk Table</em> in the tool.
+  </div>
+
+  <!-- Modal overlay — controlled by showModal() / _resolveModal() in ui.js -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal" id="modal-dialog">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title"></span>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <input type="file" id="import-pk-input" accept=".json" style="display:none">
+
+  <!-- Scripts — load in dependency order -->
+  <script src="js/engine.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/builder-common.js"></script>
+  <script src="js/pk.js"></script>
+
+</body>
+</html>
