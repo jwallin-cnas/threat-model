@@ -1,12 +1,10 @@
 /**
  * tests/setup.js — Shared test utilities
  *
- * Loads engine.js and engagement.js by executing their source with an
- * explicit `module` / `exports` scope via new Function(). This bypasses
- * Vitest's Vite transform (which strips the `module` global and breaks the
- * CJS shim) while still running the exact same source that the browser loads.
- *
- * All exports from this file are re-exported for direct import in test files.
+ * Loads js/engagement-models.js and js/engine.js by executing their source
+ * with an explicit `module` / `exports` scope via new Function(). This
+ * bypasses Vitest's Vite transform (which strips the `module` global and
+ * breaks the CommonJS shim) while running the exact bytes the browser loads.
  */
 
 import { readFileSync }  from 'fs';
@@ -16,99 +14,132 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT      = join(__dirname, '..');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Script loader
-// Executes a browser-style JS file in a custom scope that provides `module`
-// and `exports`. The CJS shim at the bottom of each file writes its exports
-// to module.exports, which we return after execution.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function loadBrowserScript(relPath) {
-  const code = readFileSync(join(ROOT, relPath), 'utf8');
-  const mod  = { exports: {} };
+function loadBrowserScript(relPath, globals = {}) {
+  const code  = readFileSync(join(ROOT, relPath), 'utf8');
+  const mod   = { exports: {} };
+  const names = Object.keys(globals);
   // eslint-disable-next-line no-new-func
-  const fn   = new Function('module', 'exports', code);
-  fn(mod, mod.exports);
+  const fn    = new Function('module', 'exports', ...names, code);
+  fn(mod, mod.exports, ...names.map(n => globals[n]));
   return mod.exports;
 }
 
-// ── Engine functions (pure, no browser globals) ───────────────────────────────
-const _engine = loadBrowserScript('js/engine.js');
+const _models = loadBrowserScript('js/engagement-models.js');
+export const { ENGAGEMENT_MODELS } = _models;
 
-export const inferTier            = _engine.inferTier;
-export const buildDefenseCatalog  = _engine.buildDefenseCatalog;
-export const buildPlatformCatalog = _engine.buildPlatformCatalog;
-export const applyEngagement      = _engine.applyEngagement;
-export const ENGAGEMENT_PRIORITY  = _engine.ENGAGEMENT_PRIORITY;
-export const THREAT_PRIORITY      = _engine.THREAT_PRIORITY;
-export const runSimulationCore    = _engine.runSimulationCore;
-
-// ── Engagement functions (pure Math.random-based per-system functions) ────────
-const _engagement = loadBrowserScript('js/engagement.js');
-export const { ENGAGEMENT_FUNCTIONS } = _engagement;
+const _engine = loadBrowserScript('js/engine.js', { ENGAGEMENT_MODELS });
+export const {
+  THREAT_TYPES,
+  inferTier,
+  buildDefenseCatalog,
+  buildPlatformCatalog,
+  normalizeDoctrine,
+  systemThreatTypes,
+  normalizePkTable,
+  pkCell,
+  rollTier,
+  applyEngagement,
+  groupManifest,
+  runSimulationCore,
+  allEngagements
+} = _engine;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Real catalog builder — loads the actual project JSON data files
+// Real data
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _loadJson(filename) {
-  return JSON.parse(readFileSync(join(ROOT, 'data', filename), 'utf8'));
+export function loadJson(relPath) {
+  return JSON.parse(readFileSync(join(ROOT, relPath), 'utf8'));
 }
 
 /**
- * Build defense and platform catalogs from the project's actual data files.
- * Use these for integration-level tests that need real system IDs and Pk values.
+ * Build a full engine config from the project's real data files. Use for
+ * integration tests that need real ids and the shipped Pk table / doctrine.
+ * `rng` defaults to a constant 0.5 so tier rolls (if any) land on medium.
  */
-export function buildTestCatalogs() {
-  const { systems: defenseSystems } = _loadJson('defenses.json');
-  const { systems: attackSystems  } = _loadJson('attacks.json');
+export function buildRealConfig(overrides = {}) {
+  const defenseCatalog  = buildDefenseCatalog(loadJson('data/defenses.json').systems);
+  const platformCatalog = buildPlatformCatalog(loadJson('data/attacks.json').systems);
+  const { table: pkTable, warnings: pkWarnings }    = normalizePkTable(loadJson('data/pk-table.json'), defenseCatalog, platformCatalog);
+  const { doctrine, warnings: doctrineWarnings }    = normalizeDoctrine(loadJson('data/doctrine.json'), defenseCatalog);
   return {
-    defenseCatalog:  buildDefenseCatalog(defenseSystems),
-    platformCatalog: buildPlatformCatalog(attackSystems)
+    pkTable, doctrine, defenseCatalog, platformCatalog,
+    models: ENGAGEMENT_MODELS,
+    rng: () => 0.5,
+    _warnings: { pk: pkWarnings, doctrine: doctrineWarnings },
+    ...overrides
   };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock catalogs — deterministic, no external data dependency
+// Mock data — small, deterministic, no file dependency
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Minimal defense catalog using 'patriot' — a real system ID present in
- * ENGAGEMENT_PRIORITY. The engine iterates ENGAGEMENT_PRIORITY to find
- * deployed batteries, so mock system IDs are silently skipped.
- * magazinePerBattery is set to 100 to give deterministic capacity arithmetic.
- */
-export const MOCK_DEFENSE_CATALOG = {
-  patriot: {
-    id:                   'patriot',
-    name:                 'Mock Patriot',
-    magazinePerBattery:   100,
-    effectiveAgainst:     ['drone', 'srbm', 'cruise_missile'],
-    threatRangeOverrides: {}
+export const MOCK_DEFENSE_SYSTEMS = [
+  { id: 'sam',   name: 'Mock SAM',   range_km: 100, batteries: 1, armament: { standard_loadout: 100 }, engagement: { model: 'kinetic' } },
+  { id: 'bmd',   name: 'Mock BMD',   range_km: 300, batteries: 1, armament: { standard_loadout: 10 },  engagement: { model: 'kinetic', shotRoll: { mrbm: { chance: 0.1, shots: 1.5 } } } },
+  { id: 'laser', name: 'Mock Laser', range_km: 5,   batteries: 1, armament: { standard_loadout: 999 }, engagement: { model: 'directed_energy', killCapPerPass: 10 } },
+  { id: 'gun',   name: 'Mock Gun',   range_km: 2,   batteries: 1, armament: { standard_loadout: 450 }, engagement: { model: 'gun', burstsPerPass: 1 } },
+  { id: 'cap',   name: 'Mock CAP',   range_km: 200, batteries: 1, shared: true, armament: { standard_loadout: 50 }, engagement: { model: 'patrol', cap: 20, pLow: 0.5 } }
+];
+
+export const MOCK_PLATFORMS = [
+  { id: 'drone_a', name: 'Drone A', type: 'drone',  payload_kg: 40,  range_km: 2000, salvo_sizes: [2, 10, 50] },
+  { id: 'drone_b', name: 'Drone B', type: 'drone',  payload_kg: 50,  range_km: 2000, salvo_sizes: [2, 10, 50] },
+  { id: 'srbm_a',  name: 'SRBM A',  type: 'srbm',   payload_kg: 450, range_km: 300,  salvo_sizes: [2, 10, 50] },
+  { id: 'mrbm_a',  name: 'MRBM A',  type: 'mrbm',   payload_kg: 750, range_km: 1600, salvo_sizes: [2, 10, 50] },
+  { id: 'cm_a',    name: 'CM A',    type: 'cruise_missile', payload_kg: 170, range_km: 1000, salvo_sizes: [2, 10, 50] }
+];
+
+/** pk 1.0 everywhere the system is allowed, 2 shots; a few deliberate gaps. */
+export const MOCK_PK_TABLE = {
+  version: '1.0', name: 'mock', tiers: { low: 1, medium: 1, high: 1 },
+  cells: {
+    sam:   { drone_a: { pk: 1, shots: 2 }, drone_b: { pk: 1, shots: 2 }, srbm_a: { pk: 1, shots: 2 }, mrbm_a: { pk: 0, shots: 0 }, cm_a: { pk: 1, shots: 2 } },
+    bmd:   { drone_a: { pk: 0, shots: 0 }, drone_b: { pk: 0, shots: 0 }, srbm_a: { pk: 1, shots: 2 }, mrbm_a: { pk: 1, shots: 1 }, cm_a: { pk: 0, shots: 0 } },
+    laser: { drone_a: { pk: 0.3, shots: 0 }, drone_b: { pk: 0.3, shots: 0 }, srbm_a: { pk: 0, shots: 0 }, mrbm_a: { pk: 0, shots: 0 }, cm_a: { pk: 0, shots: 0 } },
+    gun:   { drone_a: { pk: 1, shots: 150 }, drone_b: { pk: 1, shots: 150 }, srbm_a: { pk: 0, shots: 0 }, mrbm_a: { pk: 0, shots: 0 }, cm_a: { pk: 0, shots: 0 } },
+    cap:   { drone_a: { pk: 1, shots: 1 }, drone_b: { pk: 1, shots: 1 }, srbm_a: { pk: 0, shots: 0 }, mrbm_a: { pk: 0, shots: 0 }, cm_a: { pk: 1, shots: 1 } }
   }
 };
 
-/** Minimal platform catalog: a drone, an SRBM, and a cruise missile. */
-export const MOCK_PLATFORM_CATALOG = {
-  mock_drone: { id: 'mock_drone', name: 'Mock Drone',         type: 'drone'          },
-  mock_srbm:  { id: 'mock_srbm',  name: 'Mock SRBM',          type: 'srbm'           },
-  mock_cm:    { id: 'mock_cm',    name: 'Mock Cruise Missile', type: 'cruise_missile' }
-};
-
-/**
- * Deterministic engagement functions (pk=1, shots=2) for 'patriot'.
- * Overrides the stochastic real engagement function so tests are reproducible.
- * Tests that need non-trivial Pk should supply their own engFunctions object.
- */
-export const MOCK_ENG_FUNCTIONS = {
-  patriot: (threatType) => {
-    if (!['drone', 'srbm', 'cruise_missile'].includes(threatType)) return null;
-    return {
-      pk:                     1.0,
-      pkTier:                 'high',
-      pkIsFixed:              true,
-      shotsPerEngagement:     2,
-      shotsPerEngagementTier: null
-    };
+export const MOCK_DOCTRINE = {
+  version: '1.0', name: 'mock',
+  typeOrder: ['mrbm', 'srbm', 'cruise_missile', 'drone_jet', 'drone', 'fpv'],
+  engage: {
+    mrbm:           ['bmd', 'sam'],
+    srbm:           ['bmd', 'sam'],
+    cruise_missile: ['cap', 'sam'],
+    drone_jet:      [],
+    drone:          ['cap', 'sam', 'laser', 'gun'],
+    fpv:            []
   }
 };
+
+/** Build a mock config; pass overrides for pkTable/doctrine/rng/etc. */
+export function buildMockConfig(overrides = {}) {
+  const defenseCatalog  = buildDefenseCatalog(MOCK_DEFENSE_SYSTEMS);
+  const platformCatalog = buildPlatformCatalog(MOCK_PLATFORMS);
+  const { table: pkTable }  = normalizePkTable(overrides.pkTableRaw || MOCK_PK_TABLE, defenseCatalog, platformCatalog);
+  const { doctrine }        = normalizeDoctrine(overrides.doctrineRaw || MOCK_DOCTRINE, defenseCatalog);
+  const { pkTableRaw, doctrineRaw, ...rest } = overrides;
+  return { pkTable, doctrine, defenseCatalog, platformCatalog, models: ENGAGEMENT_MODELS, rng: () => 0.5, ...rest };
+}
+
+/** A deployed defense entry. */
+export function mkDef(id, system, quantity = 1, opts = {}) {
+  return { id, system, quantity, notes: '', ...opts };
+}
+
+/** Final magazineRemaining per defId, last write wins (same as the app's extractMagazineState). */
+export function extractMag(results) {
+  const state = {};
+  for (const e of allEngagements(results)) state[e.defId] = e.magazineRemaining;
+  return state;
+}
+
+/** A deterministic rng that returns the given sequence, then repeats the last value. */
+export function seq(values) {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)];
+}

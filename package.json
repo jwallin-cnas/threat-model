@@ -3,18 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Strike Assessment Tool — Layered Air Defense Adjudicator",
+  "description": "Strike Assessment Tool \u2014 Layered Air Defense Adjudicator",
   "scripts": {
-    "test":       "vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
-    "batch":      "node scripts/batch-sim.js"
+    "batch": "node scripts/batch-sim.js",
+    "defaults": "node scripts/generate-engagement-defaults.js",
+    "parity": "node scripts/parity-check.js --old-ref 9bded9b"
   },
   "devDependencies": {
     "vitest": "^1.6.0"
   },
   "dependencies": {
-    "pdf-lib":   "^1.17.1",
+    "pdf-lib": "^1.17.1",
     "playwright": "^1.44.0",
-    "xlsx":      "^0.18.5"
+    "xlsx": "^0.18.5"
   }
 }
