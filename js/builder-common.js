@@ -64,6 +64,16 @@ function getBuilderPreset(id) {
   return BUILDER_DATA.presets.find(p => p.id === id) || null;
 }
 
+/**
+ * Short display label for a defense system: the abbreviation in trailing
+ * parentheses when the catalog name has one ("… (THAAD)" → "THAAD"), else the
+ * full name. Use the full name in a tooltip alongside it.
+ */
+function systemShortLabel(sys) {
+  const m = /\(([^()]{2,12})\)\s*$/.exec(sys?.name || '');
+  return m ? m[1] : (sys?.shortName || sys?.name || '');
+}
+
 /** Raw defenses.json `batteries` value for a system (1 when unspecified). */
 function getSystemBatteries(systemId) {
   const sys = BUILDER_DATA.defenseSystems.find(s => s.id === systemId);

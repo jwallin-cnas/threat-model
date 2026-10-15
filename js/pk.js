@@ -116,7 +116,7 @@ function renderAll() {
     th.className = 'pk-sys-head';
     th.style.setProperty('--tier-color', TIER_COLORS[sys.tier] || '#888');
     th.title = `${sys.name} — model: ${sys.engagement?.model || 'kinetic'}`;
-    th.innerHTML = `<span class="pk-sys-name">${escapeHtml(columnLabel(sys))}</span><span class="pk-sys-model">${escapeHtml(sys.engagement?.model || 'kinetic')}</span>`;
+    th.innerHTML = `<span class="pk-sys-name">${escapeHtml(systemShortLabel(sys))}</span><span class="pk-sys-model">${escapeHtml(sys.engagement?.model || 'kinetic')}</span>`;
     sysRow.appendChild(th);
   }
   thead.appendChild(sysRow);
@@ -148,16 +148,6 @@ function renderAll() {
   wrap.innerHTML = '';
   wrap.appendChild(table);
   updateSummary();
-}
-
-/**
- * Column label: the abbreviation in trailing parentheses when the catalog
- * name has one ("… (THAAD)" → "THAAD"), else the full name. The full name
- * stays in the header tooltip.
- */
-function columnLabel(sys) {
-  const m = /\(([^()]{2,12})\)\s*$/.exec(sys.name || '');
-  return m ? m[1] : (sys.shortName || sys.name);
 }
 
 /** Build one editable cell (pk input over shots input). */

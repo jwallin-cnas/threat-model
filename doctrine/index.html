@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Resolve every relative URL against the repo root so css/, js/ and data/
+       paths are identical to index.html whether served from GitHub Pages
+       (/threat-model/doctrine/) or a local static server. -->
+  <base href="../">
+  <title>Doctrine Builder</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/doctrine.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <div class="header-title">
+        <h1>Doctrine Builder</h1>
+        <p class="header-sub">Engagement doctrine — which systems engage each threat type, and in what order</p>
+      </div>
+      <div class="header-controls builder-controls">
+        <div class="builder-name-field">
+          <label for="doctrine-name">Doctrine name</label>
+          <input type="text" id="doctrine-name" placeholder="Custom Doctrine" autocomplete="off">
+        </div>
+        <button id="btn-load-defaults"   class="btn btn-secondary">Load Default Doctrine</button>
+        <button id="btn-import-doctrine" class="btn btn-secondary">Import Doctrine…</button>
+        <button id="btn-clear-all"       class="btn btn-danger">Clear All</button>
+        <button id="btn-export-doctrine" class="btn btn-success">⬇ Export Doctrine</button>
+        <a href="./" class="btn btn-secondary btn-link-nav" title="Back to the Strike Assessment Tool">← Tool</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- One column per threat type, in processing order — populated by doctrine.js -->
+  <main class="builder-main dc-main" id="builder-main">
+    <p class="empty-state">Loading doctrine…</p>
+  </main>
+
+  <div class="storage-notice">
+    ⚠ This draft is saved in browser <code>localStorage</code> under its own key and
+    <strong>does not change</strong> the Strike Assessment Tool's active doctrine, laydown, or history.
+    Use <strong>Export Doctrine</strong> to download a JSON file for <em>Import Doctrine</em> in the tool.
+  </div>
+
+  <!-- Modal overlay — controlled by showModal() / _resolveModal() in ui.js -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal" id="modal-dialog">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title"></span>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <input type="file" id="import-doctrine-input" accept=".json" style="display:none">
+
+  <!-- Scripts — load in dependency order -->
+  <script src="js/engine.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/builder-common.js"></script>
+  <script src="js/doctrine.js"></script>
+
+</body>
+</html>

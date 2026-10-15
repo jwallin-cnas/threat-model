@@ -1,0 +1,214 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Doctrine Builder — doctrine/ (loads after css/style.css)
+   One column per threat type in processing order; cards are the systems
+   allowed to engage that type, outermost first.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dc-main { max-width: none; }
+
+/* ── Board: six columns, horizontal scroll when the viewport is narrow ────── */
+
+.dc-board {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+
+.dc-col {
+  flex: 1 1 0;
+  min-width: 240px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  transition: border-color 0.15s;
+}
+
+.dc-col.has-systems { border-color: var(--border); }
+
+/* ── Column header (drag handle for the processing order) ─────────────────── */
+
+.dc-col-head {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-areas:
+    "grip order title"
+    "grip count nav";
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.dc-col-head .dc-grip { grid-area: grip; }
+.dc-col-order         { grid-area: order; justify-self: start; }
+.dc-col-title         { grid-area: title; }
+.dc-col-count         { grid-area: count; justify-self: start; }
+.dc-col-nav           { grid-area: nav; justify-self: end; }
+
+.dc-col-order {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 10px;
+  padding: 0 7px;
+  line-height: 18px;
+}
+
+.dc-col-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-bright);
+  line-height: 1.3;
+}
+
+.dc-grip {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+/* ◀ ▶ and ▲ ▼ reuse .btn-icon but highlight in accent, not danger */
+.dc-nav-btn:not(:disabled):hover { color: var(--accent); background: var(--accent-dim); }
+.dc-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.dc-nav-btn { font-size: 10px; }
+
+.dc-col-nav, .dc-card-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── Card list ────────────────────────────────────────────────────────────── */
+
+.dc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 24px;
+}
+
+.dc-empty { padding: 6px 0; }
+
+.dc-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--tier-color, #888);
+  border-radius: var(--radius);
+  padding: 6px 6px 6px 8px;
+  font-size: 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.dc-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dc-card-name {
+  font-weight: 600;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dc-card-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+/* ── "+ Add system" slot and inline picker ────────────────────────────────── */
+
+.dc-add-slot {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 7px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.dc-add-slot:not(:disabled):hover { color: var(--accent); border-color: var(--accent); }
+.dc-add-slot:disabled { cursor: default; opacity: 0.5; }
+
+.dc-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+
+.dc-picker select { width: 100%; }
+
+/* ── Drag state ───────────────────────────────────────────────────────────── */
+
+body.is-dragging { cursor: grabbing; }
+body.is-dragging .dc-card, body.is-dragging .dc-col-head { cursor: grabbing; }
+
+/* The dragged element leaves the flow and follows the pointer; the custom
+   properties are set by startPointerDrag() in doctrine.js. */
+.drag-ghost {
+  position: fixed;
+  left: var(--drag-x);
+  top: var(--drag-y);
+  width: var(--drag-w);
+  height: var(--drag-h);
+  margin: 0;
+  z-index: 500;
+  opacity: 0.9;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
+
+.dc-col.drag-ghost { background: var(--bg-card); border-color: var(--accent); }
+.dc-card.drag-ghost { border-color: var(--accent); }
+
+.dc-card-placeholder,
+.dc-col-placeholder {
+  flex: 0 0 auto;
+  width: var(--drag-w);
+  height: var(--drag-h);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-dim);
+  opacity: 0.5;
+}
+
+.dc-col-placeholder { border-radius: var(--radius-lg); }
+
+/* ── Narrow screens ───────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .dc-col { min-width: 220px; }
+}
