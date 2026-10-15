@@ -14,6 +14,8 @@ const ATTACK_NAME_KEY  = 'threatmodel_attack_name_v2';
 const SESSION_KEY      = 'threatmodel_session_v2';
 const HISTORY_KEY      = 'threatmodel_history_v2';
 const SEED_KEY         = 'threatmodel_seed_v2';
+const PK_STORAGE_KEY       = 'threatmodel_pk_v1';        // imported Pk table override { name, data }
+const DOCTRINE_STORAGE_KEY = 'threatmodel_doctrine_v1';  // imported doctrine override { name, data }
 
 // ── Basemap ──────────────────────────────────────────────────────────────────
 // CARTO stopped serving its raster basemaps without an API key (Sept 2026).
@@ -64,6 +66,19 @@ let attackQueue      = [];    // [{ id, targetId, targetName, targetCountry, man
 
 // ── Minimap state ─────────────────────────────────────────────────────────────
 let _minimapCrossLayers = [];   // Leaflet layers for cross-target coverage circles
+
+// ── Engagement configuration (Pk table + doctrine) ───────────────────────────
+// The shipped defaults come from data/pk-table.json and data/doctrine.json.
+// An imported file overrides them in this browser until Reset to Default.
+// The normalized objects are what the engine consumes (see simulate.js).
+let defaultPkTableRaw  = null;
+let defaultDoctrineRaw = null;
+let activePkTable      = null;      // normalizePkTable() output
+let activeDoctrine     = null;      // normalizeDoctrine() output
+let activePkName       = 'Default';
+let activeDoctrineName = 'Default';
+let activePkHash       = '';
+let activeDoctrineHash = '';
 
 // ── Magazine state helpers ────────────────────────────────────────────────────
 
@@ -223,14 +238,23 @@ let _minimapMarker = null;        // Leaflet circleMarker instance
 
 async function loadData() {
   // Fetch all data files in parallel
-  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes, presetsRes] = await Promise.allSettled([
+  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes, presetsRes, pkRes, doctrineRes] = await Promise.allSettled([
     fetch('data/data.json').then(r => r.json()),
     fetch('data/targets.json').then(r => r.json()),
     fetch('data/defenses.json').then(r => r.json()),
     fetch('data/attacks.json').then(r => r.json()),
     fetch('data/defaults.json').then(r => r.json()),
-    fetch('data/presets.json').then(r => r.json())
+    fetch('data/presets.json').then(r => r.json()),
+    fetch('data/pk-table.json').then(r => r.json()),
+    fetch('data/doctrine.json').then(r => r.json())
   ]);
+
+  // Default engagement configuration (pk-table.json, doctrine.json).
+  // Normalised later by applyEngagementConfig(), once the catalogs exist.
+  if (pkRes.status === 'fulfilled') defaultPkTableRaw = pkRes.value;
+  else console.error('Could not load data/pk-table.json:', pkRes.reason);
+  if (doctrineRes.status === 'fulfilled') defaultDoctrineRaw = doctrineRes.value;
+  else console.error('Could not load data/doctrine.json:', doctrineRes.reason);
 
   // Scenario targets (data.json) — merged with localStorage overrides below
   let baseline = [];
@@ -400,6 +424,8 @@ async function resetData() {
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(HISTORY_KEY);
   localStorage.removeItem(SEED_KEY);
+  localStorage.removeItem(PK_STORAGE_KEY);
+  localStorage.removeItem(DOCTRINE_STORAGE_KEY);
   location.reload();
 }
 
@@ -418,6 +444,163 @@ function mergeLoadedData() {
   // Build catalogs using pure functions from engine.js, then merge into globals
   Object.assign(DEFENSE_CATALOG,  buildDefenseCatalog(appDefenseSystems));
   Object.assign(PLATFORM_CATALOG, buildPlatformCatalog(appAttackSystems));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Engagement configuration — Pk table and doctrine
+//
+// The Pk table says how well a system engages a platform (per-shot pk and
+// shots); the doctrine says which systems engage each threat type and in
+// what order. Both are plain JSON files. The tool ships defaults and lets
+// the user import replacements, which persist in localStorage.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Small stable hash of a JSON-serialisable value (djb2, 8 hex chars). */
+function _hashJson(value) {
+  const str = JSON.stringify(value);
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+function _loadStoredConfig(key) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
+  catch { return null; }
+}
+
+/** Read a File as JSON (rejects with a readable message). */
+function _readJsonFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = e => { try { resolve(JSON.parse(e.target.result)); } catch (err) { reject(new Error('invalid JSON: ' + err.message)); } };
+    reader.onerror = () => reject(new Error('could not read file'));
+    reader.readAsText(file);
+  });
+}
+
+/**
+ * Make a Pk table the active one: normalise it against the catalogs, record
+ * its name and hash, optionally persist the raw file, refresh the badge.
+ * @returns {string[]} normalisation warnings
+ */
+function _applyPkTable(raw, name, { persist = false } = {}) {
+  const { table, warnings } = normalizePkTable(raw, DEFENSE_CATALOG, PLATFORM_CATALOG);
+  activePkTable = table;
+  activePkName  = name || raw?.name || 'Custom';
+  activePkHash  = _hashJson(table);
+  if (persist) {
+    try { localStorage.setItem(PK_STORAGE_KEY, JSON.stringify({ name: activePkName, data: raw })); }
+    catch { /* non-critical */ }
+  }
+  renderConfigBadge('pk-badge', activePkName);
+  return warnings;
+}
+
+/**
+ * Make a doctrine the active one. Also rewrites every catalog entry's
+ * effectiveAgainst list from the doctrine: that list drives the capability
+ * chips on defense cards and the cross-target range filter.
+ * @returns {string[]} normalisation warnings
+ */
+function _applyDoctrine(raw, name, { persist = false } = {}) {
+  const { doctrine, warnings } = normalizeDoctrine(raw, DEFENSE_CATALOG);
+  activeDoctrine     = doctrine;
+  activeDoctrineName = name || raw?.name || 'Custom';
+  activeDoctrineHash = _hashJson(doctrine);
+  if (persist) {
+    try { localStorage.setItem(DOCTRINE_STORAGE_KEY, JSON.stringify({ name: activeDoctrineName, data: raw })); }
+    catch { /* non-critical */ }
+  }
+  for (const sys of Object.values(DEFENSE_CATALOG)) sys.effectiveAgainst = systemThreatTypes(doctrine, sys.id);
+  renderConfigBadge('doctrine-badge', activeDoctrineName);
+  return warnings;
+}
+
+/** Load the stored overrides if present, else the shipped defaults. Called once in init(). */
+function applyEngagementConfig() {
+  const storedPk  = _loadStoredConfig(PK_STORAGE_KEY);
+  const storedDoc = _loadStoredConfig(DOCTRINE_STORAGE_KEY);
+  const pkW  = storedPk?.data  ? _applyPkTable(storedPk.data, storedPk.name || 'Custom')
+                               : _applyPkTable(defaultPkTableRaw || {}, 'Default');
+  const docW = storedDoc?.data ? _applyDoctrine(storedDoc.data, storedDoc.name || 'Custom')
+                               : _applyDoctrine(defaultDoctrineRaw || {}, 'Default');
+  if (pkW.length)  console.warn('[pk-table] warnings:', pkW);
+  if (docW.length) console.warn('[doctrine] warnings:', docW);
+}
+
+/** The engagement-config reference recorded in every history snapshot. */
+function _engagementConfigRef() {
+  return { pkName: activePkName, pkHash: activePkHash, doctrineName: activeDoctrineName, doctrineHash: activeDoctrineHash };
+}
+
+/** True if a snapshot's engagement config differs from the active one. */
+function _configDiffers(ref) {
+  return !!ref && (ref.pkHash !== activePkHash || ref.doctrineHash !== activeDoctrineHash);
+}
+
+function renderConfigBadge(id, name) {
+  const badge = document.getElementById(id);
+  if (!badge) return;
+  badge.textContent = name || 'Default';
+  badge.classList.toggle('config-badge--custom', !!name && name !== 'Default');
+}
+
+/** Invalidate the current result after a configuration change (the next run uses the new config). */
+function _afterConfigChange() {
+  _manifestUnchanged = false;
+  document.getElementById('simulation-results')?.classList.add('hidden');
+  if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+}
+
+function _toastImport(prefix, warnings, logTag) {
+  let msg = prefix + '.';
+  if (warnings.length) {
+    msg += ` ${warnings.length} warning${warnings.length !== 1 ? 's' : ''} (see console).`;
+    console.warn(`${logTag} warnings:`, warnings);
+  }
+  showToast(msg, warnings.length > 0);
+}
+
+/** Interactive import of a Pk table file (header button). */
+async function importPkTable(file) {
+  let data;
+  try { data = await _readJsonFile(file); }
+  catch (err) { showToast('Import failed — ' + err.message, true); return; }
+  if (!data || typeof data.cells !== 'object' || Array.isArray(data.cells)) {
+    showToast('Import failed — file must contain a "cells" object.', true); return;
+  }
+  const warnings = _applyPkTable(data, data.name || file.name.replace(/\.json$/i, ''), { persist: true });
+  _afterConfigChange();
+  _toastImport(`Pk table "${activePkName}" loaded`, warnings, '[importPkTable]');
+}
+
+/** Interactive import of a doctrine file (header button). */
+async function importDoctrine(file) {
+  let data;
+  try { data = await _readJsonFile(file); }
+  catch (err) { showToast('Import failed — ' + err.message, true); return; }
+  if (!data || !Array.isArray(data.typeOrder) || typeof data.engage !== 'object') {
+    showToast('Import failed — file must contain "typeOrder" and "engage".', true); return;
+  }
+  const warnings = _applyDoctrine(data, data.name || file.name.replace(/\.json$/i, ''), { persist: true });
+  _afterConfigChange();
+  _toastImport(`Doctrine "${activeDoctrineName}" loaded`, warnings, '[importDoctrine]');
+}
+
+/** Batch hook: apply a parsed Pk table without a file picker. */
+function _importPkTableDirect(data, name) {
+  if (!data || typeof data.cells !== 'object') throw new Error('Pk table data must contain a "cells" object.');
+  const warnings = _applyPkTable(data, name || data.name || 'Custom', { persist: true });
+  _afterConfigChange();
+  return { name: activePkName, warnings };
+}
+
+/** Batch hook: apply a parsed doctrine without a file picker. */
+function _importDoctrineDirect(data, name) {
+  if (!data || !Array.isArray(data.typeOrder)) throw new Error('Doctrine data must contain "typeOrder" and "engage".');
+  const warnings = _applyDoctrine(data, name || data.name || 'Custom', { persist: true });
+  _afterConfigChange();
+  return { name: activeDoctrineName, warnings };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1479,18 +1662,12 @@ function renderAttackManifest() {
 
 /**
  * Walk simulation results and record the final magazineRemaining for each
- * system. Because THREAT_PRIORITY iterates BM → CM → drone, the last write
- * per systemId reflects the lowest (final) remaining interceptor count.
+ * deployed entry. Records are in processing order, so the last write per
+ * defId is the final remaining count.
  */
 function extractMagazineState(results) {
   const state = {};
-  for (const group of results.byThreatType) {
-    for (const eng of group.engagements) {
-      // Keyed by defId so multiple instances of the same system type are tracked
-      // independently. The last write per defId is the lowest (final) remaining count.
-      state[eng.defId] = eng.magazineRemaining;
-    }
-  }
+  for (const eng of allEngagements(results)) state[eng.defId] = eng.magazineRemaining;
   return state;
 }
 
@@ -1776,116 +1953,102 @@ async function simulate() {
 /**
  * Re-walk the original simulation results, propagating counts forward from any
  * layer that has a manual override and re-applying downstream engagements with
- * the correct (adjusted) magazine states.
+ * the correct (adjusted) magazine states and cap pass-state.
  *
- * Magazine tracking:
- *   - adjMag is seeded from each system's magazineAtStart at its first occurrence
- *     across all threat types, then updated as each engagement (re-)fires.
- *   - Override + disengaged = no interceptors expended.
- *   - Override + engaged    = interceptors recomputed for the new remaining count.
+ * overrides: { [threatType]: { [platformId]: { [defId]: { survived, disengaged } } } }
+ *
+ * Magazine tracking: adjMag is seeded from each entry's magazineAtStart at its
+ * first occurrence (= state before the first shot), then updated as each
+ * engagement re-fires. Each engagement's probability and magazine cost are
+ * recomputed through its model from the record's per-shot pk and shots, so
+ * patrol caps, laser caps and gun bursts follow the adjusted counts.
  */
 function computeAdjustedResults(originalResults, overrides) {
-  // Build magazine map keyed by defId, initialised from the earliest magazineAtStart
-  // seen across all groups (= state before the first shot of the simulation).
   const adjMag = {};
-  for (const group of originalResults.byThreatType) {
-    for (const eng of group.engagements) {
-      if (adjMag[eng.defId] === undefined && eng.magazineAtStart !== undefined)
-        adjMag[eng.defId] = eng.magazineAtStart;
-    }
+  for (const eng of allEngagements(originalResults)) {
+    if (adjMag[eng.defId] === undefined && eng.magazineAtStart !== undefined) adjMag[eng.defId] = eng.magazineAtStart;
   }
 
   let adjTotalOut = 0;
 
   const adjustedByThreatType = originalResults.byThreatType.map(group => {
-    const { threatType, initialCount, engagements } = group;
-    const groupOv = overrides[threatType] || {};
-    let remaining = initialCount;
-    const adjEngagements = [];
+    const { threatType } = group;
+    const typeOv = overrides[threatType] || {};
+    const pass   = {};   // per defId cap state for this threat type, shared across its platforms
+    let typeFinal = 0;
 
-    for (const eng of engagements) {
-      const magBefore = adjMag[eng.defId] ?? eng.magazineAtStart ?? 0;
+    const platforms = (group.platforms || []).map(plat => {
+      const platOv = typeOv[plat.platformId] || {};
+      let remaining = plat.initialCount;
+      const adjEngagements = [];
 
-      // ── Cannot engage — pass through, just update threatsIn display ─────────
-      if (eng.note === 'Cannot engage') {
-        adjEngagements.push({ ...eng, threatsIn: remaining });
-        continue;
-      }
+      for (const eng of plat.engagements) {
+        const magBefore = adjMag[eng.defId] ?? eng.magazineAtStart ?? 0;
 
-      // ── Manual override at this layer ────────────────────────────────────────
-      if (groupOv[eng.defId] !== undefined) {
-        const ov = groupOv[eng.defId];
-        const forcedSurvived = Math.min(ov.survived, remaining);
-        const forcedKilled   = remaining - forcedSurvived;
-        let interceptorsUsed, magAfter;
-
-        if (ov.disengaged) {
-          // System stood down — no interceptors expended
-          interceptorsUsed = 0;
-          magAfter = magBefore;
-        } else {
-          // System fired; recompute expended interceptors for the new remaining count
-          const shots = eng.shotsPerEngagement ?? 2;
-          if (shots === 0) {
-            interceptorsUsed = 0;
-            magAfter = magBefore;
-          } else {
-            const engageable = Math.min(remaining, Math.max(0, Math.floor(magBefore / shots)));
-            interceptorsUsed = engageable * shots;
-            magAfter = magBefore - interceptorsUsed;
-          }
+        if (eng.note === 'Cannot engage') {
+          adjEngagements.push({ ...eng, threatsIn: remaining, survived: remaining });
+          continue;
         }
 
-        adjMag[eng.defId] = magAfter;
+        const model = ENGAGEMENT_MODELS[eng.model] || ENGAGEMENT_MODELS.kinetic;
+        const ps    = pass[eng.defId] || (pass[eng.defId] = {});
+        // kinetic keeps its resolved shot count (a THAAD roll); the others derive
+        // their per-threat cost from the cell value and the adjusted count.
+        const shots = eng.model === 'kinetic'
+          ? (eng.shotsPerEngagement ?? eng.cellShots ?? 0)
+          : (eng.cellShots ?? eng.shotsPerEngagement ?? 0);
+        const ctx = { pkShot: eng.pkShot ?? 0, shots, params: eng.modelParams || {}, threatType, remaining, pass: ps };
+
+        const ov = platOv[eng.defId];
+        if (ov !== undefined) {
+          const forcedSurvived = Math.min(ov.survived, remaining);
+          const forcedKilled   = remaining - forcedSurvived;
+          const result = ov.disengaged
+            ? { killed: 0, survived: remaining, engaged: 0, interceptorsUsed: 0, magazineRemaining: magBefore, note: null }
+            : applyEngagement(remaining, 0, magBefore, model.shotsPerThreat(ctx));   // spends interceptors, kills are forced
+          model.afterEngagement(ctx, result);
+          adjMag[eng.defId] = result.magazineRemaining;
+          adjEngagements.push({
+            ...eng,
+            threatsIn:         remaining,
+            killed:            forcedKilled,
+            survived:          forcedSurvived,
+            magazineAtStart:   magBefore,
+            magazineRemaining: result.magazineRemaining,
+            interceptorsUsed:  result.interceptorsUsed,
+            isManualOverride:  true,
+            note:              ov.disengaged ? 'Disengaged (manual)' : 'Manual override'
+          });
+          remaining = forcedSurvived;
+          continue;
+        }
+
+        const P      = model.probability(ctx);
+        const spt    = model.shotsPerThreat(ctx);
+        const result = applyEngagement(remaining, P, magBefore, spt);
+        model.afterEngagement(ctx, result);
+        adjMag[eng.defId] = result.magazineRemaining;
         adjEngagements.push({
           ...eng,
-          threatsIn:         remaining,
-          killed:            forcedKilled,
-          survived:          forcedSurvived,
-          magazineAtStart:   magBefore,
-          magazineRemaining: magAfter,
-          interceptorsUsed,
-          isManualOverride:  true,
-          isPlaceholder:     false,
-          note: ov.disengaged ? 'Disengaged (manual)' : 'Manual override'
+          threatsIn:          remaining,
+          killed:             result.killed,
+          survived:           result.survived,
+          pk:                 P,
+          shotsPerEngagement: spt,
+          magazineAtStart:    magBefore,
+          magazineRemaining:  result.magazineRemaining,
+          interceptorsUsed:   result.interceptorsUsed,
+          note:               result.note
         });
-        remaining = forcedSurvived;
-        continue;
+        remaining = result.survived;
       }
 
-      // ── Re-apply engagement with updated remaining and adjusted magazine ─────
-      // Tiered-Pk systems (patrol CAP) must recompute effective Pk from the
-      // current adjusted remaining count rather than reusing the stored value,
-      // which was calculated for the original salvo size.
-      let rePk = eng.pk ?? 0;
-      if (eng.tieredPkCap != null && eng.pkLow != null) {
-        rePk = remaining <= eng.tieredPkCap
-          ? 1.0
-          : (eng.tieredPkCap + (remaining - eng.tieredPkCap) * eng.pkLow) / remaining;
-      }
-      const result = applyEngagement(
-        remaining,
-        rePk,
-        magBefore,
-        eng.shotsPerEngagement ?? 2
-      );
-      adjMag[eng.defId] = result.magazineRemaining;
-      adjEngagements.push({
-        ...eng,
-        threatsIn:         remaining,
-        killed:            result.killed,
-        survived:          result.survived,
-        magazineAtStart:   magBefore,
-        magazineRemaining: result.magazineRemaining,
-        interceptorsUsed:  magBefore - result.magazineRemaining,
-        note:              result.note,
-        isPlaceholder:     result.isPlaceholder
-      });
-      remaining = result.survived;
-    }
+      typeFinal += remaining;
+      return { ...plat, finalCount: remaining, engagements: adjEngagements };
+    });
 
-    adjTotalOut += remaining;
-    return { ...group, finalCount: remaining, engagements: adjEngagements };
+    adjTotalOut += typeFinal;
+    return { ...group, finalCount: typeFinal, platforms };
   });
 
   const finalThreats = adjustedByThreatType
@@ -1896,20 +2059,39 @@ function computeAdjustedResults(originalResults, overrides) {
 }
 
 /** Store an override for one layer and re-render results. */
-function applyLayerOverride(threatType, defId, survived, disengaged = false) {
-  if (!manualOverrides[threatType]) manualOverrides[threatType] = {};
-  manualOverrides[threatType][defId] = { survived, disengaged };
+function applyLayerOverride(threatType, platformId, defId, survived, disengaged = false) {
+  const t = manualOverrides[threatType] || (manualOverrides[threatType] = {});
+  const p = t[platformId] || (t[platformId] = {});
+  p[defId] = { survived, disengaged };
   rerenderWithOverrides();
 }
 
 /** Remove the override for one layer and re-render. */
-function clearLayerOverride(threatType, defId) {
-  if (manualOverrides[threatType]) {
-    delete manualOverrides[threatType][defId];
-    if (Object.keys(manualOverrides[threatType]).length === 0)
-      delete manualOverrides[threatType];
+function clearLayerOverride(threatType, platformId, defId) {
+  const t = manualOverrides[threatType];
+  if (t && t[platformId]) {
+    delete t[platformId][defId];
+    if (Object.keys(t[platformId]).length === 0) delete t[platformId];
+    if (Object.keys(t).length === 0) delete manualOverrides[threatType];
   }
   rerenderWithOverrides();
+}
+
+/**
+ * Overrides saved before per-platform results were keyed by type and defId
+ * only. They cannot be re-applied, so they are dropped with a console note.
+ */
+function _normalizeOverrides(ov) {
+  if (!ov || typeof ov !== 'object') return {};
+  for (const byPlat of Object.values(ov)) {
+    for (const v of Object.values(byPlat || {})) {
+      if (v && typeof v === 'object' && 'survived' in v) {
+        console.warn('[overrides] discarded overrides saved under the previous per-type format');
+        return {};
+      }
+    }
+  }
+  return ov;
 }
 
 /** Remove all overrides and re-render. */
@@ -1932,17 +2114,21 @@ function rerenderWithOverrides() {
     //     A fresh simulation is re-run with the exclusions passed as the 4th arg.
     //   killOverrides — layer-level kill-count adjustments applied as a
     //     re-walk on top of whatever base results we have.
+    // Both buckets are keyed type → platform → defId. The engine accepts the
+    // per-platform exclusion form directly.
     const disengagedByThreatType = {};
     const killOverrides          = {};
 
-    for (const [tt, ttOvs] of Object.entries(manualOverrides)) {
-      for (const [defId, ov] of Object.entries(ttOvs)) {
-        if (ov.disengaged) {
-          if (!disengagedByThreatType[tt]) disengagedByThreatType[tt] = [];
-          disengagedByThreatType[tt].push(defId);
-        } else {
-          if (!killOverrides[tt]) killOverrides[tt] = {};
-          killOverrides[tt][defId] = ov;
+    for (const [tt, byPlat] of Object.entries(manualOverrides)) {
+      for (const [pid, byDef] of Object.entries(byPlat)) {
+        for (const [defId, ov] of Object.entries(byDef)) {
+          if (ov.disengaged) {
+            const t = disengagedByThreatType[tt] || (disengagedByThreatType[tt] = {});
+            (t[pid] || (t[pid] = [])).push(defId);
+          } else {
+            const t = killOverrides[tt] || (killOverrides[tt] = {});
+            (t[pid] || (t[pid] = {}))[defId] = ov;
+          }
         }
       }
     }
@@ -1994,6 +2180,7 @@ function rerenderWithOverrides() {
   saveMagStateToStorage();
 
   document.getElementById('override-notice')?.classList.toggle('hidden', !hasOv);
+  _renderConfigNotice();
   // Always show original inbound totals in the summary header
   renderResultsSummary(lastSimResults, lastSimTarget);
   renderResultsLayers(displayResults.byThreatType);
@@ -2013,6 +2200,23 @@ function rerenderWithOverrides() {
 }
 
 /**
+ * Show a notice when the displayed result was produced under a different Pk
+ * table or doctrine than the one loaded now. Override re-runs always use the
+ * active configuration.
+ */
+function _renderConfigNotice() {
+  const el = document.getElementById('config-notice');
+  if (!el) return;
+  const ref = simHistory[simHistoryCursor]?.engagementConfig;
+  const differs = _configDiffers(ref);
+  el.classList.toggle('hidden', !differs);
+  if (differs) {
+    el.textContent = `⚠ This result was produced with Pk table "${ref.pkName}" and doctrine "${ref.doctrineName}". `
+      + `The active configuration is "${activePkName}" / "${activeDoctrineName}"; overrides re-run with the active one.`;
+  }
+}
+
+/**
  * Open an inline override form directly below the given engagement row.
  * The user can specify how many were killed, or disengage the system entirely.
  */
@@ -2021,6 +2225,7 @@ function activateOverrideEdit(triggerBtn) {
   document.querySelector('.override-edit-form')?.remove();
 
   const threatType = triggerBtn.dataset.threat;
+  const platformId = triggerBtn.dataset.platform;
   const defId      = triggerBtn.dataset.def;
   const threatsIn  = parseInt(triggerBtn.dataset.threatsIn, 10);
   const killedNow  = parseInt(triggerBtn.dataset.killed,    10);
@@ -2048,12 +2253,12 @@ function activateOverrideEdit(triggerBtn) {
       return;
     }
     form.remove();
-    applyLayerOverride(threatType, defId, threatsIn - val, false);
+    applyLayerOverride(threatType, platformId, defId, threatsIn - val, false);
   });
 
   form.querySelector('.btn-ov-disengage').addEventListener('click', () => {
     form.remove();
-    applyLayerOverride(threatType, defId, threatsIn, true);
+    applyLayerOverride(threatType, platformId, defId, threatsIn, true);
   });
 
   form.querySelector('.btn-ov-cancel').addEventListener('click', () => form.remove());
@@ -2072,6 +2277,8 @@ function renderSimulationResults(results, target) {
   renderResultsSummary(results, target);
   renderResultsLayers(results.byThreatType);
   renderResultsFinal(results);
+  // A fresh run always uses the active configuration.
+  document.getElementById('config-notice')?.classList.add('hidden');
 }
 
 function renderResultsSummary(results, target) {
@@ -2081,9 +2288,7 @@ function renderResultsSummary(results, target) {
     `<span class="threat-chip threat-${t.type}">${THREAT_TYPE_ICONS[t.type] || ''} ${t.count}× ${THREAT_TYPE_LABELS[t.type] || t.type}</span>`
   ).join('');
 
-  const systemsEngaged = new Set(
-    results.byThreatType.flatMap(b => b.engagements.map(e => e.systemId))
-  ).size;
+  const systemsEngaged = new Set(allEngagements(results).map(e => e.systemId)).size;
 
   el.innerHTML = `
     <div class="summary-header">
@@ -2113,7 +2318,7 @@ function renderResultsLayers(byThreatType) {
 }
 
 function buildThreatTypeSection(group) {
-  const { threatType, initialCount, finalCount, engagements } = group;
+  const { threatType, initialCount, finalCount, platforms = [] } = group;
   const icon  = THREAT_TYPE_ICONS[threatType]  || '';
   const label = THREAT_TYPE_LABELS[threatType] || threatType;
 
@@ -2130,16 +2335,28 @@ function buildThreatTypeSection(group) {
   `;
   section.appendChild(hdr);
 
-  // ── Engagement rows ──────────────────────────────────────────────────────
-  if (engagements.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'engagement-row engagement-pass';
-    empty.textContent = 'No systems assigned — all pass through';
-    section.appendChild(empty);
-  } else {
-    for (const eng of engagements) {
-      section.appendChild(buildEngagementRow(eng, threatType));
+  // ── One block per platform, in manifest order ────────────────────────────
+  for (const plat of platforms) {
+    const block = document.createElement('div');
+    block.className = 'platform-section';
+    const platFtr = plat.finalCount === 0
+      ? `all ${plat.initialCount} intercepted`
+      : `${plat.finalCount} of ${plat.initialCount} penetrate`;
+    block.innerHTML = `
+      <div class="platform-section-header">
+        <span class="platform-section-name">${plat.platformName}</span>
+        <span class="platform-section-count">${plat.initialCount} inbound · ${platFtr}</span>
+      </div>`;
+
+    if (plat.engagements.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'engagement-row engagement-pass';
+      empty.textContent = 'No system engages this platform — all pass through';
+      block.appendChild(empty);
+    } else {
+      for (const eng of plat.engagements) block.appendChild(buildEngagementRow(eng, threatType, plat.platformId));
     }
+    section.appendChild(block);
   }
 
   // ── Footer ───────────────────────────────────────────────────────────────
@@ -2168,40 +2385,47 @@ function buildEngagementProse(eng, threatType) {
     mrbm:           'medium-range ballistic missile',
     srbm:           'short-range ballistic missile',
     cruise_missile: 'cruise missile',
+    drone_jet:      'jet-powered drone',
     drone:          'drone',
-    fpv:            'FPV drone',
-    hypersonic:     'hypersonic glide vehicle'
+    fpv:            'FPV drone'
   };
   const tLabel  = PROSE_LABELS[threatType] || threatType.replace(/_/g, ' ');
   const tPlural = (eng.threatsIn === 1) ? tLabel : (tLabel + 's');
   const name    = eng.systemName;
   const killed  = eng.killed   ?? 0;
   const total   = eng.threatsIn ?? 0;
-  const pk      = (eng.pk ?? 0).toFixed(2);
+  const P       = (eng.pk ?? 0).toFixed(2);
+  const pkShot  = (eng.pkShot ?? 0).toFixed(2);
+  const isDE    = eng.model === 'directed_energy';
 
   // ── Manual override ───────────────────────────────────────────────────────
   if (eng.isManualOverride) {
-    const killWord = eng.shotsPerEngagement === 0 ? 'neutralised' : 'destroyed';
+    const killWord = isDE ? 'neutralised' : 'destroyed';
     return `This engagement result was manually adjusted. ${name} was recorded as having ${killWord} <strong>${killed}</strong> of <strong>${total}</strong> ${tPlural}.`;
   }
 
-  // ── Placeholder ───────────────────────────────────────────────────────────
-  if (eng.isPlaceholder) {
-    return `${name}'s Pk has not been configured. This engagement is a placeholder — no interceptors were consumed and no threats were destroyed.`;
-  }
-
   // ── Pk sentence ───────────────────────────────────────────────────────────
+  const tierPart = eng.pkTier ? ` after a <strong>${eng.pkTier}</strong> tier roll (×${eng.tierMultiplier})` : '';
   let pkSentence;
-  if (eng.pkIsFixed) {
-    pkSentence = `${name} engaged with a fixed Pk of <strong>${pk}</strong>.`;
-  } else if (eng.pkTier) {
-    pkSentence = `${name} rolled a <strong>${eng.pkTier}</strong>-confidence Pk of <strong>${pk}</strong>.`;
+  if (isDE) {
+    const cap = eng.modelParams?.killCapPerPass;
+    pkSentence = `${name} engaged ${eng.platformName}s at a per-attempt Pk of <strong>${pkShot}</strong>${tierPart}`
+      + (cap != null ? `, capped at <strong>${cap}</strong> kills per pass` : '')
+      + `, for an effective engagement Pk of <strong>${P}</strong>.`;
+  } else if (eng.model === 'gun') {
+    pkSentence = `${name} fired a burst of <strong>${eng.cellShots}</strong> rounds at <strong>${pkShot}</strong> Pk per burst${tierPart}.`;
+  } else if (eng.model === 'patrol') {
+    const cap = eng.modelParams?.cap;
+    pkSentence = `${name} engaged at a per-shot Pk of <strong>${pkShot}</strong>${tierPart} for the first <strong>${cap}</strong> ${tPlural} of this type, `
+      + `<strong>${(eng.modelParams?.pLow ?? 0).toFixed(2)}</strong> beyond that, for an effective engagement Pk of <strong>${P}</strong>.`;
   } else {
-    pkSentence = `${name} engaged with a Pk of <strong>${pk}</strong>.`;
+    const shots = eng.shotsPerEngagement ?? 0;
+    pkSentence = `${name} engaged at a per-shot Pk of <strong>${pkShot}</strong>${tierPart} with <strong>${shots}</strong> shot${shots !== 1 ? 's' : ''} per ${tLabel}, `
+      + `an engagement Pk of <strong>${P}</strong>.`;
   }
 
   // ── Kill sentence ─────────────────────────────────────────────────────────
-  const killWord = eng.shotsPerEngagement === 0 ? 'neutralised' : 'destroyed';
+  const killWord = isDE ? 'neutralised' : 'destroyed';
   let killPart;
   if      (killed === 0)     killPart = `No ${tPlural} were ${killWord}`;
   else if (killed === total) killPart = `All <strong>${total}</strong> ${tPlural} were ${killWord}`;
@@ -2210,40 +2434,41 @@ function buildEngagementProse(eng, threatType) {
 
   // ── Interceptor sentence ──────────────────────────────────────────────────
   let intSentence;
-  if (eng.shotsPerEngagement === 0) {
+  if (isDE) {
     intSentence = `As a directed-energy or electronic-warfare system, no interceptors were consumed.`;
   } else {
-    const shots    = eng.shotsPerEngagement ?? 2;
     const expended = eng.interceptorsUsed   ?? 0;
     const magStart = eng.magazineAtStart    ?? 0;
     const magEnd   = eng.magazineRemaining  ?? 0;
-
-    let rateDesc;
-    if (eng.shotsPerEngagementTier === 'elevated') {
-      rateDesc = `at an <strong>elevated</strong> average rate of <strong>${shots}</strong> interceptors per ${tLabel}`;
-    } else {
-      rateDesc = `at <strong>${shots}</strong> interceptor${shots !== 1 ? 's' : ''} per ${tLabel}`;
-    }
-
-    intSentence = `<strong>${expended}</strong> interceptor${expended !== 1 ? 's' : ''} were expended ${rateDesc} (${magStart} → ${magEnd} remaining).`;
+    const rateDesc = eng.shotsPerEngagementTier === 'elevated'
+      ? `at an <strong>elevated</strong> rate of <strong>${eng.shotsPerEngagement}</strong> interceptors per ${tLabel}`
+      : (eng.model === 'gun' ? '' : `at <strong>${eng.shotsPerEngagement}</strong> interceptor${eng.shotsPerEngagement !== 1 ? 's' : ''} per ${tLabel}`);
+    const unit = eng.model === 'gun' ? 'round' : 'interceptor';
+    intSentence = `<strong>${fmtNumber(expended)}</strong> ${unit}${expended !== 1 ? 's' : ''} were expended${rateDesc ? ' ' + rateDesc : ''} (${fmtNumber(magStart)} → ${fmtNumber(magEnd)} remaining).`;
   }
 
   return `${pkSentence} ${killSentence} ${intSentence}`;
 }
 
-function buildEngagementRow(eng, threatType = '') {
+/** Format a possibly-fractional count for display (1.5 → "1.5", 24 → "24"). */
+function fmtNumber(n) {
+  return Number.isInteger(n) ? String(n) : (Math.round(n * 100) / 100).toString();
+}
+
+function buildEngagementRow(eng, threatType = '', platformId = '') {
   const row = document.createElement('div');
 
   const locationHtml = eng.locationName
     ? `<span class="eng-location">📍 ${eng.locationName}${eng.locationCountry ? ', ' + eng.locationCountry : ''}</span>`
     : '';
+  const keyAttrs = `data-threat="${threatType}" data-platform="${platformId}" data-def="${eng.defId}"`;
 
   if (eng.note === 'Cannot engage') {
     row.className = 'engagement-row eng-no-capability';
     row.innerHTML = `
       <span class="eng-name">${eng.systemName}</span>
       ${locationHtml}
-      <span class="eng-note-text">Cannot engage this threat type — passes through</span>
+      <span class="eng-note-text">Cannot engage this platform (Pk 0) — passes through</span>
     `;
     return row;
   }
@@ -2274,41 +2499,36 @@ function buildEngagementRow(eng, threatType = '') {
         <span class="eng-sep">/</span>
         <span class="eng-in">${eng.threatsIn} in</span>
       </div>
-      <button class="btn-icon btn-clear-override"
-        data-threat="${threatType}" data-def="${eng.defId}" title="Clear override">✕</button>
+      <button class="btn-icon btn-clear-override" ${keyAttrs} title="Clear override">✕</button>
     `;
     row.querySelector('.btn-clear-override')
-      .addEventListener('click', e => clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.def));
+      .addEventListener('click', e => clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.platform, e.currentTarget.dataset.def));
     return row;
   }
 
   // ── Normal / manually-overridden engagement ──────────────────────────────
-  const isOverride    = !!eng.isManualOverride;
-  const isPlaceholder = !!eng.isPlaceholder;
-  const statusClass   = eng.killed === 0 ? 'eng-none'
-                      : eng.survived === 0 ? 'eng-all' : 'eng-partial';
+  const isOverride  = !!eng.isManualOverride;
+  const statusClass = eng.killed === 0 ? 'eng-none'
+                    : eng.survived === 0 ? 'eng-all' : 'eng-partial';
 
-  row.className = `engagement-row ${statusClass}`
-    + (isPlaceholder ? ' eng-placeholder' : '')
-    + (isOverride    ? ' eng-overridden'  : '');
+  row.className = `engagement-row ${statusClass}` + (isOverride ? ' eng-overridden' : '');
 
-  const pkText = isPlaceholder
-    ? '<span class="eng-placeholder-badge">PLACEHOLDER</span>'
-    : `<span class="eng-pk">Pk = ${(eng.pk ?? 0).toFixed(2)}</span>`;
+  const shotsLabel = eng.model === 'directed_energy' ? 'no interceptors'
+                   : eng.model === 'gun' ? `${eng.cellShots}-round burst`
+                   : `${fmtNumber(eng.shotsPerEngagement ?? 0)} shot${eng.shotsPerEngagement !== 1 ? 's' : ''}`;
+  const pkText = `<span class="eng-pk" title="per-shot pk ${(eng.pkShot ?? 0).toFixed(2)} · ${shotsLabel}${eng.pkTier ? ' · ' + eng.pkTier + ' tier' : ''}">Pk = ${(eng.pk ?? 0).toFixed(2)}</span>`;
 
   const intUsed = eng.interceptorsUsed ?? 0;
 
   const overrideBadge = isOverride
     ? `<span class="override-badge">⚡ Override
-         <button class="btn-icon btn-clear-override"
-           data-threat="${threatType}" data-def="${eng.defId}" title="Clear override">✕</button>
+         <button class="btn-icon btn-clear-override" ${keyAttrs} title="Clear override">✕</button>
        </span>`
     : '';
 
   // Edit button only appears on un-overridden rows when a simulation is stored
   const editBtn = (!isOverride && threatType && lastSimResults)
-    ? `<button class="btn-icon btn-override-eng"
-         data-threat="${threatType}" data-def="${eng.defId}"
+    ? `<button class="btn-icon btn-override-eng" ${keyAttrs}
          data-threats-in="${eng.threatsIn}" data-killed="${eng.killed}"
          title="Override this layer's result">⚙</button>`
     : '';
@@ -2326,7 +2546,7 @@ function buildEngagementRow(eng, threatType = '') {
       <span class="eng-sep">/</span>
       <span class="eng-in">${eng.threatsIn} in</span>
       ${pkText}
-      ${intUsed > 0 ? `<span class="eng-interceptors">${intUsed} int.</span>` : ''}
+      ${intUsed > 0 ? `<span class="eng-interceptors">${fmtNumber(intUsed)} ${eng.model === 'gun' ? 'rds' : 'int.'}</span>` : ''}
     </div>
     ${editBtn}
   `;
@@ -2337,7 +2557,7 @@ function buildEngagementRow(eng, threatType = '') {
   row.querySelectorAll('.btn-clear-override')
     .forEach(btn => btn.addEventListener('click', e => {
       e.stopPropagation();
-      clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.def);
+      clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.platform, e.currentTarget.dataset.def);
     }));
 
   // ── Toggleable prose detail block ────────────────────────────────────────
@@ -2360,8 +2580,6 @@ function renderResultsFinal(results) {
   const allKilled   = results.totalOut === 0;
   const noneKilled  = results.totalOut === results.totalIn;
 
-  const hasPlaceholder = results.byThreatType.some(b => b.engagements.some(e => e.isPlaceholder));
-
   let html = `<div class="final-result ${allKilled ? 'final-all-killed' : noneKilled ? 'final-none-killed' : 'final-partial'}">`;
 
   if (allKilled) {
@@ -2378,10 +2596,6 @@ function renderResultsFinal(results) {
       ).join('');
       html += `<div class="final-penetrators">${chips}</div>`;
     }
-  }
-
-  if (hasPlaceholder) {
-    html += `<div class="placeholder-notice">⚠ One or more defensive layers used placeholder Pk = 0.00. Set actual Pk values in js/simulate.js for meaningful results.</div>`;
   }
 
   html += '</div>';
@@ -2419,7 +2633,7 @@ function _loadTargetState(targetId) {
     lastSimTarget      = s.lastSimTarget;
     lastSimDefenses    = JSON.parse(JSON.stringify(s.lastSimDefenses));
     preSimMagState     = JSON.parse(JSON.stringify(s.preSimMagState));
-    manualOverrides    = JSON.parse(JSON.stringify(s.manualOverrides));
+    manualOverrides    = _normalizeOverrides(JSON.parse(JSON.stringify(s.manualOverrides || {})));
     _manifestUnchanged = s._manifestUnchanged;
   } else {
     attackManifest     = [];
@@ -2516,7 +2730,8 @@ function _createSnapshot({ isInitial, type, label, targetId, targetName,
     results:        results    ? JSON.parse(JSON.stringify(results))        : null,
     allDefenses:    JSON.parse(JSON.stringify(allDefenses     || [])),
     manualOverrides:JSON.parse(JSON.stringify(manualOverrides || {})),
-    stats:          results    ? { totalIn: results.totalIn, totalOut: results.totalOut } : null
+    stats:          results    ? { totalIn: results.totalIn, totalOut: results.totalOut } : null,
+    engagementConfig: _engagementConfigRef()
   };
   return snap;
 }
@@ -2553,7 +2768,7 @@ function navigateToSnapshot(index) {
   lastSimTarget    = snap.targetId ? getTarget(snap.targetId)                    : null;
   lastSimDefenses  = JSON.parse(JSON.stringify(snap.allDefenses));
   preSimMagState   = JSON.parse(JSON.stringify(snap.preSimMagState));
-  manualOverrides  = JSON.parse(JSON.stringify(snap.manualOverrides));
+  manualOverrides  = _normalizeOverrides(JSON.parse(JSON.stringify(snap.manualOverrides || {})));
   attackManifest   = JSON.parse(JSON.stringify(snap.attackManifest));
   simHistoryCursor = index;
   _manifestUnchanged = !!snap.results;
@@ -2751,55 +2966,51 @@ function _buildAttackSection(snap, index) {
     </tr>`;
   }
 
-  // ── Per-threat-type engagement tables ─────────────────────────────────────
+  // ── Per-threat-type engagement tables, one block of rows per platform ────
   let engagementHtml = '';
   for (const group of snap.results.byThreatType) {
     const typeLabel = THREAT_TYPE_LABELS[group.threatType] || group.threatType;
     const killed    = group.initialCount - group.finalCount;
 
     let engRows = '';
-    for (const eng of group.engagements) {
-      const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—';
-
-      const sysCell = `${eng.systemName}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}`;
-
-      if (eng.note === 'Cannot engage') {
-        engRows += `<tr class="pr-row-dim">
-          <td>${sysCell}</td><td>${loc || '—'}</td>
-          <td colspan="5" class="pr-italic">Cannot engage this threat type</td></tr>`;
-        continue;
+    for (const plat of group.platforms || []) {
+      engRows += `<tr class="pr-platform-row"><td colspan="7">${plat.platformName} &nbsp;—&nbsp; ${plat.initialCount} inbound, ${plat.finalCount} leaked</td></tr>`;
+      if (plat.engagements.length === 0) {
+        engRows += `<tr class="pr-row-dim"><td colspan="7" class="pr-italic">No system engages this platform</td></tr>`;
       }
-      if (eng.note === 'Magazine exhausted') {
-        engRows += `<tr class="pr-row-dim">
-          <td>${sysCell}</td><td>${loc || '—'}</td>
+      for (const eng of plat.engagements) {
+        const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—';
+        const sysCell = `${eng.systemName}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}`;
+
+        if (eng.note === 'Cannot engage') {
+          engRows += `<tr class="pr-row-dim">
+            <td>${sysCell}</td><td>${loc || '—'}</td>
+            <td colspan="5" class="pr-italic">Cannot engage this platform (Pk 0)</td></tr>`;
+          continue;
+        }
+        if (eng.note === 'Magazine exhausted') {
+          engRows += `<tr class="pr-row-dim">
+            <td>${sysCell}</td><td>${loc || '—'}</td>
+            <td class="pr-num">${eng.threatsIn}</td>
+            <td colspan="4" class="pr-italic">Magazine exhausted</td></tr>`;
+          continue;
+        }
+
+        const tierLabel = eng.pkTier ? ` (${eng.pkTier})` : '';
+        const pkDisplay = `${(eng.pkShot ?? 0).toFixed(2)}/shot${tierLabel} → ${(eng.pk ?? 0).toFixed(2)}`;
+        const shotsDisplay = eng.model === 'directed_energy' ? '—'
+                           : eng.model === 'gun' ? `${eng.cellShots} rds` : fmtNumber(eng.shotsPerEngagement ?? 0);
+
+        engRows += `<tr>
+          <td>${sysCell}</td>
+          <td>${loc || '—'}</td>
           <td class="pr-num">${eng.threatsIn}</td>
-          <td colspan="4" class="pr-italic">Magazine exhausted</td></tr>`;
-        continue;
+          <td>${pkDisplay}</td>
+          <td class="pr-num">${shotsDisplay}</td>
+          <td class="pr-num">${eng.killed}</td>
+          <td class="pr-num${eng.survived > 0 ? ' pr-leaked' : ''}">${eng.survived}</td>
+        </tr>`;
       }
-      if (eng.isPlaceholder) {
-        engRows += `<tr class="pr-row-dim">
-          <td>${sysCell}</td><td>${loc || '—'}</td>
-          <td class="pr-num">${eng.threatsIn}</td>
-          <td colspan="4" class="pr-italic">Placeholder — Pk not modelled</td></tr>`;
-        continue;
-      }
-
-      const pkTierLabel = eng.pkTier
-        ? eng.pkTier.charAt(0).toUpperCase() + eng.pkTier.slice(1)
-        : '—';
-      const pkDisplay = (eng.pk != null)
-        ? `${eng.pk.toFixed(2)} (${pkTierLabel})`
-        : pkTierLabel;
-
-      engRows += `<tr>
-        <td>${sysCell}</td>
-        <td>${loc || '—'}</td>
-        <td class="pr-num">${eng.threatsIn}</td>
-        <td>${pkDisplay}</td>
-        <td class="pr-num">${eng.shotsPerEngagement ?? '—'}</td>
-        <td class="pr-num">${eng.killed}</td>
-        <td class="pr-num${eng.survived > 0 ? ' pr-leaked' : ''}">${eng.survived}</td>
-      </tr>`;
     }
 
     engagementHtml += `
@@ -2807,7 +3018,7 @@ function _buildAttackSection(snap, index) {
       <table class="pr-table">
         <thead><tr>
           <th>System</th><th>Location</th><th>In</th>
-          <th>Pk</th><th>Shots per Threat</th><th>Killed</th><th>Survived</th>
+          <th>Pk (per shot → engagement)</th><th>Shots per Threat</th><th>Killed</th><th>Survived</th>
         </tr></thead>
         <tbody>${engRows}</tbody>
       </table>
@@ -2820,9 +3031,9 @@ function _buildAttackSection(snap, index) {
     mrbm:           'MRBM',
     srbm:           'SRBM',
     cruise_missile: 'Cruise Missile',
+    drone_jet:      'Jet Drone',
     drone:          'Drone',
-    fpv:            'FPV',
-    hypersonic:     'Hypersonic'
+    fpv:            'FPV'
   };
 
   const typeParts = snap.results.byThreatType
@@ -3276,29 +3487,27 @@ function _getSimulationResults() {
       // Collect magazine-exhausted engagements (could have engaged but out of rounds)
       const magazineExhausted = [];
       const exhaustedSeen = new Set();
-      for (const g of s.results.byThreatType) {
-        for (const eng of g.engagements) {
-          // Interceptor tally (tracked systems only)
-          if (TRACKED_SYSTEMS.includes(eng.systemId)) {
-            const used = eng.interceptorsUsed || 0;
-            if (used > 0) {
-              const bucket = operatorMap[eng.defId] === 'United States' ? 'us' : 'allied';
-              interceptors[bucket][eng.systemId] = (interceptors[bucket][eng.systemId] || 0) + used;
-            }
+      for (const eng of allEngagements(s.results)) {
+        // Interceptor tally (tracked systems only)
+        if (TRACKED_SYSTEMS.includes(eng.systemId)) {
+          const used = eng.interceptorsUsed || 0;
+          if (used > 0) {
+            const bucket = operatorMap[eng.defId] === 'United States' ? 'us' : 'allied';
+            interceptors[bucket][eng.systemId] = (interceptors[bucket][eng.systemId] || 0) + used;
           }
-          // Magazine-exhausted: system could engage this threat type but had no rounds left
-          if (eng.note === 'Magazine exhausted') {
-            const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ');
-            const dedupeKey = `${eng.systemId}::${eng.defId}`;
-            if (!exhaustedSeen.has(dedupeKey)) {
-              exhaustedSeen.add(dedupeKey);
-              magazineExhausted.push({
-                systemName: eng.systemName || eng.systemId,
-                notes:      eng.notes      || '',
-                location:   loc            || '',
-                threatsIn:  eng.threatsIn  ?? null,
-              });
-            }
+        }
+        // Magazine-exhausted: system could engage this threat type but had no rounds left
+        if (eng.note === 'Magazine exhausted') {
+          const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ');
+          const dedupeKey = `${eng.systemId}::${eng.defId}`;
+          if (!exhaustedSeen.has(dedupeKey)) {
+            exhaustedSeen.add(dedupeKey);
+            magazineExhausted.push({
+              systemName: eng.systemName || eng.systemId,
+              notes:      eng.notes      || '',
+              location:   loc            || '',
+              threatsIn:  eng.threatsIn  ?? null,
+            });
           }
         }
       }
@@ -3315,9 +3524,14 @@ function _getSimulationResults() {
           threatType:   g.threatType,
           initialCount: g.initialCount,
           finalCount:   g.finalCount,
+          platforms:    (g.platforms || []).map(p => ({
+            platformId: p.platformId, platformName: p.platformName,
+            initialCount: p.initialCount, finalCount: p.finalCount
+          }))
         })),
         interceptors,
         magazineExhausted,
+        engagementConfig: s.engagementConfig || null
       };
     });
 }
@@ -4009,6 +4223,24 @@ function wireEvents() {
     e.target.value = '';   // reset so the same file can be re-imported
   });
 
+  // Import Pk table / doctrine — buttons trigger the hidden file inputs
+  document.getElementById('btn-import-pk').addEventListener('click', () => {
+    document.getElementById('import-pk-input').click();
+  });
+  document.getElementById('import-pk-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) importPkTable(file);
+    e.target.value = '';
+  });
+  document.getElementById('btn-import-doctrine').addEventListener('click', () => {
+    document.getElementById('import-doctrine-input').click();
+  });
+  document.getElementById('import-doctrine-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) importDoctrine(file);
+    e.target.value = '';
+  });
+
   // Export PDF (print)
   document.getElementById('btn-export-pdf').addEventListener('click', exportHistoryPDF);
   document.getElementById('btn-reload-all').addEventListener('click', performGlobalReload);
@@ -4060,7 +4292,7 @@ function _restoreSession() {
     lastSimTarget      = pts.lastSimTarget   || null;
     lastSimDefenses    = JSON.parse(JSON.stringify(pts.lastSimDefenses  || []));
     preSimMagState     = JSON.parse(JSON.stringify(pts.preSimMagState   || {}));
-    manualOverrides    = JSON.parse(JSON.stringify(pts.manualOverrides  || {}));
+    manualOverrides    = _normalizeOverrides(JSON.parse(JSON.stringify(pts.manualOverrides  || {})));
     _manifestUnchanged = pts._manifestUnchanged || false;
   }
 
@@ -4087,6 +4319,7 @@ function _restoreSession() {
 async function init() {
   await loadData();
   mergeLoadedData();
+  applyEngagementConfig();
   renderTargetDropdown();
   populatePlatformSelect();
   renderDefenseLayers(null);

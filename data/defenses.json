@@ -18,8 +18,7 @@
         "shotRoll": {
           "mrbm": { "chance": 0.1, "shots": 1.5 }
         }
-      },
-      "threats": ["srbm", "mrbm"]
+      }
     },
     {
       "id": "arrow",
@@ -33,8 +32,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 24
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["srbm", "mrbm"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "aegis_sm3",
@@ -48,8 +46,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 75
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["srbm", "mrbm"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "patriot",
@@ -64,8 +61,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 12
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "davids_sling",
@@ -79,8 +75,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 36
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "cheongung2",
@@ -94,8 +89,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 32
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["srbm", "mrbm", "cruise_missile", "drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "aegis_sm2",
@@ -109,8 +103,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 75
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "aegis_sm6",
@@ -124,8 +117,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 75
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["srbm", "cruise_missile"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "iron_dome",
@@ -139,8 +131,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 60
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "nasams",
@@ -154,8 +145,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 18
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "ifpc2",
@@ -169,8 +159,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 36
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "pantsirs1e",
@@ -184,8 +173,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 36
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "fslids",
@@ -199,8 +187,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 16
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["drone", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "m_shorad",
@@ -214,8 +201,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 24
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "phalanx_cram",
@@ -229,8 +215,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 1550
       },
-      "engagement": { "model": "gun", "burstsPerPass": 1 },
-      "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
+      "engagement": { "model": "gun", "burstsPerPass": 1 }
     },
     {
       "id": "tactical_jammer",
@@ -244,8 +229,7 @@
         "kill_modality": "jamming",
         "standard_loadout": 999
       },
-      "engagement": { "model": "directed_energy", "killCapPerPass": 5 },
-      "threats": ["drone", "fpv"]
+      "engagement": { "model": "directed_energy", "killCapPerPass": 5 }
     },
     {
       "id": "merops",
@@ -259,8 +243,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 2
       },
-      "engagement": { "model": "kinetic" },
-      "threats": ["drone", "fpv"]
+      "engagement": { "model": "kinetic" }
     },
     {
       "id": "high_powered_microwave",
@@ -274,8 +257,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
-      "engagement": { "model": "directed_energy" },
-      "threats": ["drone", "fpv"]
+      "engagement": { "model": "directed_energy" }
     },
     {
       "id": "containerized_laser",
@@ -289,8 +271,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
-      "engagement": { "model": "directed_energy", "killCapPerPass": 10 },
-      "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
+      "engagement": { "model": "directed_energy", "killCapPerPass": 10 }
     },
     {
       "id": "iron_beam",
@@ -304,8 +285,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
-      "engagement": { "model": "directed_energy", "killCapPerPass": 10 },
-      "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
+      "engagement": { "model": "directed_energy", "killCapPerPass": 10 }
     },
     {
       "id": "f15e_patrol",
@@ -320,8 +300,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 200
       },
-      "engagement": { "model": "patrol", "cap": 20, "pLow": 0.5 },
-      "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
+      "engagement": { "model": "patrol", "cap": 20, "pLow": 0.5 }
     },
     {
       "id": "f15i_patrol",
@@ -336,8 +315,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 100
       },
-      "engagement": { "model": "patrol", "cap": 25, "pLow": 0 },
-      "threats": ["drone", "drone_jet", "fpv"]
+      "engagement": { "model": "patrol", "cap": 25, "pLow": 0 }
     },
     {
       "id": "fa18_patrol",
@@ -352,8 +330,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 72
       },
-      "engagement": { "model": "patrol", "cap": 20, "pLow": 0.5 },
-      "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
+      "engagement": { "model": "patrol", "cap": 20, "pLow": 0.5 }
     }
   ]
 }

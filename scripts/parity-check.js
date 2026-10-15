@@ -74,6 +74,9 @@ const newPC = newEngine.buildPlatformCatalog(attacksRaw);
 const { table: pkTable, warnings: pkW }   = newEngine.normalizePkTable(readJson('data/pk-table.json'), newDC, newPC);
 const { doctrine, warnings: docW }        = newEngine.normalizeDoctrine(readJson('data/doctrine.json'), newDC);
 if (pkW.length || docW.length) { console.warn('[parity] data warnings:', [...pkW, ...docW].slice(0, 10)); }
+// Capability (which threat types a system can engage) comes from the doctrine
+// for BOTH engines, so the cross-target range filter is identical.
+const CAPABILITY = Object.fromEntries(Object.keys(newDC).map(id => [id, newEngine.systemThreatTypes(doctrine, id)]));
 
 // Systems whose legacy Pk never rolled (pkIsFixed true for every type they engage).
 const FIXED = new Set(Object.keys(oldEngFns).filter(id => {
@@ -117,13 +120,13 @@ function defensesFor(laydown, tid, dc) {
     for (const d of laydown[oid]) {
       const c = dc[d.system]; if (!c || c.range_km <= 0) continue;
       const ov = c.threatRangeOverrides || {};
-      const types = (DS[d.system].threats || []).filter(tt => dist <= (ov[tt] ?? c.range_km));
+      const types = (CAPABILITY[d.system] || []).filter(tt => dist <= (ov[tt] ?? c.range_km));
       if (!types.length) continue;
       const op = d.operator || '';
       if (op !== 'United States' && op !== (t.country || '')) continue;   // default-disabled coverage
       cross.push({ id: d.id, system: d.system, quantity: d.quantity, notes: d.notes || '', operator: op,
         locationName: o.name, locationCountry: o.country || '',
-        restrictToThreatTypes: types.length < (DS[d.system].threats || []).length ? types : null, _dist: dist });
+        restrictToThreatTypes: types.length < (CAPABILITY[d.system] || []).length ? types : null, _dist: dist });
     }
   }
   cross.sort((a, b) => a._dist - b._dist);

@@ -138,6 +138,38 @@ header {
   border: 1px solid var(--border);
 }
 
+/* Pk table and doctrine indicators — same look as the laydown badge */
+.config-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.config-indicator-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}
+
+.config-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+.config-badge--custom {
+  background: var(--warn-dim);
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
 .attack-badge--active {
   background: var(--accent-dim);
   color: var(--accent);
@@ -959,10 +991,6 @@ select option, select optgroup {
   overflow: hidden;
 }
 
-.result-layer-card.is-placeholder {
-  border-left-color: var(--warn);
-}
-
 .result-layer-header {
   display: flex;
   justify-content: space-between;
@@ -1050,18 +1078,6 @@ select option, select optgroup {
 .detail-note   { color: var(--text-dim); font-style: italic; font-size: 11px; }
 .detail-note-text { color: var(--text-dim); font-size: 11px; }
 
-.placeholder-badge {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  padding: 1px 5px;
-  background: var(--warn-dim);
-  color: var(--warn);
-  border: 1px solid var(--warn);
-  border-radius: 3px;
-}
-
 .result-layer-footer {
   display: flex;
   align-items: center;
@@ -1077,13 +1093,6 @@ select option, select optgroup {
 .footer-in    { color: var(--text-dim); }
 .footer-arrow { color: var(--border); }
 .footer-out   { color: var(--text-bright); font-weight: 700; }
-
-.placeholder-warning {
-  font-size: 11px;
-  color: var(--warn);
-  font-family: var(--font-ui);
-  margin-left: auto;
-}
 
 /* ── Threat-type sections (simulation results) ───────────────────────────── */
 
@@ -1110,6 +1119,23 @@ select option, select optgroup {
 .threat-section-ballistic_missile { background: #221510; color: #ffa657; border-bottom-color: #602020; }
 .threat-section-cruise_missile    { background: #1e1228; color: #d2a8ff; border-bottom-color: #4a2060; }
 .threat-section-drone             { background: #0e1e2a; color: #79c0ff; border-bottom-color: #1f4060; }
+
+/* One block per attack platform inside a threat section (manifest order) */
+.platform-section + .platform-section { border-top: 1px dashed var(--border); }
+
+.platform-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 12px 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.platform-section-name  { font-weight: 600; color: var(--text); }
+.platform-section-count { white-space: nowrap; }
 
 .threat-section-icon  { font-size: 14px; }
 .threat-section-label { flex: 1; }
@@ -1175,19 +1201,6 @@ select option, select optgroup {
 .eng-all     .eng-killed { color: var(--success); }
 .eng-partial .eng-killed { color: var(--warn); }
 
-.eng-placeholder .eng-pk { display: none; }
-
-.eng-placeholder-badge {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  padding: 1px 5px;
-  background: var(--warn-dim);
-  color: var(--warn);
-  border: 1px solid var(--warn);
-  border-radius: 3px;
-}
 
 /* Cannot engage this threat type */
 .eng-no-capability {
@@ -1348,6 +1361,9 @@ select option, select optgroup {
   margin-bottom: 10px;
 }
 
+/* Same style, shown when the displayed result used a different Pk table / doctrine */
+.config-notice { display: block; line-height: 1.4; }
+
 /* Inline link-style button used inside notices / badges */
 .btn-inline {
   background: none;
@@ -1419,17 +1435,6 @@ select option, select optgroup {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-}
-
-.placeholder-notice {
-  margin-top: 12px;
-  padding: 8px 12px;
-  background: var(--warn-dim);
-  border: 1px solid var(--warn);
-  border-radius: var(--radius);
-  font-size: 12px;
-  color: var(--warn);
-  font-family: var(--font-ui);
 }
 
 /* ── Storage notice ──────────────────────────────────────────────────────── */
@@ -1705,6 +1710,14 @@ select option, select optgroup {
   .pr-italic { font-style: italic; color: #777; }
   .pr-leaked { font-weight: bold; }
   .pr-row-dim td { color: #999; }
+
+.pr-platform-row td {
+  background: #f0f0f0;
+  font-weight: 600;
+  font-size: 9.5px;
+  padding-top: 4px;
+  padding-bottom: 3px;
+}
   .pr-notes  { font-style: italic; color: #555; }
 
   /* ── Sub-summary / attack summary ─────────────────────────────────────── */

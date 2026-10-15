@@ -381,7 +381,8 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
           platformId:      group.platformId,
           platformName:    platform.name,
           model:           catalog.engagement?.model || 'kinetic',
-          modelParams:     params
+          modelParams:     params,
+          cellShots:       cell.shots
         });
 
         // A cell with pk 0 means the system cannot engage this platform.

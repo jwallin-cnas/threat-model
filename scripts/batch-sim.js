@@ -18,7 +18,7 @@
  *
  * Usage:
  *   npm run batch
- *   node scripts/batch-sim.js
+ *   node scripts/batch-sim.js [--pk <pk-table.json>] [--doctrine <doctrine.json>]
  *
  * Prerequisites:
  *   npm install
@@ -36,6 +36,14 @@ import { fileURLToPath }                          from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT      = path.join(__dirname, '..');
+
+// ── CLI flags ─────────────────────────────────────────────────────────────────
+//   --pk <file>        Pk table JSON to load before the batch (default: data/pk-table.json via the app)
+//   --doctrine <file>  doctrine JSON to load before the batch (default: data/doctrine.json via the app)
+const argv   = process.argv.slice(2);
+const argOpt = name => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
+const PK_FILE       = argOpt('--pk');
+const DOCTRINE_FILE = argOpt('--doctrine');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Minimal static file server
@@ -438,6 +446,17 @@ async function main() {
   await page.waitForFunction(() => window._appReady === true, { timeout: 20_000 });
   // Reset to the fixed seed so the full batch is reproducible from this point
   await page.evaluate(() => window._setSeed(window.FIXED_SEED));
+
+  // Optional engagement configuration overrides (otherwise the app's defaults apply)
+  for (const [flag, file, hook] of [['--pk', PK_FILE, '_importPkTableDirect'], ['--doctrine', DOCTRINE_FILE, '_importDoctrineDirect']]) {
+    if (!file) continue;
+    const data = JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+    const res  = await page.evaluate(([h, d]) => window[h](d), [hook, data]);
+    console.log(`[batch] ${flag} ${file} → "${res.name}"${res.warnings.length ? ` (${res.warnings.length} warning(s))` : ''}`);
+    res.warnings.forEach(w => console.warn(`  [warn]  ${w}`));
+  }
+  const cfg = await page.evaluate(() => ({ pk: activePkName, doctrine: activeDoctrineName }));
+  console.log(`[batch] Pk table "${cfg.pk}" · doctrine "${cfg.doctrine}"`);
   console.log('[batch] App ready\n');
 
   // ── Run all combinations ──────────────────────────────────────────────────
