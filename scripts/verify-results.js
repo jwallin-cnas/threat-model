@@ -97,7 +97,8 @@ function simResultsToLeakers(simResults) {
 // and per-type summaries. We parse the summary line for each threat type.
 function parsePrintHtml(html) {
   // Match lines like: "SRBM 150 incoming → 0 leakers"  (the bold summary line)
-  const re = /(\w[\w\s]*?)\s+([\d,]+)\s+incoming\s+→\s+([\d,]+)\s+leakers?/gi;
+  // The leaker count is wrapped in <strong> by _buildAttackSection().
+  const re = /(\w[\w\s]*?)\s+([\d,]+)\s+incoming\s+→\s+(?:<strong>)?([\d,]+)\s+leakers?/gi;
   const results = [];
   let m;
   while ((m = re.exec(html)) !== null) {
@@ -250,7 +251,9 @@ async function main() {
       // Simpler: compare grand total leakers (sim vs PDF)
       const simGrandTotal  = Object.values(simTotalByType).reduce((s, v) => s + v, 0);
       // Extract "N leaked" from PDF HTML — the bold summary per threat type block
-      const pdfTotalMatch  = printHtml.match(/(\d+)\s+leaked/gi) || [];
+      // Only the per-type sub-summary wraps the count in <strong>; the
+      // per-platform rows ("N inbound, N leaked") must not be counted twice.
+      const pdfTotalMatch  = printHtml.match(/<strong>(\d+)\s+leaked<\/strong>/gi) || [];
       const pdfGrandTotal  = pdfTotalMatch.reduce((s, m) => {
         const n = parseInt(m.match(/\d+/)[0], 10);
         return s + n;
