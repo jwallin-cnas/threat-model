@@ -17,8 +17,9 @@
 }
 
 .dc-col {
-  flex: 1 1 0;
-  min-width: 240px;
+  /* Fixed comfortable width: the board scrolls sideways rather than squeezing text. */
+  flex: 0 0 320px;
+  width: 320px;
   background: var(--bg-panel);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
@@ -107,13 +108,13 @@
 .dc-card {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: var(--bg-card);
   border: 1px solid var(--border-soft);
   border-left: 3px solid var(--tier-color, #888);
   border-radius: var(--radius);
-  padding: 6px 6px 6px 8px;
-  font-size: 12px;
+  padding: 9px 8px 9px 10px;
+  font-size: 13px;
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -130,13 +131,12 @@
 .dc-card-name {
   font-weight: 600;
   color: var(--text-bright);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;   /* long names wrap; nothing is cut off */
 }
 
 .dc-card-sub {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
   font-family: var(--font-mono);
 }
@@ -210,7 +210,7 @@ body.is-dragging .dc-card, body.is-dragging .dc-col-head { cursor: grabbing; }
 /* ── Narrow screens ───────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .dc-col { min-width: 220px; }
+  .dc-col { flex-basis: 280px; width: 280px; }
 }
 
 /* ── Locked systems (doctrine.locked) ─────────────────────────────────────── */
