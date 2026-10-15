@@ -58,8 +58,26 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 16px 24px;
 }
+
+/* The title block keeps its width; the button group wraps onto as many
+   lines as it needs (two at desktop widths) instead of squeezing the title. */
+.header-title {
+  flex: 0 0 auto;
+  min-width: 300px;
+}
+
+/* Laydown / Attack / Pk table / Doctrine badges in two columns under the subtitle */
+.header-badges {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 20px;
+  row-gap: 0;
+  margin-top: 6px;
+  justify-content: start;
+}
+.header-badges > div { margin-top: 2px; }
 
 .header-title h1 {
   font-size: 18px;
@@ -79,7 +97,11 @@ header {
 
 .header-controls {
   display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+  min-width: 0;
 }
 
 .laydown-indicator {
@@ -453,6 +475,10 @@ select option, select optgroup {
   border: 1px solid var(--border-soft);
   margin-bottom: 10px;
   position: relative;
+  /* Own stacking context: Leaflet's panes (z-index 400+) stay inside the
+     map box and cannot paint over the sticky header (z-index 100). */
+  z-index: 0;
+  isolation: isolate;
   background: #111;
 }
 
