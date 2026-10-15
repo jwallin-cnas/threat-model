@@ -40,6 +40,12 @@
           "minimum": 0,
           "description": "Maximum engagement range in kilometers. Use 0 for shared/patrol assets with no fixed emplacement range."
         },
+        "tier": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "description": "Optional display tier override (1 = exo-atmospheric … 6 = close-in). When absent the tier is inferred from range_km: ≥200 → 1, ≥100 → 2, ≥50 → 3, ≥25 → 4, ≥10 → 5, else 6. Tier affects card order and builder grouping only, never the engagement order."
+        },
         "threat_range_overrides": {
           "type": "object",
           "description": "Per-threat-type range overrides in km. Keys are threat type strings (e.g. 'srbm', 'mrbm'); values override range_km for the cross-target range check for that type only. Omit to use range_km for all threat types.",

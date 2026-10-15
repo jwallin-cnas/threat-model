@@ -305,6 +305,7 @@
       "id": "f15e_patrol",
       "name": "F-15E Patrol (×4)",
       "range_km": 200,
+      "tier": 2,
       "batteries": 1,
       "shared": true,
       "armament": {
@@ -320,6 +321,7 @@
       "id": "f15i_patrol",
       "name": "F-15I Patrol (×4)",
       "range_km": 200,
+      "tier": 2,
       "batteries": 1,
       "shared": true,
       "armament": {

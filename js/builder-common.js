@@ -70,7 +70,9 @@ function getBuilderPreset(id) {
  * full name. Use the full name in a tooltip alongside it.
  */
 function systemShortLabel(sys) {
-  const m = /\(([^()]{2,12})\)\s*$/.exec(sys?.name || '');
+  // Only an upper-case abbreviation counts ("THAAD", "FS-LIDS", "IFPC-2");
+  // a trailing count such as "(×4)" is part of the name and stays.
+  const m = /\(([A-Z][A-Z0-9/-]{1,11})\)\s*$/.exec(sys?.name || '');
   return m ? m[1] : (sys?.shortName || sys?.name || '');
 }
 

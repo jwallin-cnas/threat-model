@@ -37,6 +37,13 @@ describe('shipped data files', () => {
     expect(cfg.defenseCatalog.vampire).toMatchObject({ range_km: 15, magazinePerBattery: 20, tier: 5 });
   });
 
+  it('place the F-15 patrols in the upper endo-atmospheric tier by explicit override', () => {
+    expect(cfg.defenseCatalog.f15e_patrol.tier).toBe(2);
+    expect(cfg.defenseCatalog.f15i_patrol.tier).toBe(2);
+    expect(cfg.defenseCatalog.fa18_patrol.tier).toBe(2);     // 100 km → tier 2 by range
+    expect(cfg.defenseCatalog.thaad.tier).toBe(1);           // 200 km → tier 1 by range
+  });
+
   it('give MEROPS a 10-interceptor loadout', () => {
     expect(cfg.defenseCatalog.merops.magazinePerBattery).toBe(10);
   });

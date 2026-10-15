@@ -56,7 +56,9 @@ function inferTier(range_km) {
 function buildDefenseCatalog(systems) {
   const catalog = {};
   for (const sys of systems) {
-    const tier = inferTier(sys.range_km);
+    // An explicit `tier` in defenses.json overrides the range-based default
+    // (used to place the F-15 patrols in the upper endo-atmospheric tier).
+    const tier = Number.isInteger(sys.tier) ? sys.tier : inferTier(sys.range_km);
     catalog[sys.id] = {
       id:                   sys.id,
       name:                 sys.name,
