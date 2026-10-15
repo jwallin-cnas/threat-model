@@ -16,6 +16,7 @@
       "iron_dome",
       "nasams",
       "ifpc2",
+      "vampire",
       "pantsirs1e"
     ],
     "drone_jet": [
@@ -29,6 +30,7 @@
       "iron_dome",
       "nasams",
       "ifpc2",
+      "vampire",
       "pantsirs1e",
       "iron_beam",
       "containerized_laser",
@@ -46,6 +48,7 @@
       "iron_dome",
       "nasams",
       "ifpc2",
+      "vampire",
       "pantsirs1e",
       "fslids",
       "merops",
@@ -67,6 +70,7 @@
       "iron_dome",
       "nasams",
       "ifpc2",
+      "vampire",
       "pantsirs1e",
       "fslids",
       "merops",

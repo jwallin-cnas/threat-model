@@ -28,6 +28,7 @@
  *   node scripts/generate-engagement-defaults.js            # read js/*.js from disk
  *   node scripts/generate-engagement-defaults.js --ref 6f5409c   # read legacy files from a git ref
  *   node scripts/generate-engagement-defaults.js --dry-run  # print, write nothing
+ *   node scripts/generate-engagement-defaults.js --ref 9bded9b --clone vampire=ifpc2   # VAMPIRE copies IFPC-2
  */
 
 import * as fs           from 'fs';
@@ -44,6 +45,12 @@ const args   = process.argv.slice(2);
 const refIdx = args.indexOf('--ref');
 const REF    = refIdx >= 0 ? args[refIdx + 1] : null;
 const DRY    = args.includes('--dry-run');
+// --clone new=existing[,new2=existing2]: systems with no legacy function that
+// copy another system's Pk row and doctrine slots (inserted right after it).
+const cloneIdx = args.indexOf('--clone');
+const CLONES   = cloneIdx >= 0
+  ? Object.fromEntries(args[cloneIdx + 1].split(',').map(pair => pair.split('=').map(s => s.trim())))
+  : {};
 
 // ── Engagement model classification ──────────────────────────────────────────
 // This mapping is a design decision, not something the legacy code states.
@@ -129,6 +136,13 @@ for (const sys of systems) {
   }
 }
 
+// Clones: copy the source row cell for cell.
+for (const [newId, srcId] of Object.entries(CLONES)) {
+  if (!cells[srcId]) { console.warn(`[generate] --clone ${newId}=${srcId}: unknown source system`); continue; }
+  if (!systems.includes(newId)) { console.warn(`[generate] --clone ${newId}: not in defenses.json`); continue; }
+  cells[newId] = JSON.parse(JSON.stringify(cells[srcId]));
+}
+
 const pkTable = {
   version: '1.0',
   name:    'Baseline (generated from legacy engagement.js)',
@@ -141,6 +155,14 @@ const pkTable = {
 const engage = {};
 for (const type of THREAT_PRIORITY) {
   engage[type] = ENGAGEMENT_PRIORITY.filter(sys => legacyParams(sys, type) !== null);
+}
+
+// Clones: slot right after the source system in every list that has it.
+for (const [newId, srcId] of Object.entries(CLONES)) {
+  for (const list of Object.values(engage)) {
+    const i = list.indexOf(srcId);
+    if (i >= 0 && !list.includes(newId)) list.splice(i + 1, 0, newId);
+  }
 }
 
 const doctrine = {

@@ -162,6 +162,20 @@
       "engagement": { "model": "kinetic" }
     },
     {
+      "id": "vampire",
+      "name": "Vehicle-Agnostic Modular Palletized ISR Rocket Equipment (VAMPIRE)",
+      "range_km": 15,
+      "batteries": 1,
+      "armament": {
+        "type": "missile",
+        "name": "APKWS II laser-guided rocket",
+        "payload_kg": 4.5,
+        "kill_modality": "fragmentation",
+        "standard_loadout": 20
+      },
+      "engagement": { "model": "kinetic" }
+    },
+    {
       "id": "pantsirs1e",
       "name": "Pantsir-S1E",
       "range_km": 20,
@@ -241,7 +255,7 @@
         "name": "Electronic Attack Suite",
         "payload_kg": 0,
         "kill_modality": "fragmentation",
-        "standard_loadout": 2
+        "standard_loadout": 10
       },
       "engagement": { "model": "kinetic" }
     },

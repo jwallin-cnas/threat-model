@@ -22,8 +22,23 @@ describe('shipped data files', () => {
     const systems   = Object.keys(cfg.defenseCatalog);
     const platforms = Object.keys(cfg.platformCatalog);
     for (const s of systems) for (const p of platforms) expect(cfg.pkTable.cells[s][p]).toBeDefined();
-    expect(systems.length).toBe(23);
+    expect(systems.length).toBe(24);
     expect(platforms.length).toBe(22);
+  });
+
+  it('give VAMPIRE the same Pk row and doctrine slots as IFPC-2, right after it', () => {
+    expect(cfg.pkTable.cells.vampire).toEqual(cfg.pkTable.cells.ifpc2);
+    for (const type of cfg.doctrine.typeOrder) {
+      const list = cfg.doctrine.engage[type];
+      const i = list.indexOf('ifpc2');
+      if (i >= 0) expect(list[i + 1]).toBe('vampire');
+      else        expect(list).not.toContain('vampire');
+    }
+    expect(cfg.defenseCatalog.vampire).toMatchObject({ range_km: 15, magazinePerBattery: 20, tier: 5 });
+  });
+
+  it('give MEROPS a 10-interceptor loadout', () => {
+    expect(cfg.defenseCatalog.merops.magazinePerBattery).toBe(10);
   });
 
   it('carry the legacy per-engagement values converted to per-shot', () => {
