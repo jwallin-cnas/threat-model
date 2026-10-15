@@ -13,6 +13,12 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 48
       },
+      "engagement": {
+        "model": "kinetic",
+        "shotRoll": {
+          "mrbm": { "chance": 0.1, "shots": 1.5 }
+        }
+      },
       "threats": ["srbm", "mrbm"]
     },
     {
@@ -27,6 +33,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 24
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["srbm", "mrbm"]
     },
     {
@@ -41,6 +48,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 75
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["srbm", "mrbm"]
     },
     {
@@ -56,6 +64,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 12
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["srbm", "mrbm", "cruise_missile", "drone", "drone_jet", "fpv"]
     },
     {
@@ -70,6 +79,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 36
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["srbm", "mrbm", "cruise_missile", "drone", "drone_jet", "fpv"]
     },
     {
@@ -84,6 +94,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 32
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["srbm", "mrbm", "cruise_missile", "drone", "drone_jet", "fpv"]
     },
     {
@@ -98,6 +109,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 75
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
     },
     {
@@ -112,6 +124,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 75
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["srbm", "cruise_missile"]
     },
     {
@@ -126,6 +139,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 60
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
     },
     {
@@ -140,6 +154,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 18
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
     },
     {
@@ -154,6 +169,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 36
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["drone", "drone_jet", "fpv"]
     },
     {
@@ -168,6 +184,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 36
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["cruise_missile", "drone", "drone_jet", "fpv"]
     },
     {
@@ -182,6 +199,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 16
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["drone", "fpv"]
     },
     {
@@ -196,6 +214,7 @@
         "kill_modality": "hit-to-kill",
         "standard_loadout": 24
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
     },
     {
@@ -210,6 +229,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 1550
       },
+      "engagement": { "model": "gun", "burstsPerPass": 1 },
       "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
     },
     {
@@ -224,6 +244,7 @@
         "kill_modality": "jamming",
         "standard_loadout": 999
       },
+      "engagement": { "model": "directed_energy", "killCapPerPass": 5 },
       "threats": ["drone", "fpv"]
     },
     {
@@ -238,6 +259,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 2
       },
+      "engagement": { "model": "kinetic" },
       "threats": ["drone", "fpv"]
     },
     {
@@ -252,6 +274,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
+      "engagement": { "model": "directed_energy" },
       "threats": ["drone", "fpv"]
     },
     {
@@ -266,6 +289,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
+      "engagement": { "model": "directed_energy", "killCapPerPass": 10 },
       "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
     },
     {
@@ -280,6 +304,7 @@
         "kill_modality": "directed-energy",
         "standard_loadout": 999
       },
+      "engagement": { "model": "directed_energy", "killCapPerPass": 10 },
       "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
     },
     {
@@ -295,6 +320,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 200
       },
+      "engagement": { "model": "patrol", "cap": 20, "pLow": 0.5 },
       "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
     },
     {
@@ -310,6 +336,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 100
       },
+      "engagement": { "model": "patrol", "cap": 25, "pLow": 0 },
       "threats": ["drone", "drone_jet", "fpv"]
     },
     {
@@ -325,6 +352,7 @@
         "kill_modality": "fragmentation",
         "standard_loadout": 72
       },
+      "engagement": { "model": "patrol", "cap": 20, "pLow": 0.5 },
       "threats": ["drone", "drone_jet", "cruise_missile", "fpv"]
     }
   ]

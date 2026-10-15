@@ -57,6 +57,9 @@
         "armament": {
           "$ref": "#/definitions/Armament"
         },
+        "engagement": {
+          "$ref": "#/definitions/Engagement"
+        },
         "threats": {
           "type": "array",
           "description": "Threat types this system is designed to engage.",
@@ -64,8 +67,56 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "enum": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"]
+            "enum": ["srbm", "mrbm", "cruise_missile", "drone", "drone_jet", "fpv", "hypersonic"]
           }
+        }
+      }
+    },
+
+    "Engagement": {
+      "type": "object",
+      "description": "How the engine turns a Pk-table cell (per-shot pk, shots) into an engagement. The model names the rule; the other fields are that model's parameters.",
+      "required": ["model"],
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["kinetic", "directed_energy", "gun", "patrol"],
+          "description": "kinetic: P = 1 − (1 − pk)^shots, magazine spent. directed_energy: P = pk, no magazine, optional kill cap per pass. gun: pk per burst of `shots` rounds, burstsPerPass bursts. patrol: pk for the first `cap` threats, pLow beyond, folded into one effective P."
+        },
+        "shotRoll": {
+          "type": "object",
+          "description": "kinetic only. Per threat type, a chance that the shot count is replaced by a different value (THAAD: 10 percent chance of 1.5 shots against MRBM).",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["chance", "shots"],
+            "additionalProperties": false,
+            "properties": {
+              "chance": { "type": "number", "minimum": 0, "maximum": 1 },
+              "shots":  { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "killCapPerPass": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "directed_energy only. Maximum kills in one pass against one platform group, regardless of salvo size."
+        },
+        "burstsPerPass": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "gun only. Bursts fired in one pass; each burst spends `shots` rounds and kills with probability pk."
+        },
+        "cap": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "patrol only. Number of threats engaged at the cell pk before pLow applies."
+        },
+        "pLow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "patrol only. Per-shot pk for threats beyond `cap`."
         }
       }
     },

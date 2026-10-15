@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data/schemas/pk-table.schema.json",
+  "title": "Pk Table Schema",
+  "description": "Validates pk-table.json and files exported by the Pk matrix builder: a dense defense system × attack platform matrix of per-shot kill probability and shots per engagement.",
+  "type": "object",
+  "required": ["version", "cells"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "name": {
+      "type": "string",
+      "description": "Display name shown in the tool's header badge."
+    },
+    "tiers": {
+      "type": "object",
+      "description": "Multipliers applied to a cell's pk after a random tier roll (u ≥ 0.67 high, u ≥ 0.33 medium, else low). All three at 1.0 make Pk deterministic and skip the roll.",
+      "additionalProperties": false,
+      "properties": {
+        "low":    { "type": "number", "minimum": 0 },
+        "medium": { "type": "number", "minimum": 0 },
+        "high":   { "type": "number", "minimum": 0 }
+      }
+    },
+    "cells": {
+      "type": "object",
+      "description": "Keyed by defense system id (defenses.json), then by attack platform id (attacks.json).",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["pk", "shots"],
+          "additionalProperties": false,
+          "properties": {
+            "pk": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Per-shot probability of kill. 0 means the system cannot engage this platform."
+            },
+            "shots": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Interceptors fired per threat engaged (kinetic, patrol), rounds per burst (gun), or 0 (directed energy)."
+            }
+          }
+        }
+      }
+    }
+  }
+}

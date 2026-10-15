@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data/schemas/doctrine.schema.json",
+  "title": "Engagement Doctrine Schema",
+  "description": "Validates doctrine.json and files exported by the Doctrine builder: the order in which threat types are processed and, for each type, the ordered list of defense systems allowed to engage it.",
+  "type": "object",
+  "required": ["version", "typeOrder", "engage"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "name": {
+      "type": "string",
+      "description": "Display name shown in the tool's header badge."
+    },
+    "typeOrder": {
+      "type": "array",
+      "description": "Threat types in processing order. Magazine spent on an earlier type carries into later types.",
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["mrbm", "srbm", "cruise_missile", "drone_jet", "drone", "fpv"] }
+    },
+    "engage": {
+      "type": "object",
+      "description": "For each threat type in typeOrder, the defense system ids allowed to engage it, outermost first. A system absent from a list never engages that type.",
+      "additionalProperties": false,
+      "properties": {
+        "mrbm":           { "$ref": "#/definitions/SystemList" },
+        "srbm":           { "$ref": "#/definitions/SystemList" },
+        "cruise_missile": { "$ref": "#/definitions/SystemList" },
+        "drone_jet":      { "$ref": "#/definitions/SystemList" },
+        "drone":          { "$ref": "#/definitions/SystemList" },
+        "fpv":            { "$ref": "#/definitions/SystemList" }
+      }
+    }
+  },
+  "definitions": {
+    "SystemList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}
