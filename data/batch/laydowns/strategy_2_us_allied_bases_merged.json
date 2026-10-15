@@ -8,7 +8,7 @@
         "quantity": 3,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "doha_d2",
@@ -16,7 +16,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 5
+        "reloads": 6
       }
     ],
     "ras_laffan_lng": [
@@ -26,7 +26,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 6
+        "reloads": 7
       }
     ],
     "hamad_port": [
@@ -36,7 +36,7 @@
         "quantity": 3,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "hamad_port_d2",
@@ -44,7 +44,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 3
+        "reloads": 4
       }
     ],
     "us_fifth_fleet": [
@@ -54,7 +54,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Bahrain",
-        "reloads": 6
+        "reloads": 7
       },
       {
         "id": "s2_5thfleet_fslids",
@@ -62,7 +62,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 5
+        "reloads": 6
       },
       {
         "id": "s2_5thfleet_cram",
@@ -70,7 +70,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 5
+        "reloads": 6
       }
     ],
     "jebel_ali_port": [
@@ -80,7 +80,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "jebel_ali_port_d2",
@@ -88,7 +88,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "jebel_ali_port_d3",
@@ -96,7 +96,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "al_dhafra_ab": [
@@ -106,7 +106,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "al_dhafra_ab_d2",
@@ -114,7 +114,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "s2_dhafra_merops",
@@ -122,7 +122,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 4
+        "reloads": 5
       },
       {
         "id": "s2_dhafra_hpm",
@@ -130,7 +130,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_dhafra_tjammer",
@@ -138,7 +138,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "dubai": [
@@ -148,7 +148,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 2
+        "reloads": 3
       }
     ],
     "abu_dhabi": [
@@ -158,7 +158,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "ruwais_refinery": [
@@ -168,7 +168,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "ruwais_refinery_d2",
@@ -176,7 +176,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "fujairah_port": [
@@ -186,7 +186,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "fujairah_port_d2",
@@ -194,7 +194,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 2
+        "reloads": 3
       }
     ],
     "murban_bab_hashah": [
@@ -204,7 +204,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "muwaffaq_al_salti_ab": [
@@ -214,7 +214,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "United Arab Emirates",
-        "reloads": 5
+        "reloads": 6
       }
     ],
     "prince_sultan_ab": [
@@ -224,7 +224,7 @@
         "quantity": 4,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "prince_sultan_ab_d2",
@@ -232,7 +232,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "prince_sultan_ab_d3",
@@ -240,7 +240,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "s2_psab_thaad",
@@ -248,7 +248,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_psab_hpm",
@@ -256,7 +256,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_psab_tjammer",
@@ -264,7 +264,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "king_khalid_ab": [
@@ -274,7 +274,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "king_khalid_ab_d2",
@@ -282,7 +282,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       }
     ],
     "aramco_persian_gulf_corridor": [
@@ -292,7 +292,7 @@
         "quantity": 4,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       }
     ],
     "aramco_riyadh": [
@@ -302,7 +302,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       }
     ],
     "dammam": [
@@ -312,7 +312,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       }
     ],
     "aramco_red_sea_corridor": [
@@ -322,7 +322,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "s2_aramcors_tjammer",
@@ -330,7 +330,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "riyadh": [
@@ -340,7 +340,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "jeddah": [
@@ -350,7 +350,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Saudi Arabia",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "ali_al_salem_ab": [
@@ -360,7 +360,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Kuwait",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "camp_arifjan": [
@@ -370,7 +370,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Kuwait",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_arifjan_merops",
@@ -378,7 +378,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_arifjan_ifpc2",
@@ -386,7 +386,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "s2_arifjan_cram",
@@ -394,7 +394,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 5
+        "reloads": 6
       },
       {
         "id": "s2_arifjan_tjammer",
@@ -402,7 +402,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "thumrait_ab": [
@@ -412,7 +412,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Oman",
-        "reloads": 5
+        "reloads": 6
       }
     ],
     "al_udeid_ab": [
@@ -422,7 +422,7 @@
         "quantity": 3,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "al_udeid_ab_d2",
@@ -430,7 +430,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 5
+        "reloads": 6
       },
       {
         "id": "al_udeid_ab_d3",
@@ -438,7 +438,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Qatar",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "s2_udeid_thaad",
@@ -446,7 +446,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_udeid_merops",
@@ -454,7 +454,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 4
+        "reloads": 5
       },
       {
         "id": "s2_udeid_ifpc2",
@@ -462,7 +462,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 2
+        "reloads": 3
       },
       {
         "id": "s2_udeid_laser",
@@ -470,7 +470,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_udeid_tjammer",
@@ -478,7 +478,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "muscat": [
@@ -488,7 +488,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Oman",
-        "reloads": 5
+        "reloads": 6
       }
     ],
     "tel_nof_ab": [
@@ -498,7 +498,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "tel_nof_ab_d2",
@@ -506,7 +506,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "ramat_david_ab": [
@@ -516,7 +516,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 3
+        "reloads": 4
       }
     ],
     "nevatim_ab": [
@@ -526,7 +526,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 3
+        "reloads": 4
       }
     ],
     "tel_aviv": [
@@ -536,7 +536,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "tel_aviv_d2",
@@ -544,7 +544,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 6
+        "reloads": 7
       }
     ],
     "haifa": [
@@ -554,7 +554,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "haifa_d2",
@@ -562,7 +562,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 6
+        "reloads": 7
       },
       {
         "id": "haifa_d3",
@@ -570,7 +570,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "jerusalem": [
@@ -580,7 +580,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 3
+        "reloads": 4
       },
       {
         "id": "jerusalem_d2",
@@ -588,7 +588,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 6
+        "reloads": 7
       }
     ],
     "beer_sheva": [
@@ -598,7 +598,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "beer_sheva_d2",
@@ -606,7 +606,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "hatzerim_ab": [
@@ -616,7 +616,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "reloads": 6
+        "reloads": 7
       }
     ],
     "isa_ab": [
@@ -626,7 +626,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Bahrain",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "camp_buehring": [
@@ -636,7 +636,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 5
+        "reloads": 6
       },
       {
         "id": "s2_buehring_mshorad",
@@ -644,7 +644,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "mohammed_al_ahmed_naval_base": [
@@ -654,7 +654,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "persian_gulf_place_point": [
@@ -664,7 +664,7 @@
         "quantity": 1,
         "notes": "DCA",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_pg_sag_sm3",
@@ -672,7 +672,7 @@
         "quantity": 1,
         "notes": "SAG",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_pg_sag_sm6",
@@ -680,7 +680,7 @@
         "quantity": 1,
         "notes": "SAG",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_pg_sag_sm2",
@@ -688,7 +688,7 @@
         "quantity": 1,
         "notes": "SAG",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ],
     "gulf_of_oman_place_point": [
@@ -698,7 +698,7 @@
         "quantity": 1,
         "notes": "CSG CAP",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_goo_csg_sm3",
@@ -706,7 +706,7 @@
         "quantity": 1,
         "notes": "CSG",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_goo_csg_sm6",
@@ -714,7 +714,7 @@
         "quantity": 1,
         "notes": "CSG",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       },
       {
         "id": "s2_goo_csg_sm2",
@@ -722,7 +722,7 @@
         "quantity": 1,
         "notes": "CSG",
         "operator": "United States",
-        "reloads": 1
+        "reloads": 2
       }
     ]
   }

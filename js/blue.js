@@ -3,12 +3,17 @@
  *
  * Shows every target on one page, grouped by country. Each target card has
  * the same "+ Add Defense System" form as the main tool (plus Operator and
- * Reloads fields) and exports a laydown JSON file that the tool's
+ * Loadouts fields) and exports a laydown JSON file that the tool's
  * "Import Laydown" button accepts.
  *
  * Quantity semantics: quantities are in FILE units (what defaults.json
  * stores). importLaydown() multiplies by defenses.json `batteries`, so one
  * Patriot "system" becomes 3 batteries (36 interceptors) inside the tool.
+ *
+ * Loadout semantics: "Loadouts" is the TOTAL number of full loads a system
+ * gets, including the one it starts with. It is written to the file's
+ * `reloads` field. 0 means the system starts empty and can never reload;
+ * 1 means the initial load only. The tool holds total − 1 as reloads.
  *
  * State is held in memory and mirrored to localStorage under its own key so
  * an accidental reload doesn't lose work. Nothing here touches app.js state.
@@ -16,9 +21,10 @@
 
 const BLUE_STORAGE_KEY   = 'threatmodel_blue_builder_v1';
 const BLUE_DEFAULT_NAME  = 'Blue Laydown';   // used when the name field is left blank
-const RELOAD_OPTIONS   = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const LOADOUT_OPTIONS    = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const DEFAULT_LOADOUTS   = 1;                // initial load only
 
-let laydown     = {};   // { [targetId]: [ { system, quantity, notes, operator, reloads } ] }
+let laydown     = {};   // { [targetId]: [ { system, quantity, notes, operator, loadouts } ] }
 let laydownName = '';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +41,18 @@ function restoreBlue() {
   if (!s) return false;
   laydownName = typeof s.name === 'string' ? s.name : '';
   laydown     = (s.laydown && typeof s.laydown === 'object' && !Array.isArray(s.laydown)) ? s.laydown : {};
+
+  // Drafts saved before the Loadouts change stored `reloads` (resupply count,
+  // not counting the initial load). Convert them once: loadouts = reloads + 1.
+  for (const entries of Object.values(laydown)) {
+    for (const e of entries) {
+      if (e.loadouts == null) {
+        const rl = parseFloat(e.reloads);
+        e.loadouts = Number.isFinite(rl) ? Math.max(0, rl) + 1 : DEFAULT_LOADOUTS;
+      }
+      delete e.reloads;
+    }
+  }
   return true;
 }
 
@@ -154,8 +172,8 @@ function fillCard(card, target) {
           <select class="tc-operator"></select>
         </div>
         <div class="form-group">
-          <label>Reloads <span class="label-hint">— number of full loadouts</span></label>
-          <select class="tc-reloads"></select>
+          <label>Loadouts <span class="label-hint">— total full loads, including the first</span></label>
+          <select class="tc-loadouts"></select>
         </div>
       </div>
 
@@ -183,18 +201,19 @@ function fillCard(card, target) {
   const qtyInput    = card.querySelector('.tc-qty');
   const magInfo     = card.querySelector('.tc-mag');
   const operatorSel = card.querySelector('.tc-operator');
-  const reloadsSel  = card.querySelector('.tc-reloads');
+  const loadoutsSel = card.querySelector('.tc-loadouts');
   const notesInput  = card.querySelector('.tc-notes');
   const form        = card.querySelector('.tc-add-form');
 
   fillSystemSelect(systemSel);
   fillOperatorSelect(operatorSel, 'United States');
-  reloadsSel.innerHTML = '';
-  for (const n of RELOAD_OPTIONS) {
+  loadoutsSel.innerHTML = '';
+  for (const n of LOADOUT_OPTIONS) {
     const opt = document.createElement('option');
-    opt.value = String(n); opt.textContent = String(n);
-    if (n === 1) opt.selected = true;
-    reloadsSel.appendChild(opt);
+    opt.value = String(n);
+    opt.textContent = n === 0 ? '0 — starts empty' : String(n);
+    if (n === DEFAULT_LOADOUTS) opt.selected = true;
+    loadoutsSel.appendChild(opt);
   }
 
   const refreshMagInfo = () => {
@@ -225,12 +244,12 @@ function fillCard(card, target) {
     const systemId = systemSel.value;
     const qty      = Math.max(1, parseInt(qtyInput.value, 10) || 1);
     const operator = operatorSel.value || 'United States';
-    const reloads  = parseInt(reloadsSel.value, 10);
+    const loadouts = parseInt(loadoutsSel.value, 10);
     const notes    = notesInput.value.trim();
 
     if (!systemId) { showToast('Please select a system.', true); return; }
 
-    const added = addEntries(target.id, systemId, qty, notes, operator, Number.isInteger(reloads) ? reloads : 1);
+    const added = addEntries(target.id, systemId, qty, notes, operator, Number.isInteger(loadouts) ? loadouts : DEFAULT_LOADOUTS);
     if (added > 0) {
       persistBlue();
       refreshCard(target.id);
@@ -253,11 +272,12 @@ function buildRow(targetId, entry, index) {
   row.style.setProperty('--tier-color', TIER_COLORS[catalog?.tier] || '#888');
 
   const qtyLabel = catalog?.isShared ? 'patrol asset' : `${entry.quantity} system${entry.quantity !== 1 ? 's' : ''}`;
-  const reloads  = entry.reloads;
+  const loadouts = entry.loadouts;
+  const loadoutLabel = loadouts === 0 ? '0 loadouts (starts empty)' : `${loadouts} loadout${loadouts !== 1 ? 's' : ''}`;
   row.innerHTML = `
     <div class="tc-defense-main">
       <span class="tc-defense-name">${escapeHtml(catalog?.name || entry.system)}</span>
-      <span class="tc-defense-sub">${qtyLabel} · ${escapeHtml(entry.operator || '')} · ↻ ${reloads} reload${reloads !== 1 ? 's' : ''}</span>
+      <span class="tc-defense-sub">${qtyLabel} · ${escapeHtml(entry.operator || '')} · ${loadoutLabel}</span>
       ${entry.notes ? `<span class="tc-defense-notes">${escapeHtml(entry.notes)}</span>` : ''}
     </div>
     <button type="button" class="btn-icon tc-btn-remove" title="Remove">✕</button>`;
@@ -288,7 +308,7 @@ function closeForm(card) {
   card.querySelector('.tc-qty').value      = '1';
   card.querySelector('.tc-qty').disabled   = false;
   card.querySelector('.tc-notes').value    = '';
-  card.querySelector('.tc-reloads').value  = '1';
+  card.querySelector('.tc-loadouts').value = String(DEFAULT_LOADOUTS);
   card.querySelector('.tc-operator').value = 'United States';
   card.querySelector('.tc-mag').classList.add('hidden');
 }
@@ -298,19 +318,19 @@ function closeForm(card) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Returns the number of entries actually added. */
-function addEntries(targetId, systemId, quantity, notes, operator, reloads) {
+function addEntries(targetId, systemId, quantity, notes, operator, loadouts) {
   const preset = getBuilderPreset(systemId);
   if (preset) {
     let added = 0;
     for (const c of preset.components) {
-      added += addOneEntry(targetId, c.system, c.quantity ?? 1, c.notes || '', operator, reloads);
+      added += addOneEntry(targetId, c.system, c.quantity ?? 1, c.notes || '', operator, loadouts);
     }
     return added;
   }
-  return addOneEntry(targetId, systemId, quantity, notes, operator, reloads);
+  return addOneEntry(targetId, systemId, quantity, notes, operator, loadouts);
 }
 
-function addOneEntry(targetId, systemId, quantity, notes, operator, reloads) {
+function addOneEntry(targetId, systemId, quantity, notes, operator, loadouts) {
   const catalog = DEFENSE_CATALOG[systemId];
   if (!catalog) { showToast(`Unknown system "${systemId}".`, true); return 0; }
 
@@ -322,7 +342,7 @@ function addOneEntry(targetId, systemId, quantity, notes, operator, reloads) {
       showToast(`${catalog.name} is already assigned to this target.`, true);
       return 0;
     }
-    laydown[targetId].push({ system: systemId, quantity: 1, notes: notes || '', operator, reloads });
+    laydown[targetId].push({ system: systemId, quantity: 1, notes: notes || '', operator, loadouts });
     return 1;
   }
 
@@ -331,7 +351,7 @@ function addOneEntry(targetId, systemId, quantity, notes, operator, reloads) {
     quantity: Math.max(1, quantity | 0),
     notes:    notes || '',
     operator,
-    reloads
+    loadouts
   });
   return 1;
 }
@@ -378,14 +398,15 @@ function applyLaydownData(data) {
         warnings.push(`Invalid quantity for "${d.system}" at target "${targetId}" — skipped`);
         continue;
       }
-      const rl      = parseFloat(d.reloads);
-      const reloads = Number.isFinite(rl) ? Math.max(0, rl) : 1;
+      // File `reloads` = total loadouts including the initial load (absent → 1).
+      const rl       = parseFloat(d.reloads);
+      const loadouts = Number.isFinite(rl) ? Math.max(0, rl) : DEFAULT_LOADOUTS;
       applied.push({
         system:   d.system,
         quantity: catalog.isShared ? 1 : qty,
         notes:    typeof d.notes === 'string' ? d.notes : '',
         operator: d.operator || target.country || 'United States',
-        reloads
+        loadouts
       });
     }
     if (applied.length) next[targetId] = applied;
@@ -484,7 +505,8 @@ async function clearAll() {
  * Build the laydown file object. Entry ids follow the defaults.json
  * convention `${targetId}_d${n}`; shared patrol assets use `shared_<system>`
  * so their magazine pools across targets exactly as addDefense() does.
- * Targets are emitted in targets.json order.
+ * Targets are emitted in targets.json order. The file's `reloads` field
+ * carries the total loadouts (including the initial load).
  */
 function buildLaydownExport(name) {
   const defaults = {};
@@ -501,7 +523,7 @@ function buildLaydownExport(name) {
         quantity: e.quantity,
         notes:    e.notes || '',
         operator: e.operator,
-        reloads:  e.reloads
+        reloads:  e.loadouts
       };
     });
   }

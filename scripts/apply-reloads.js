@@ -12,6 +12,9 @@
  *                            is left unchanged
  *   • Values are NOT additive — the spreadsheet value is the total reload
  *     count, not a delta on top of anything else
+ *   • SEMANTICS CHANGE: the JSON `reloads` field now means the TOTAL number
+ *     of loadouts including the initial one (0 = starts empty). Spreadsheet
+ *     values must be expressed as total loadouts before this script is run.
  *
  * Usage:
  *   node scripts/apply-reloads.js [path-to-xlsx]

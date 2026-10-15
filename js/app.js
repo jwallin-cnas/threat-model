@@ -86,7 +86,70 @@ function clearMagStateForTarget(targetId) {
     // targets and can only be reset explicitly from their card.
     if (DEFENSE_CATALOG[def.system]?.isShared) continue;
     delete globalMagState[def.id];
+    _applyInitialMagazine(def);
   }
+}
+
+// ── Loadouts ──────────────────────────────────────────────────────────────────
+// A laydown file's `reloads` value is the TOTAL number of full loadouts a
+// system gets, INCLUDING the one it starts with. In memory the entry keeps
+// both numbers: `loadouts` is that total and `reloads` is the resupply still
+// available (total − 1, never below 0). The Reload button and the history
+// snapshots work on `reloads` only. An entry with 0 loadouts starts with an
+// empty magazine and can never be reloaded.
+
+/** Parse a file-level `reloads` value into a loadout count (absent or invalid → 1). */
+function parseLoadouts(raw) {
+  if (raw == null || raw === '') return 1;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? Math.max(0, n) : 1;
+}
+
+/**
+ * Convert one raw laydown entry (defaults.json or an imported laydown file)
+ * into the in-memory shape: quantity scaled by the system's `batteries`,
+ * operator defaulted to the host country, and the file's total-loadouts
+ * value split into `loadouts` / `reloads`.
+ *
+ * @param {object} d        raw entry from the file
+ * @param {object} target   the target that owns the entry
+ * @param {number} [qty]    validated file-unit quantity (defaults to d.quantity or 1)
+ */
+function _ingestDefenseEntry(d, target, qty = d.quantity ?? 1) {
+  const sysData  = appDefenseSystems.find(s => s.id === d.system);
+  const loadouts = parseLoadouts(d.reloads);
+  return {
+    ...d,
+    quantity: qty * (sysData?.batteries ?? 1),
+    operator: d.operator || target.country || '',
+    loadouts,
+    reloads:  Math.max(0, loadouts - 1)
+  };
+}
+
+/**
+ * Apply the starting magazine implied by an entry's loadouts. An entry with
+ * 0 loadouts starts empty (explicit 0 in globalMagState). Every other entry
+ * starts full, which is the absence of a key.
+ */
+function _applyInitialMagazine(def) {
+  if (def.loadouts === 0) globalMagState[def.id] = 0;
+}
+
+/** Find a defense entry by id on any target, or null. */
+function findDefenseEntryById(defId) {
+  for (const t of appTargetCatalog) {
+    const def = (t.defenses || []).find(d => d.id === defId);
+    if (def) return def;
+  }
+  return null;
+}
+
+/** Reset one defense's magazine to its starting state: full, or empty for a 0-loadout entry. */
+function resetMagEntry(defId) {
+  delete globalMagState[defId];
+  const def = findDefenseEntryById(defId);
+  if (def) _applyInitialMagazine(def);
 }
 
 /** Persist global magazine state to localStorage. */
@@ -222,11 +285,7 @@ async function loadData() {
   // These are overridden below if the user has a localStorage entry for that target.
   for (const t of appTargetCatalog) {
     const raw = appDefaultDefenses[t.id];
-    t.defenses = Array.isArray(raw) ? raw.map(d => {
-      const sysData = appDefenseSystems.find(s => s.id === d.system);
-      const qty     = (d.quantity ?? 1) * (sysData?.batteries ?? 1);
-      return { ...d, quantity: qty, operator: d.operator || t.country || '' };
-    }) : [];
+    t.defenses = Array.isArray(raw) ? raw.map(d => _ingestDefenseEntry(d, t)) : [];
   }
 
   // Merge localStorage overrides into appTargetCatalog.
@@ -241,6 +300,14 @@ async function loadData() {
       if (!baselineIds.has(t.id)) merged.push(t);
     }
     appTargetCatalog = merged;
+  }
+
+  // Entries with 0 loadouts start empty. Only seed the empty state where no
+  // magazine entry exists yet, so a saved session (or a manual edit) wins.
+  for (const t of appTargetCatalog) {
+    for (const def of t.defenses || []) {
+      if (!(def.id in globalMagState)) _applyInitialMagazine(def);
+    }
   }
 
   // Seed simulation history with the initial (pre-attack) state.
@@ -725,7 +792,7 @@ function buildSharedDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} missiles</span>
-          <span class="mag-expended">${expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no loadouts — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -776,7 +843,7 @@ function buildSharedDefenseCard(def, targetId) {
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!await _confirmTruncate()) return;
-      deleteMagEntry(btn.dataset.defenseId);
+      resetMagEntry(btn.dataset.defenseId);   // full, or empty for a 0-loadout entry
       saveMagStateToStorage();
       _manifestUnchanged = false;
       document.getElementById('simulation-results').classList.add('hidden');
@@ -822,7 +889,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} interceptors</span>
-          <span class="mag-expended">${expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no loadouts — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -904,7 +971,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!await _confirmTruncate()) return;
-      deleteMagEntry(btn.dataset.defenseId);
+      resetMagEntry(btn.dataset.defenseId);   // full, or empty for a 0-loadout entry
       saveMagStateToStorage();
       _manifestUnchanged = false;
       document.getElementById('simulation-results').classList.add('hidden');
@@ -975,7 +1042,7 @@ function buildDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} interceptors</span>
-          <span class="mag-expended">${expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no loadouts — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -1036,7 +1103,7 @@ function buildDefenseCard(def, targetId) {
   card.querySelectorAll('.btn-reset-sys-loadout').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!await _confirmTruncate()) return;
-      deleteMagEntry(btn.dataset.defenseId);
+      resetMagEntry(btn.dataset.defenseId);   // full, or empty for a 0-loadout entry
       saveMagStateToStorage();
       _manifestUnchanged = false;
       document.getElementById('simulation-results').classList.add('hidden');
@@ -1154,11 +1221,12 @@ async function resetTargetToDefault(targetId) {
   });
   if (!confirmed) return;
 
+  // Same conversion as loadData(): batteries scaling, operator default, loadouts.
   const raw = appDefaultDefenses[targetId];
-  target.defenses = Array.isArray(raw) ? raw.map(d => ({ ...d })) : [];
+  target.defenses = Array.isArray(raw) ? raw.map(d => _ingestDefenseEntry(d, target)) : [];
   saveToStorage();
 
-  clearMagStateForTarget(targetId);
+  clearMagStateForTarget(targetId);   // also seeds the empty start for 0-loadout entries
   saveMagStateToStorage();
 
   // Clear the per-target manifest and results for this target
@@ -2981,16 +3049,11 @@ async function importLaydown(file) {
           warnings.push(`Invalid quantity for system "${d.system}" at target "${targetId}" — skipped`);
           continue;
         }
-        const sysData    = appDefenseSystems.find(s => s.id === d.system);
-        const scaledQty  = qty * (sysData?.batteries ?? 1);
-        applied.push({
-          ...d,
-          quantity: scaledQty,
-          operator: d.operator || target.country || ''
-        });
+        applied.push(_ingestDefenseEntry(d, target, qty));
       }
 
       target.defenses = applied;
+      for (const def of applied) _applyInitialMagazine(def);   // 0 loadouts → starts empty
       targetsUpdated++;
     }
 
@@ -3308,16 +3371,11 @@ function _importLaydownDirect(data) {
         warnings.push(`Invalid quantity for system "${d.system}" at target "${targetId}" — skipped`);
         continue;
       }
-      const sysData   = appDefenseSystems.find(s => s.id === d.system);
-      const scaledQty = qty * (sysData?.batteries ?? 1);
-      applied.push({
-        ...d,
-        quantity: scaledQty,
-        operator: d.operator || target.country || ''
-      });
+      applied.push(_ingestDefenseEntry(d, target, qty));
     }
 
     target.defenses = applied;
+    for (const def of applied) _applyInitialMagazine(def);   // 0 loadouts → starts empty
     targetsUpdated++;
   }
 

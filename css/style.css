@@ -2133,7 +2133,7 @@ select option, select optgroup {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  align-items: end;   /* keep both selects level when the Reloads label wraps */
+  align-items: end;   /* keep both selects level when the Loadouts label wraps */
 }
 
 .label-hint {
