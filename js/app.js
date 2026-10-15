@@ -2005,7 +2005,7 @@ function computeAdjustedResults(originalResults, overrides) {
           const forcedKilled   = remaining - forcedSurvived;
           const result = ov.disengaged
             ? { killed: 0, survived: remaining, engaged: 0, interceptorsUsed: 0, magazineRemaining: magBefore, note: null }
-            : applyEngagement(remaining, 0, magBefore, model.shotsPerThreat(ctx));   // spends interceptors, kills are forced
+            : applyEngagement(remaining, 0, magBefore, model.shotsPerThreat(ctx), (r, n) => model.partialProbability(ctx, r, n));   // spends interceptors, kills are forced
           model.afterEngagement(ctx, result);
           adjMag[eng.defId] = result.magazineRemaining;
           adjEngagements.push({
@@ -2025,7 +2025,7 @@ function computeAdjustedResults(originalResults, overrides) {
 
         const P      = model.probability(ctx);
         const spt    = model.shotsPerThreat(ctx);
-        const result = applyEngagement(remaining, P, magBefore, spt);
+        const result = applyEngagement(remaining, P, magBefore, spt, (r, n) => model.partialProbability(ctx, r, n));
         model.afterEngagement(ctx, result);
         adjMag[eng.defId] = result.magazineRemaining;
         adjEngagements.push({
@@ -2038,6 +2038,8 @@ function computeAdjustedResults(originalResults, overrides) {
           magazineAtStart:    magBefore,
           magazineRemaining:  result.magazineRemaining,
           interceptorsUsed:   result.interceptorsUsed,
+          partialShots:       result.partial ? result.partial.shots : 0,
+          partialP:           result.partial ? result.partial.P     : null,
           note:               result.note
         });
         remaining = result.survived;
@@ -2445,6 +2447,9 @@ function buildEngagementProse(eng, threatType) {
       : (eng.model === 'gun' ? '' : `at <strong>${eng.shotsPerEngagement}</strong> interceptor${eng.shotsPerEngagement !== 1 ? 's' : ''} per ${tLabel}`);
     const unit = eng.model === 'gun' ? 'round' : 'interceptor';
     intSentence = `<strong>${fmtNumber(expended)}</strong> ${unit}${expended !== 1 ? 's' : ''} were expended${rateDesc ? ' ' + rateDesc : ''} (${fmtNumber(magStart)} → ${fmtNumber(magEnd)} remaining).`;
+    if (eng.partialShots > 0) {
+      intSentence += ` The last engagement used the remaining <strong>${fmtNumber(eng.partialShots)}</strong> ${unit}${eng.partialShots !== 1 ? 's' : ''} at a reduced Pk of <strong>${(eng.partialP ?? 0).toFixed(2)}</strong>.`;
+    }
   }
 
   return `${pkSentence} ${killSentence} ${intSentence}`;
@@ -2516,7 +2521,8 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
   const shotsLabel = eng.model === 'directed_energy' ? 'no interceptors'
                    : eng.model === 'gun' ? `${eng.cellShots}-round burst`
                    : `${fmtNumber(eng.shotsPerEngagement ?? 0)} shot${eng.shotsPerEngagement !== 1 ? 's' : ''}`;
-  const pkText = `<span class="eng-pk" title="per-shot pk ${(eng.pkShot ?? 0).toFixed(2)} · ${shotsLabel}${eng.pkTier ? ' · ' + eng.pkTier + ' tier' : ''}">Pk = ${(eng.pk ?? 0).toFixed(2)}</span>`;
+  const partialNote = eng.partialShots > 0 ? ` · last engagement with ${fmtNumber(eng.partialShots)} shot${eng.partialShots !== 1 ? 's' : ''} (Pk ${(eng.partialP ?? 0).toFixed(2)})` : '';
+  const pkText = `<span class="eng-pk" title="per-shot pk ${(eng.pkShot ?? 0).toFixed(2)} · ${shotsLabel}${eng.pkTier ? ' · ' + eng.pkTier + ' tier' : ''}${partialNote}">Pk = ${(eng.pk ?? 0).toFixed(2)}</span>`;
 
   const intUsed = eng.interceptorsUsed ?? 0;
 

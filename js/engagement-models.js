@@ -22,6 +22,9 @@
  *   shotsPerThreat(ctx)     → magazine cost per threat, deterministic
  *   resolve(ctx)            → { P, shotsPerThreat, shotsTier }; may consume ctx.rng
  *   afterEngagement(ctx, r) → updates ctx.pass from an applyEngagement() result
+ *   partialProbability(ctx, shotsLeft, engagedFull)
+ *                           → P for ONE more threat engaged with only `shotsLeft` rounds
+ *                             (the leftover that cannot afford a full engagement)
  *
  * ctx = { pkShot, shots, params, threatType, remaining, pass, rng }
  *   pkShot     cell pk after the tier multiplier (0..1)
@@ -61,7 +64,8 @@ const ENGAGEMENT_MODELS = {
       const c = { ...ctx, shots };
       return { P: this.probability(c), shotsPerThreat: this.shotsPerThreat(c), shotsTier };
     },
-    afterEngagement() {}
+    afterEngagement() {},
+    partialProbability(ctx, shotsLeft) { return this.probability({ ...ctx, shots: shotsLeft }); }
   },
 
   // ── directed_energy ───────────────────────────────────────────────────────
@@ -82,7 +86,8 @@ const ENGAGEMENT_MODELS = {
     },
     afterEngagement(ctx, result) {
       if (ctx.pass) ctx.pass.kills = (ctx.pass.kills || 0) + result.killed;
-    }
+    },
+    partialProbability() { return 0; }   // no magazine, never called
   },
 
   // ── gun ───────────────────────────────────────────────────────────────────
@@ -109,6 +114,10 @@ const ENGAGEMENT_MODELS = {
     afterEngagement(ctx, result) {
       if (!ctx.pass || !(ctx.shots > 0)) return;
       ctx.pass.bursts = (ctx.pass.bursts || 0) + result.interceptorsUsed / ctx.shots;
+    },
+    // A short burst: kill probability scales with the fraction of a full burst.
+    partialProbability(ctx, shotsLeft) {
+      return ctx.shots > 0 ? ctx.pkShot * Math.min(1, shotsLeft / ctx.shots) : 0;
     }
   },
 
@@ -136,6 +145,14 @@ const ENGAGEMENT_MODELS = {
     },
     afterEngagement(ctx, result) {
       if (ctx.pass) ctx.pass.engaged = (ctx.pass.engaged || 0) + result.engaged;
+    },
+    // The extra threat falls in the full-Pk band or the pLow band depending on
+    // how many threats this pass has engaged so far.
+    partialProbability(ctx, shotsLeft, engagedFull) {
+      const cap  = ctx.params?.cap ?? Infinity;
+      const done = (ctx.pass?.engaged || 0) + engagedFull;
+      const p    = done < cap ? ctx.pkShot : (ctx.params?.pLow ?? 0);
+      return p >= 1 ? 1 : 1 - Math.pow(1 - p, shotsLeft);
     }
   }
 };

@@ -65,8 +65,17 @@ describe('shipped data files', () => {
     expect(cfg.doctrine.engage.mrbm).toEqual(['aegis_sm3', 'thaad', 'arrow', 'patriot', 'davids_sling', 'cheongung2', 'aegis_sm6']);
     expect(cfg.doctrine.engage.drone[0]).toBe('f15e_patrol');
     expect(cfg.doctrine.engage.drone).not.toContain('thaad');
-    expect(cfg.doctrine.engage.drone).not.toContain('f15i_patrol');   // absent from legacy ENGAGEMENT_PRIORITY
     expect(systemThreatTypes(cfg.doctrine, 'thaad')).toEqual(['mrbm', 'srbm']);
+  });
+
+  it('add the F-15I patrol right after the F/A-18 patrol, locked in place', () => {
+    for (const type of ['drone', 'drone_jet', 'fpv']) {
+      const list = cfg.doctrine.engage[type];
+      expect(list[list.indexOf('fa18_patrol') + 1]).toBe('f15i_patrol');
+    }
+    expect(cfg.doctrine.engage.cruise_missile).not.toContain('f15i_patrol');
+    expect(cfg.doctrine.engage.mrbm).not.toContain('f15i_patrol');
+    expect(cfg.doctrine.locked).toEqual(['f15i_patrol']);
   });
 
   it('name a model for every system', () => {

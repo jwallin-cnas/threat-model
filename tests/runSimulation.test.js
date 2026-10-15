@@ -201,6 +201,20 @@ describe('runSimulationCore — magazine', () => {
     expect(r2.totalOut).toBe(10);
   });
 
+  it('spends a leftover round on one more threat at reduced Pk (partial engagement)', () => {
+    // sam: pk 1, 2 shots. 5 interceptors vs 10 drones → 2 full engagements + 1 shot at the third.
+    const r = run([{ platformId: 'drone_a', count: 10 }], [mkDef('s1', 'sam')], { s1: 5 });
+    const e = allEngagements(r)[0];
+    expect(e).toMatchObject({ killed: 3, interceptorsUsed: 5, magazineRemaining: 0, partialShots: 1, partialP: 1 });
+    expect(e.note).toBeNull();
+  });
+
+  it('a magazine too low for a full engagement still fires what it has', () => {
+    const r = run([{ platformId: 'drone_a', count: 10 }], [mkDef('s1', 'sam')], { s1: 1 });
+    const e = allEngagements(r)[0];
+    expect(e).toMatchObject({ killed: 1, interceptorsUsed: 1, magazineRemaining: 0, partialShots: 1 });
+  });
+
   it('does not change initialMagazineState', () => {
     const mag = { s1: 10 };
     run([{ platformId: 'drone_a', count: 10 }], [mkDef('s1', 'sam')], mag);
@@ -315,6 +329,13 @@ describe('normalizeDoctrine / normalizePkTable', () => {
     expect(warnings.some(w => /nope/.test(w))).toBe(true);
     expect(warnings.some(w => /Duplicate/.test(w))).toBe(true);
     expect(warnings.some(w => /engage\.fpv/.test(w))).toBe(true);
+  });
+
+  it('keeps known locked systems and drops unknown ones', () => {
+    const { doctrine, warnings } = normalizeDoctrine({ ...MOCK_DOCTRINE, locked: ['sam', 'nope', 'sam'] }, cfg.defenseCatalog);
+    expect(doctrine.locked).toEqual(['sam']);
+    expect(warnings.some(w => /nope.*locked/.test(w))).toBe(true);
+    expect(normalizeDoctrine(MOCK_DOCTRINE, cfg.defenseCatalog).doctrine.locked).toEqual([]);
   });
 
   it('makes the table dense, clamps values, defaults tiers, warns on unknown ids', () => {

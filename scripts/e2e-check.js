@@ -199,6 +199,23 @@ async function checkDoctrineBuilder(browser, base) {
   check(JSON.stringify(r1.counts) === JSON.stringify(expected.typeOrder.map(t => expected.engage[t].length)), 'doctrine: default column counts');
   const r2 = await page.evaluate(() => { const w = window._doctrineApplyData({ version: '1.0', typeOrder: ['drone', 'bogus'], engage: { drone: ['patriot', 'nope'] } }); const s = window._doctrineState(); return { w: w.length, order: s.doctrine.typeOrder, drone: s.doctrine.engage.drone }; });
   check(r2.w >= 2 && r2.order[0] === 'drone' && JSON.stringify(r2.drone) === '["patriot"]', 'doctrine: import drops unknown ids and types with warnings');
+  // Locked systems: F-15I is fixed in the default doctrine
+  await page.evaluate(async () => { const raw = await fetch('data/doctrine.json').then(r => r.json()); window._doctrineApplyData(raw); });
+  const r2b = await page.evaluate(() => {
+    const col  = document.querySelector('.dc-col[data-type="drone"]');
+    const card = col.querySelector('.dc-card[data-system="f15i_patrol"]');
+    const before = window._doctrineState().doctrine.engage.drone.slice();
+    moveSystem('drone', 0, 3);                       // move the F-15E past the locked card
+    const after = window._doctrineState().doctrine.engage.drone.slice();
+    removeSystem('drone', after.indexOf('f15i_patrol'));
+    const afterRemove = window._doctrineState().doctrine.engage.drone.slice();
+    const ex = window._doctrineBuildExport('L');
+    return { locked: card?.classList.contains('dc-card--locked'), lockIcon: !!card?.querySelector('.dc-lock'), noRemove: !card?.querySelector('.dc-btn-remove'),
+      idxBefore: before.indexOf('f15i_patrol'), idxAfter: after.indexOf('f15i_patrol'), movedFirst: after[0], stillThere: afterRemove.includes('f15i_patrol'), exportLocked: ex.locked };
+  });
+  check(r2b.locked && r2b.lockIcon && r2b.noRemove, 'doctrine: locked card shows a lock and no remove button');
+  check(r2b.idxBefore === 2 && r2b.idxAfter === 2 && r2b.movedFirst === 'fa18_patrol', 'doctrine: moving another card past the locked one leaves it at its index');
+  check(r2b.stillThere && JSON.stringify(r2b.exportLocked) === '["f15i_patrol"]', 'doctrine: locked card cannot be removed and the export carries locked');
   await page.evaluate(() => window._doctrineApplyData(JSON.parse(JSON.stringify({ version: '1.0', typeOrder: ['mrbm', 'srbm', 'cruise_missile', 'drone_jet', 'drone', 'fpv'], engage: window._doctrineBuildExport('d').engage }))));
   await page.evaluate(async () => { const raw = await fetch('data/doctrine.json').then(r => r.json()); window._doctrineApplyData(raw); });
   const exported = await page.evaluate(() => window._doctrineBuildExport('Round Trip'));

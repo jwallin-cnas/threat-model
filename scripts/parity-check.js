@@ -23,7 +23,7 @@
  * create a false pass.
  *
  * Usage:
- *   node scripts/parity-check.js --old-ref 9bded9b [--seeds 50] [--tol-pinned 2] [--tol-mean 5]
+ *   node scripts/parity-check.js --old-ref 9bded9b [--seeds 50] [--tol-pinned 2] [--tol-mean 5] [--full-doctrine]
  *   node scripts/parity-check.js --old-ref 9bded9b --dump <laydownStem> <attackStem> <attackNumber>
  */
 
@@ -72,7 +72,16 @@ const oldPC = oldEngine.buildPlatformCatalog(attacksRaw);
 const newDC = newEngine.buildDefenseCatalog(defensesRaw);
 const newPC = newEngine.buildPlatformCatalog(attacksRaw);
 const { table: pkTable, warnings: pkW }   = newEngine.normalizePkTable(readJson('data/pk-table.json'), newDC, newPC);
-const { doctrine, warnings: docW }        = newEngine.normalizeDoctrine(readJson('data/doctrine.json'), newDC);
+const { doctrine: shippedDoctrine, warnings: docW } = newEngine.normalizeDoctrine(readJson('data/doctrine.json'), newDC);
+// The comparison is about engine logic, so the new engine runs the shipped
+// doctrine restricted to the systems the legacy ENGAGEMENT_PRIORITY knew.
+// Systems added since (F-15I, VAMPIRE) are deliberate behaviour changes and
+// are left out here; --full-doctrine keeps them.
+const FULL_DOCTRINE = args.includes('--full-doctrine');
+const doctrine = FULL_DOCTRINE ? shippedDoctrine : {
+  ...shippedDoctrine,
+  engage: Object.fromEntries(Object.entries(shippedDoctrine.engage).map(([t, l]) => [t, l.filter(id => oldEngine.ENGAGEMENT_PRIORITY.includes(id))]))
+};
 if (pkW.length || docW.length) { console.warn('[parity] data warnings:', [...pkW, ...docW].slice(0, 10)); }
 // Capability (which threat types a system can engage) comes from the doctrine
 // for BOTH engines, so the cross-target range filter is identical.

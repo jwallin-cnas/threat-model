@@ -212,3 +212,19 @@ body.is-dragging .dc-card, body.is-dragging .dc-col-head { cursor: grabbing; }
 @media (max-width: 900px) {
   .dc-col { min-width: 220px; }
 }
+
+/* ── Locked systems (doctrine.locked) ─────────────────────────────────────── */
+.dc-card--locked {
+  border-style: dashed;
+  cursor: default;
+  touch-action: auto;
+}
+.dc-card--locked .dc-card-main { opacity: 0.85; }
+.dc-lock {
+  font-size: 13px;
+  line-height: 1;
+  color: var(--warn);
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}

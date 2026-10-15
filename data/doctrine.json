@@ -2,6 +2,7 @@
   "version": "1.0",
   "name": "Baseline (generated from legacy ENGAGEMENT_PRIORITY)",
   "typeOrder": ["mrbm", "srbm", "cruise_missile", "drone_jet", "drone", "fpv"],
+  "locked": ["f15i_patrol"],
   "engage": {
     "mrbm": ["aegis_sm3", "thaad", "arrow", "patriot", "davids_sling", "cheongung2", "aegis_sm6"],
     "srbm": ["aegis_sm3", "thaad", "arrow", "patriot", "davids_sling", "cheongung2", "aegis_sm6"],
@@ -22,6 +23,7 @@
     "drone_jet": [
       "f15e_patrol",
       "fa18_patrol",
+      "f15i_patrol",
       "patriot",
       "davids_sling",
       "cheongung2",
@@ -40,6 +42,7 @@
     "drone": [
       "f15e_patrol",
       "fa18_patrol",
+      "f15i_patrol",
       "patriot",
       "davids_sling",
       "cheongung2",
@@ -62,6 +65,7 @@
     "fpv": [
       "f15e_patrol",
       "fa18_patrol",
+      "f15i_patrol",
       "patriot",
       "davids_sling",
       "cheongung2",

@@ -28,7 +28,8 @@
  *   node scripts/generate-engagement-defaults.js            # read js/*.js from disk
  *   node scripts/generate-engagement-defaults.js --ref 6f5409c   # read legacy files from a git ref
  *   node scripts/generate-engagement-defaults.js --dry-run  # print, write nothing
- *   node scripts/generate-engagement-defaults.js --ref 9bded9b --clone vampire=ifpc2   # VAMPIRE copies IFPC-2
+ *   node scripts/generate-engagement-defaults.js --ref 9bded9b --clone vampire=ifpc2 \
+ *        --insert f15i_patrol:after=fa18_patrol --lock f15i_patrol
  */
 
 import * as fs           from 'fs';
@@ -47,6 +48,16 @@ const REF    = refIdx >= 0 ? args[refIdx + 1] : null;
 const DRY    = args.includes('--dry-run');
 // --clone new=existing[,new2=existing2]: systems with no legacy function that
 // copy another system's Pk row and doctrine slots (inserted right after it).
+// --insert id:after=anchor[,…]: a system with a legacy function that was NOT in
+// ENGAGEMENT_PRIORITY, placed right after `anchor` in every list where its
+// legacy function accepts the type (F-15I after the F/A-18 patrol).
+// --lock id[,id…]: systems the Doctrine Builder shows fixed in place.
+const insertIdx = args.indexOf('--insert');
+const INSERTS   = insertIdx >= 0
+  ? args[insertIdx + 1].split(',').map(spec => { const [id, rest] = spec.split(':'); return { id: id.trim(), after: (rest || '').replace(/^after=/, '').trim() }; })
+  : [];
+const lockIdx = args.indexOf('--lock');
+const LOCKED  = lockIdx >= 0 ? args[lockIdx + 1].split(',').map(s => s.trim()) : [];
 const cloneIdx = args.indexOf('--clone');
 const CLONES   = cloneIdx >= 0
   ? Object.fromEntries(args[cloneIdx + 1].split(',').map(pair => pair.split('=').map(s => s.trim())))
@@ -165,10 +176,22 @@ for (const [newId, srcId] of Object.entries(CLONES)) {
   }
 }
 
+// Inserts: after the anchor, in every type the system's legacy function accepts.
+for (const { id, after } of INSERTS) {
+  if (!ENGAGEMENT_FUNCTIONS[id]) { console.warn(`[generate] --insert ${id}: no legacy function`); continue; }
+  for (const type of THREAT_PRIORITY) {
+    const list = engage[type];
+    if (list.includes(id) || legacyParams(id, type) === null) continue;
+    const i = list.indexOf(after);
+    list.splice(i + 1, 0, id);   // i = -1 → front of the list
+  }
+}
+
 const doctrine = {
   version:   '1.0',
   name:      'Baseline (generated from legacy ENGAGEMENT_PRIORITY)',
   typeOrder: [...THREAT_PRIORITY],
+  locked:    LOCKED.filter(id => systems.includes(id)),
   engage
 };
 

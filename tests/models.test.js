@@ -99,6 +99,29 @@ describe('patrol', () => {
   });
 });
 
+describe('partialProbability', () => {
+
+  it('kinetic: per-shot combination over the leftover shots', () => {
+    expect(M.kinetic.partialProbability({ pkShot: 0.5, shots: 3, params: {} }, 1)).toBeCloseTo(0.5);
+    expect(M.kinetic.partialProbability({ pkShot: 0.5, shots: 3, params: {} }, 2)).toBeCloseTo(0.75);
+  });
+
+  it('gun: scales with the fraction of a burst', () => {
+    expect(M.gun.partialProbability({ pkShot: 1, shots: 150, params: { burstsPerPass: 1 } }, 75)).toBeCloseTo(0.5);
+    expect(M.gun.partialProbability({ pkShot: 1, shots: 150, params: { burstsPerPass: 1 } }, 300)).toBe(1);
+  });
+
+  it('patrol: uses the full-Pk band until the cap, then pLow', () => {
+    const ctx = { pkShot: 1, shots: 1, params: { cap: 20, pLow: 0.5 }, pass: { engaged: 10 } };
+    expect(M.patrol.partialProbability(ctx, 1, 5)).toBe(1);        // 15 engaged so far < 20
+    expect(M.patrol.partialProbability(ctx, 1, 10)).toBeCloseTo(0.5); // 20 engaged → tail band
+  });
+
+  it('directed energy: never partial', () => {
+    expect(M.directed_energy.partialProbability({}, 1)).toBe(0);
+  });
+});
+
 describe('rollTier', () => {
 
   it('skips the roll and returns multiplier 1 when all tiers are 1', () => {

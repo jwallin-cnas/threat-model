@@ -7,6 +7,10 @@
  * column never engages that type. The page exports a doctrine JSON file
  * that the tool's "Import Doctrine" button accepts.
  *
+ * A system listed in doctrine.locked (an allied asset the facilitator does
+ * not control) is shown with a lock, keeps its position, and cannot be
+ * removed or cleared.
+ *
  * Column headers drag left/right to reorder the types; cards drag up/down
  * to reorder within a column. ◀ ▶ and ▲ ▼ buttons do the same without a
  * pointer. Dragging a card into another column is not supported: a drag
@@ -20,7 +24,7 @@ const DOCTRINE_STORAGE_KEY  = 'threatmodel_doctrine_builder_v1';
 const DOCTRINE_DEFAULT_NAME = 'Custom Doctrine';   // used when the name field is left blank
 const DRAG_THRESHOLD_PX     = 4;                   // pointer travel before a press becomes a drag
 
-let doctrine     = emptyDoctrine();   // { typeOrder: [type], engage: { [type]: [systemId] } }
+let doctrine     = emptyDoctrine();   // { typeOrder: [type], engage: { [type]: [systemId] }, locked: [systemId] }
 let doctrineName = '';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,7 +35,26 @@ let doctrineName = '';
 function emptyDoctrine() {
   const engage = {};
   for (const t of THREAT_TYPES) engage[t] = [];
-  return { typeOrder: THREAT_TYPES.slice(), engage };
+  return { typeOrder: THREAT_TYPES.slice(), engage, locked: [] };
+}
+
+/** Locked systems stay where the file put them: no drag, ▲ ▼, ✕ or Clear All. */
+function isLocked(systemId) { return (doctrine.locked || []).includes(systemId); }
+
+/**
+ * After any reorder of `list`, put every locked system back at the index it
+ * held in `before`, so other cards can move around it but never displace it.
+ */
+function enforceLocked(list, before) {
+  for (const id of doctrine.locked || []) {
+    const was = before.indexOf(id);
+    if (was < 0) continue;
+    const now = list.indexOf(id);
+    if (now === was) continue;
+    if (now >= 0) list.splice(now, 1);
+    list.splice(Math.min(was, list.length), 0, id);
+  }
+  return list;
 }
 
 function persistDoctrine() {
@@ -187,18 +210,24 @@ function buildCard(type, systemId, index, count) {
 
   const model     = catalog?.engagement?.model || 'kinetic';
   const engages   = systemThreatTypes(doctrine, systemId).map(t => THREAT_TYPE_LABELS[t] || t);
-  card.title      = `${catalog?.name || systemId} — engages: ${engages.join(', ')}`;
+  const locked    = isLocked(systemId);
+  card.title      = `${catalog?.name || systemId} — engages: ${engages.join(', ')}`
+                  + (locked ? ' — fixed in place: this asset is not under U.S. control and cannot be moved or removed' : '');
+  if (locked) card.classList.add('dc-card--locked');
   card.innerHTML  = `
-    <span class="dc-grip" aria-hidden="true">⠿</span>
+    <span class="${locked ? 'dc-lock' : 'dc-grip'}" aria-hidden="true">${locked ? '🔒' : '⠿'}</span>
     <div class="dc-card-main">
       <span class="dc-card-name">${escapeHtml(catalog ? systemShortLabel(catalog) : systemId)}</span>
-      <span class="dc-card-sub">tier ${escapeHtml(catalog?.tier ?? '?')} · ${escapeHtml(model)}</span>
+      <span class="dc-card-sub">tier ${escapeHtml(catalog?.tier ?? '?')} · ${escapeHtml(model)}${locked ? ' · locked' : ''}</span>
     </div>
+    ${locked ? '' : `
     <span class="dc-card-nav">
       <button type="button" class="btn-icon dc-nav-btn dc-btn-up"   title="Move up"   ${index === 0 ? 'disabled' : ''}>▲</button>
       <button type="button" class="btn-icon dc-nav-btn dc-btn-down" title="Move down" ${index === count - 1 ? 'disabled' : ''}>▼</button>
     </span>
-    <button type="button" class="btn-icon dc-btn-remove" title="Remove from this type">✕</button>`;
+    <button type="button" class="btn-icon dc-btn-remove" title="Remove from this type">✕</button>`}`;
+
+  if (locked) return card;   // no reordering, removal, or drag for a locked system
 
   card.querySelector('.dc-btn-up').addEventListener('click',     () => moveSystem(type, index, index - 1));
   card.querySelector('.dc-btn-down').addEventListener('click',   () => moveSystem(type, index, index + 1));
@@ -289,6 +318,7 @@ function addSystem(type, systemId) {
 function removeSystem(type, index) {
   const list = systemsFor(type);
   if (index < 0 || index >= list.length) return;
+  if (isLocked(list[index])) { showToast('That system is locked in place and cannot be removed.', true); return; }
   list.splice(index, 1);
   persistDoctrine();
   refreshColumn(type);
@@ -300,8 +330,11 @@ function moveSystem(type, from, to) {
   if (from < 0 || from >= list.length) return;
   to = Math.max(0, Math.min(list.length - 1, to));
   if (from === to) { refreshColumn(type); return; }
+  if (isLocked(list[from])) { showToast('That system is locked in place and cannot be moved.', true); refreshColumn(type); return; }
+  const before = list.slice();
   const [id] = list.splice(from, 1);
   list.splice(to, 0, id);
+  enforceLocked(list, before);
   persistDoctrine();
   refreshColumn(type);
 }
@@ -440,7 +473,7 @@ function applyDoctrineData(data) {
   }
   const { doctrine: norm, warnings } = normalizeDoctrine(data, DEFENSE_CATALOG);
 
-  const next = { typeOrder: norm.typeOrder.slice(), engage: {} };
+  const next = { typeOrder: norm.typeOrder.slice(), engage: {}, locked: (norm.locked || []).slice() };
   for (const t of THREAT_TYPES) if (!next.typeOrder.includes(t)) next.typeOrder.push(t);
   for (const t of next.typeOrder) next.engage[t] = (norm.engage[t] || []).slice();
 
@@ -523,10 +556,10 @@ async function clearAll() {
     ]
   });
   if (!ok) return;
-  for (const t of doctrine.typeOrder) doctrine.engage[t] = [];
+  for (const t of doctrine.typeOrder) doctrine.engage[t] = systemsFor(t).filter(isLocked);   // locked systems stay
   persistDoctrine();
   renderAll();
-  showToast('Draft cleared.');
+  showToast(doctrine.locked?.length ? 'Draft cleared — locked systems kept.' : 'Draft cleared.');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -541,7 +574,8 @@ async function clearAll() {
 function buildDoctrineExport(name) {
   const engage = {};
   for (const t of doctrine.typeOrder) engage[t] = systemsFor(t).slice();
-  return { version: '1.0', name, typeOrder: doctrine.typeOrder.slice(), engage };
+  const locked = (doctrine.locked || []).filter(id => doctrine.typeOrder.some(t => systemsFor(t).includes(id)));
+  return { version: '1.0', name, typeOrder: doctrine.typeOrder.slice(), locked, engage };
 }
 
 function exportDoctrine() {

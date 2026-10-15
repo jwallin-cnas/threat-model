@@ -142,6 +142,14 @@ function normalizeDoctrine(raw, defenseCatalog) {
   for (const t of Object.keys(raw?.engage || {})) {
     if (!seenTypes.has(t)) warnings.push(`engage.${t} is present but "${t}" is not in typeOrder — ignored`);
   }
+
+  // Locked systems: the builder shows them fixed in place (not movable or
+  // removable). The engine itself ignores the list.
+  out.locked = [];
+  for (const id of Array.isArray(raw?.locked) ? raw.locked : []) {
+    if (!defenseCatalog[id]) { warnings.push(`Unknown system "${id}" in locked — dropped`); continue; }
+    if (!out.locked.includes(id)) out.locked.push(id);
+  }
   return { doctrine: out, warnings };
 }
 
@@ -228,35 +236,55 @@ function rollTier(tiers, rng) {
  * @param {number} P              probability that one engaged threat is killed
  * @param {number} magazine       interceptors available now
  * @param {number} shotsPerThreat magazine cost per engaged threat (0 = no magazine use)
- * @returns {{ killed, survived, engaged, interceptorsUsed, magazineRemaining, note }}
+ * @param {function} [partialP]   (shotsLeft, engagedFull) → probability of killing ONE more
+ *                                threat with the leftover rounds; when given, a magazine that
+ *                                cannot afford a full engagement is still spent on one threat
+ * @returns {{ killed, survived, engaged, interceptorsUsed, magazineRemaining, note, partial }}
+ *          partial is null or { shots, P } for the reduced final engagement
  *
  * shotsPerThreat may be fractional (THAAD 1.5), so magazineRemaining can be.
- * The kill count is the rounded expected value: the only randomness in the
- * engine is the Pk tier and any shot roll, both decided before this call.
+ * The kill count is the rounded expected value (full engagements plus the
+ * partial one): the only randomness in the engine is the Pk tier and any
+ * shot roll, both decided before this call.
  */
-function applyEngagement(count, P, magazine, shotsPerThreat) {
-  if (count <= 0) return { killed: 0, survived: 0, engaged: 0, interceptorsUsed: 0, magazineRemaining: magazine, note: null };
+function applyEngagement(count, P, magazine, shotsPerThreat, partialP = null) {
+  if (count <= 0) return { killed: 0, survived: 0, engaged: 0, interceptorsUsed: 0, magazineRemaining: magazine, note: null, partial: null };
 
   if (shotsPerThreat === 0) {
     const killed = Math.round(count * P);
-    return { killed, survived: count - killed, engaged: count, interceptorsUsed: 0, magazineRemaining: magazine, note: null };
+    return { killed, survived: count - killed, engaged: count, interceptorsUsed: 0, magazineRemaining: magazine, note: null, partial: null };
   }
 
   if (magazine <= 0) {
-    return { killed: 0, survived: count, engaged: 0, interceptorsUsed: 0, magazineRemaining: 0, note: 'Magazine exhausted' };
+    return { killed: 0, survived: count, engaged: 0, interceptorsUsed: 0, magazineRemaining: 0, note: 'Magazine exhausted', partial: null };
   }
 
   const maxEngageable = Math.max(0, Math.floor(magazine / shotsPerThreat));
-  const engaged       = Math.min(count, maxEngageable);
-  const killed        = Math.round(engaged * P);
-  const used          = engaged * shotsPerThreat;
+  let engaged  = Math.min(count, maxEngageable);
+  let expected = engaged * P;
+  let used     = engaged * shotsPerThreat;
+  let partial  = null;
+
+  // Leftover rounds that cannot afford a full engagement still go at one
+  // more threat, at the reduced probability the model gives for that many shots.
+  const leftover = magazine - used;
+  if (partialP && engaged < count && leftover > 0) {
+    const pPartial = partialP(leftover, engaged);
+    partial   = { shots: leftover, P: pPartial };
+    expected += pPartial;
+    used      = magazine;
+    engaged  += 1;
+  }
+
+  const killed = Math.round(expected);
   return {
     killed,
     survived:          count - killed,
     engaged,
     interceptorsUsed:  used,
     magazineRemaining: magazine - used,
-    note:              null
+    note:              engaged === 0 ? 'Magazine too low' : null,
+    partial
   };
 }
 
@@ -416,7 +444,8 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
         for (const { e, ctx, tier, mult, pkShot, P, shotsPerThreat, shotsTier } of resolved) {
           if (remaining <= 0) break;
           const magazineBefore = e.magazineRemaining;
-          const result = applyEngagement(remaining, P, magazineBefore, shotsPerThreat);
+          const result = applyEngagement(remaining, P, magazineBefore, shotsPerThreat,
+            (shotsLeft, engagedFull) => model.partialProbability(ctx, shotsLeft, engagedFull));
           e.magazineRemaining = result.magazineRemaining;
           model.afterEngagement(ctx, result);
 
@@ -434,6 +463,8 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
             magazineAtStart:        magazineBefore,
             interceptorsUsed:       magazineBefore - e.magazineRemaining,
             magazineRemaining:      e.magazineRemaining,
+            partialShots:           result.partial ? result.partial.shots : 0,
+            partialP:               result.partial ? result.partial.P     : null,
             note:                   result.note
           });
           remaining = result.survived;

@@ -18,6 +18,12 @@
       "uniqueItems": true,
       "items": { "type": "string", "enum": ["mrbm", "srbm", "cruise_missile", "drone_jet", "drone", "fpv"] }
     },
+    "locked": {
+      "type": "array",
+      "description": "System ids the Doctrine Builder shows fixed in place: they cannot be moved, removed, or cleared (an allied asset the facilitator does not control). The engine ignores this list.",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
     "engage": {
       "type": "object",
       "description": "For each threat type in typeOrder, the defense system ids allowed to engage it, outermost first. A system absent from a list never engages that type.",
