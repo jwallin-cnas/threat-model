@@ -63,10 +63,15 @@
           "minLength": 1,
           "description": "Nation or organisation that operates this system at this location. Determines cross-target default enable/disable state: 'United States' is enabled by default; all other operators are disabled by default when covering a neighbouring target."
         },
+        "chips": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total number of full loadouts this entry gets, INCLUDING the one it starts with. A chip is the physical game-board token for one loadout. 0 means the system starts with an empty magazine and can never be reloaded. Absent means 1 (the initial load only). The tool holds total − 1 as the resupply available to the Reload button."
+        },
         "reloads": {
           "type": "number",
           "minimum": 0,
-          "description": "Total number of full loadouts this entry gets, INCLUDING the one it starts with. 0 means the system starts with an empty magazine and can never be reloaded. Absent means 1 (the initial load only). The tool holds total − 1 as the resupply available to the Reload button."
+          "description": "DEPRECATED alias for `chips` (same meaning: total loadouts including the first). Read only when `chips` is absent. New files must use `chips`."
         }
       }
     }

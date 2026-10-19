@@ -105,15 +105,17 @@ function clearMagStateForTarget(targetId) {
   }
 }
 
-// ── Loadouts ──────────────────────────────────────────────────────────────────
-// A laydown file's `reloads` value is the TOTAL number of full loadouts a
-// system gets, INCLUDING the one it starts with. In memory the entry keeps
-// both numbers: `loadouts` is that total and `reloads` is the resupply still
-// available (total − 1, never below 0). The Reload button and the history
-// snapshots work on `reloads` only. An entry with 0 loadouts starts with an
-// empty magazine and can never be reloaded.
+// ── Chips (loadouts) ─────────────────────────────────────────────────────────
+// A laydown file's `chips` value is the TOTAL number of full loadouts a
+// system gets, INCLUDING the one it starts with. A chip is the physical
+// game-board token for one loadout. In memory the entry keeps both numbers:
+// `loadouts` is that total and `reloads` is the resupply still available
+// (total − 1, never below 0). The Reload button and the history snapshots
+// work on `reloads` only. An entry with 0 chips starts with an empty
+// magazine and can never be reloaded. Files written before the rename used
+// `reloads` for the same total; that field is still read as a fallback.
 
-/** Parse a file-level `reloads` value into a loadout count (absent or invalid → 1). */
+/** Parse a file-level `chips` value into a loadout count (absent or invalid → 1). */
 function parseLoadouts(raw) {
   if (raw == null || raw === '') return 1;
   const n = parseFloat(raw);
@@ -123,8 +125,8 @@ function parseLoadouts(raw) {
 /**
  * Convert one raw laydown entry (defaults.json or an imported laydown file)
  * into the in-memory shape: quantity scaled by the system's `batteries`,
- * operator defaulted to the host country, and the file's total-loadouts
- * value split into `loadouts` / `reloads`.
+ * operator defaulted to the host country, and the file's `chips` total
+ * (legacy files: `reloads`) split into `loadouts` / `reloads`.
  *
  * @param {object} d        raw entry from the file
  * @param {object} target   the target that owns the entry
@@ -132,9 +134,10 @@ function parseLoadouts(raw) {
  */
 function _ingestDefenseEntry(d, target, qty = d.quantity ?? 1) {
   const sysData  = appDefenseSystems.find(s => s.id === d.system);
-  const loadouts = parseLoadouts(d.reloads);
+  const loadouts = parseLoadouts(d.chips ?? d.reloads);
+  const { chips: _chips, ...rest } = d;
   return {
-    ...d,
+    ...rest,
     quantity: qty * (sysData?.batteries ?? 1),
     operator: d.operator || target.country || '',
     loadouts,
@@ -975,7 +978,7 @@ function buildSharedDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} missiles</span>
-          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no loadouts — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no chips — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -1073,7 +1076,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} interceptors</span>
-          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no loadouts — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no chips — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -1248,7 +1251,7 @@ function buildDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} interceptors</span>
-          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no loadouts — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no chips — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
           ${resetBtn}
         </div>`;
     } else {
