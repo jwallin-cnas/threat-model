@@ -1002,6 +1002,7 @@ function buildSharedDefenseCard(def, targetId) {
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="patrol-badge">✈ Patrol</span>
+      ${operatorBadgeHtml(def.operator)}
       <div class="defense-card-actions">
         ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
         <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
@@ -1125,6 +1126,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
   card.innerHTML = `
     <div class="defense-card-header">
       <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km</span>
+      ${operatorBadgeHtml(def.operator, { abbreviate: true })}
       <div class="defense-card-actions">
         ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
         <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
@@ -1167,6 +1169,25 @@ function buildCrossTargetDefenseCard(def, targetId) {
   });
 
   return card;
+}
+
+/**
+ * Operator label for a defense card. Own and patrol cards show the full
+ * nation name (it fits on every card). Cross-target cards, whose header
+ * already carries the placement location, use the standard abbreviation
+ * for the two long names so the header wraps less. The full name is always
+ * in the tooltip. Returns '' when the entry has no operator.
+ */
+const OPERATOR_ABBREVIATIONS = {
+  'United States':        'U.S.',
+  'United Arab Emirates': 'U.A.E.'
+};
+
+function operatorBadgeHtml(operator, { abbreviate = false } = {}) {
+  const name = (operator || '').trim();
+  if (!name) return '';
+  const label = abbreviate ? (OPERATOR_ABBREVIATIONS[name] || name) : name;
+  return `<span class="operator-badge" title="Operated by ${name}">${label}</span>`;
 }
 
 /**
@@ -1257,6 +1278,7 @@ function buildDefenseCard(def, targetId) {
   // const tierBadgeHtml = `<span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>`;
   card.innerHTML = `
     <div class="defense-card-header">
+      ${operatorBadgeHtml(def.operator)}
       <div class="defense-card-actions">
         ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
         <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"

@@ -1605,6 +1605,23 @@ select option, select optgroup {
   white-space: nowrap;
 }
 
+/* Operator (nation) label on every defense card — own, cross-target, patrol */
+.operator-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: auto;   /* keeps the actions pinned to the right on own cards */
+}
+.patrol-badge + .operator-badge,
+.cross-target-badge + .operator-badge { margin-left: 6px; }
+
 .cross-target-badge {
   font-size: 10px;
   font-family: var(--font-mono);
