@@ -1125,14 +1125,16 @@ function buildCrossTargetDefenseCard(def, targetId) {
   // const tierBadgeHtml = `<span class="tier-badge" style="background:${color}20;color:${color};border-color:${color}40">${label}</span>`;
   card.innerHTML = `
     <div class="defense-card-header">
-      <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km</span>
-      ${operatorBadgeHtml(def.operator, { abbreviate: true })}
+      ${operatorBadgeHtml(def.operator)}
       <div class="defense-card-actions">
         ${isDisabled ? '<span class="disabled-sim-badge">EXCLUDED</span>' : ''}
         <button class="btn-icon btn-toggle-defense${isDisabled ? ' is-disabled' : ''}"
           data-target="${targetId}" data-defense="${def.id}"
           title="${isDisabled ? 'Re-enable for simulation' : 'Exclude from simulation'}">⊘</button>
       </div>
+    </div>
+    <div class="cross-target-location">
+      <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km</span>
     </div>
     <div class="defense-card-body">
       <span class="defense-name">${catalog?.name || def.system}</span>

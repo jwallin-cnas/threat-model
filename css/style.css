@@ -1638,12 +1638,10 @@ select option, select optgroup {
   overflow-wrap: break-word;
 }
 
-/* Pin the exclude button to the top of the header when the location badge
-   wraps onto multiple lines; add a gap so EXCLUDED label never touches badge */
-.cross-target-card .defense-card-header {
-  align-items: flex-start;
-  gap: 8px;
-}
+/* Cross-target cards: the header holds operator + actions like own cards;
+   the placement label sits on its own row beneath it */
+.cross-target-location { margin-bottom: 4px; }
+.cross-target-location .cross-target-badge { display: inline-block; }
 
 /* Warning note shown on cross-target cards when a system's per-threat-type
    range cap means it cannot engage all threat types at this target's distance */
