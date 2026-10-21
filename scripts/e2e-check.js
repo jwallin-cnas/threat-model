@@ -195,9 +195,9 @@ async function checkPkBuilder(browser, base) {
     summary: document.getElementById('pk-summary').textContent,
     counts: (() => { let n = 0, t = 0; for (const row of Object.values(window._pkState().table.cells)) for (const c of Object.values(row)) { t++; if (c.pk > 0) n++; } return [n, t]; })()
   }));
-  check(r1.rows === 22 && r1.cols === 24, 'pk: matrix is 22 × 24');
+  check(r1.rows === 23 && r1.cols === 24, 'pk: matrix is 23 × 24');
   check(r1.patriot === '0.4687' && r1.thaadZero && r1.deDisabled, 'pk: defaults, zero shading and DE shots disabled');
-  check(r1.summary === `${r1.counts[0]} of ${r1.counts[1]} pairings engage` && r1.counts[1] === 22 * 24, 'pk: summary counts engageable pairings (' + r1.summary + ')');
+  check(r1.summary === `${r1.counts[0]} of ${r1.counts[1]} pairings engage` && r1.counts[1] === 23 * 24, 'pk: summary counts engageable pairings (' + r1.summary + ')');
 
   await page.fill('.pk-cell[data-system="patriot"][data-platform="geran_2"] .pk-in', '0.9');
   await page.press('.pk-cell[data-system="patriot"][data-platform="geran_2"] .pk-in', 'Tab');

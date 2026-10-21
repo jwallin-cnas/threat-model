@@ -252,7 +252,7 @@
       "batteries": 1,
       "armament": {
         "type": "missile",
-        "name": "Electronic Attack Suite",
+        "name": "MEROPS Drone",
         "payload_kg": 0,
         "kill_modality": "fragmentation",
         "standard_loadout": 10

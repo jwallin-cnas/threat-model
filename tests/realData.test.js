@@ -23,7 +23,7 @@ describe('shipped data files', () => {
     const platforms = Object.keys(cfg.platformCatalog);
     for (const s of systems) for (const p of platforms) expect(cfg.pkTable.cells[s][p]).toBeDefined();
     expect(systems.length).toBe(24);
-    expect(platforms.length).toBe(22);
+    expect(platforms.length).toBe(23);
   });
 
   it('give VAMPIRE the same Pk row and doctrine slots as IFPC-2, right after it', () => {

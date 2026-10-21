@@ -51,6 +51,14 @@
       "salvo_sizes": [2, 10, 50]
     },
     {
+      "id": "shahed_131",
+      "name": "Shahed-131",
+      "type": "drone",
+      "payload_kg": 40,
+      "range_km": 2000,
+      "salvo_sizes": [2, 10, 50]
+    },
+    {
       "id": "shahed_136",
       "name": "Shahed-136",
       "type": "drone",
