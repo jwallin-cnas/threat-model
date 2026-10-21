@@ -17,7 +17,11 @@ Document layout (all Times New Roman):
           · location display name (targets.json "name") — 12 pt, bold, left.
           · one line per system at that location — 12 pt, left:
                 "<System> (<Operator>) -- Quantity: <n>, Chips: <n>"
-    A target id that is not in targets.json goes under "Other", last.
+    A target id that is not in targets.json goes under "Other".
+  • Water place points (target ids ending in "_place_point": Persian Gulf,
+    Gulf of Oman, Red Sea, Mediterranean Sea) are not filed under their
+    targets.json country. They form a final "Maritime" section at the end
+    of the document, in file order.
 
 Quantity is the file value (file units, not batteries). Chips is the file's
 `chips` field; a legacy `reloads` field is read when `chips` is absent, and
@@ -49,7 +53,9 @@ ROOT          = pathlib.Path(__file__).resolve().parent.parent
 TARGETS_PATH  = ROOT / 'data' / 'targets.json'
 DEFENSES_PATH = ROOT / 'data' / 'defenses.json'
 
-OTHER_COUNTRY = 'Other'   # heading for target ids missing from targets.json
+OTHER_COUNTRY    = 'Other'      # heading for target ids missing from targets.json
+MARITIME_HEADING = 'Maritime'   # heading for the water place points, always last
+WATER_SUFFIX     = '_place_point'
 
 FONT      = 'Times New Roman'
 TITLE_PT  = 14
@@ -308,6 +314,8 @@ def main(argv=None) -> int:
         else:
             unknown_targets.append(target_id)
             loc, country = fallback_name(target_id), OTHER_COUNTRY
+        if target_id.endswith(WATER_SUFFIX):
+            country = MARITIME_HEADING
         lines = []
         for e in entries:
             if not isinstance(e, dict) or not e.get('system'):
@@ -324,10 +332,11 @@ def main(argv=None) -> int:
         if lines:
             by_country.setdefault(country, []).append((loc, lines))
 
-    # "Other" (ids missing from targets.json) always goes last.
-    groups = [(c, b) for c, b in by_country.items() if c != OTHER_COUNTRY]
-    if OTHER_COUNTRY in by_country:
-        groups.append((OTHER_COUNTRY, by_country[OTHER_COUNTRY]))
+    # "Other" (ids missing from targets.json) follows the countries, and the
+    # water place points always close the document.
+    tail   = (OTHER_COUNTRY, MARITIME_HEADING)
+    groups = [(c, b) for c, b in by_country.items() if c not in tail]
+    groups += [(c, by_country[c]) for c in tail if c in by_country]
     n_locations = sum(len(b) for _, b in groups)
 
     out_dir = args.out_dir or args.laydown.resolve().parent
