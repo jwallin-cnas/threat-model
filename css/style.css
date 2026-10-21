@@ -1785,6 +1785,16 @@ select option, select optgroup {
     font-style: italic;
     margin: 2pt 0 6pt;
   }
+
+  /* ── End-of-report summaries (chip changes, platform losses) ──────────── */
+  .pr-summary          { margin-bottom: 18pt; }
+  .pr-summary-title    { font-size: 13pt; font-weight: bold; border-bottom: 1pt solid #333; padding-bottom: 4pt; margin-bottom: 4pt; }
+  .pr-summary-note     { font-size: 8.5pt; color: #555; font-style: italic; margin-bottom: 8pt; }
+  .pr-sum-group        { margin-bottom: 8pt; break-inside: avoid-page; }
+  .pr-sum-heading      { font-size: 11pt; font-weight: bold; text-decoration: underline; margin-bottom: 2pt; }
+  .pr-sum-block        { margin: 0 0 5pt; break-inside: avoid; }
+  .pr-sum-location     { font-size: 10pt; font-weight: bold; }
+  .pr-sum-line         { font-size: 10pt; }
 }
 
 /* ── Simulation History Dialog ───────────────────────────────────────────── */

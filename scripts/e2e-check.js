@@ -143,6 +143,42 @@ async function checkTool(browser, base) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Report summaries — chip changes (Blue) and platform losses (Red)
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkReportSummaries(browser, base) {
+  console.log('\n── report summaries ──');
+  const page = await browser.newPage();
+  const errs = collectErrors(page);
+  await page.goto(base + '/index.html');
+  await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  const r = await page.evaluate(() => {
+    window._setSeed(0);
+    window._importAttackQueueDirect({ version: '1.0', attacks: [
+      { targetId: 'us_fifth_fleet', platforms: [{ platformId: 'geran_2', quantity: 200 }, { platformId: 'fateh_110', quantity: 10 }] },
+      { targetId: 'doha',           platforms: [{ platformId: 'geran_2', quantity: 150 }] },
+      { targetId: 'riyadh',         platforms: [{ platformId: 'geran_2', quantity: 150 }] }
+    ] });
+    window._simulateQueueDirect();
+    const div = document.createElement('div'); div.innerHTML = window._buildPrintDocument();
+    const secs = [...div.querySelectorAll('.pr-summary')];
+    const lines = sec => [...sec.querySelectorAll('.pr-sum-heading, .pr-sum-location, .pr-sum-line')].map(e => e.textContent);
+    return { titles: secs.map(x => x.querySelector('.pr-summary-title').textContent), blue: lines(secs[0]), red: lines(secs[1]),
+             thaadChip: _fmtChips(48 / 48), half: _fmtChips(18 / 36), label: _printSystemLabel(DEFENSE_CATALOG.thaad) };
+  });
+  check(r.titles.join('|') === 'Chip Changes — Blue|Platform Losses — Red', 'summaries: both sections close the report');
+  check(r.blue[0] === 'Bahrain' && r.blue[1] === 'U.S. Fifth Fleet' && r.blue[2] === 'Patriot (Bahrain): -1 chip (-36 ints.)',
+        'summaries: country, location, then "-1 chip (-36 ints.)" for one Patriot load ' + JSON.stringify(r.blue.slice(0, 3)));
+  check(r.blue.includes('Patriot (Qatar): -3 chips (-108 ints.)'), 'summaries: a three-system Patriot entry emptied is three chips');
+  check(r.thaadChip === '-1 chip' && r.half === '-0.5 chips' && r.label === 'THAAD', 'summaries: chip wording and THAAD short label');
+  check(JSON.stringify(r.red) === JSON.stringify(['Short-Range Ballistic Missiles', 'Fateh-110: -10', 'Drones', 'Geran-2: -500']),
+        'summaries: Red losses sum salvos by type (Geran-2 200+150+150 = -500) ' + JSON.stringify(r.red));
+  check(errs.length === 0, 'summaries: no page errors ' + JSON.stringify(errs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Pk builder
 // ─────────────────────────────────────────────────────────────────────────────
 async function checkPkBuilder(browser, base) {
@@ -385,6 +421,7 @@ const { server, base } = await startServer();
 const browser = await chromium.launch();
 try {
   if (!ONLY || ONLY === 'tool')     await checkTool(browser, base);
+  if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
   if (!ONLY || ONLY === 'pk')       await checkPkBuilder(browser, base);
   if (!ONLY || ONLY === 'doctrine') await checkDoctrineBuilder(browser, base);
   if (!ONLY || ONLY === 'blue')     await checkBlueBuilder(browser, base);

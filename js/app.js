@@ -2973,6 +2973,8 @@ function _buildPrintDocument() {
   }
 
   html += _buildFinalMagSection();
+  html += _buildChipChangesSection(attacks);
+  html += _buildRedLossesSection(attacks);
 
   return html;
 }
@@ -3197,6 +3199,174 @@ function _buildFinalMagSection() {
       <thead><tr><th>System</th><th>Target</th><th>Country</th><th>Remaining</th><th>Loaded</th></tr></thead>
       <tbody>${bodyHtml}</tbody>
     </table>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// End-of-report summaries — what to take off the game board
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Escape text from laydown and catalog files for the print HTML. */
+function _printEsc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Short system label: the trailing upper-case abbreviation ("… (THAAD)" → "THAAD"), else the name. */
+function _printSystemLabel(catalog) {
+  const m = /\(([A-Z][A-Z0-9/-]{1,11})\)\s*$/.exec(catalog?.name || '');
+  return m ? m[1] : (catalog?.name || '');
+}
+
+/** "-1 chip", "-0.5 chips", "-2.33 chips" (at most two decimals). */
+function _fmtChips(n) {
+  const r = Math.round(n * 100) / 100;
+  return `-${r} chip${r === 1 ? '' : 's'}`;
+}
+
+/** Water place points (Persian Gulf, Gulf of Oman, Red Sea, Mediterranean Sea) group as "Maritime", last. */
+const PRINT_MARITIME_HEADING = 'Maritime';
+function _printIsWaterPoint(targetId) { return /_place_point$/.test(targetId || ''); }
+
+/**
+ * Chip changes across every attack in the report, grouped by country and
+ * location, so the players know which chips to take off the board.
+ *
+ * One chip is one full load of ONE system: magazinePerBattery × that system's
+ * `batteries` (Patriot 12 × 3 = 36; THAAD 48 × 1 = 48). A shared patrol asset's
+ * chip is its whole magazine. An entry of N systems therefore holds N chips per
+ * full load. Chips lost = interceptors expended ÷ chip size, summed over the
+ * attacks (reloads are not losses and are left out). Systems with no magazine
+ * (directed energy, jammers) never appear.
+ *
+ * Each entry is listed under the location where it is placed (its own target,
+ * or the target it covers from), in targets.json order, countries by first
+ * appearance; the water place points close the list under "Maritime".
+ */
+function _buildChipChangesSection(attacks) {
+  // Home target of every entry in the current laydown (first listing wins).
+  const homeOf  = new Map();
+  const orderOf = new Map(appTargetCatalog.map((t, i) => [t.id, i]));
+  for (const t of appTargetCatalog) {
+    for (const d of (t.defenses || [])) if (!homeOf.has(d.id)) homeOf.set(d.id, t);
+  }
+  const targetByName = new Map(appTargetCatalog.map(t => [t.name, t]));
+
+  const byDef = new Map();   // def.id → { def, used, home, locName, country }
+  for (const snap of attacks) {
+    const prevMag  = snap.preSimMagState || {};
+    const afterMag = snap.magStateAfter  || {};
+    const seen     = new Set();
+    for (const def of (snap.allDefenses || [])) {
+      if (seen.has(def.id)) continue;   // a shared asset can be listed twice in one attack
+      seen.add(def.id);
+      const catalog = DEFENSE_CATALOG[def.system];
+      const maxMag  = (catalog?.magazinePerBattery || 0) * (def.quantity || 1);
+      if (!catalog || maxMag === 0) continue;
+      const before = (def.id in prevMag)  ? prevMag[def.id]  : maxMag;
+      const after  = (def.id in afterMag) ? afterMag[def.id] : maxMag;
+      const used   = before - after;
+      if (!(used > 0)) continue;
+      const rec = byDef.get(def.id);
+      if (rec) { rec.used += used; continue; }
+      const home = homeOf.get(def.id) || targetByName.get(def.locationName) || null;
+      byDef.set(def.id, {
+        def, catalog, used, home,
+        locName: home?.name || def.locationName || '—',
+        country: home && _printIsWaterPoint(home.id) ? PRINT_MARITIME_HEADING
+               : (home?.country || def.locationCountry || 'Other')
+      });
+    }
+  }
+
+  let body = '';
+  if (byDef.size === 0) {
+    body = '<div class="pr-no-change">No interceptors expended in these attacks.</div>';
+  } else {
+    // country → location → entries, in targets.json order; Maritime last
+    const rank = r => (r.country === PRINT_MARITIME_HEADING ? 1e6 : 0) + (r.home ? orderOf.get(r.home.id) ?? 5e5 : 5e5);
+    const recs = [...byDef.values()].sort((a, b) => rank(a) - rank(b));
+    const countries = new Map();
+    for (const r of recs) {
+      if (!countries.has(r.country)) countries.set(r.country, new Map());
+      const locs = countries.get(r.country);
+      if (!locs.has(r.locName)) locs.set(r.locName, []);
+      locs.get(r.locName).push(r);
+    }
+    // keep "Maritime" last even if a country first appears after it
+    const ordered = [...countries.entries()].sort((a, b) => (a[0] === PRINT_MARITIME_HEADING) - (b[0] === PRINT_MARITIME_HEADING));
+    for (const [country, locs] of ordered) {
+      body += `<div class="pr-sum-group"><div class="pr-sum-heading">${_printEsc(country)}</div>`;
+      for (const [locName, rows] of locs) {
+        body += `<div class="pr-sum-block"><div class="pr-sum-location">${_printEsc(locName)}</div>`;
+        for (const r of rows) {
+          const isShared  = r.catalog.isShared;
+          const perSystem = isShared ? r.catalog.magazinePerBattery
+                                     : r.catalog.magazinePerBattery * (appDefenseSystems.find(s => s.id === r.def.system)?.batteries ?? 1);
+          const chips     = r.used / perSystem;
+          const operator  = r.def.operator ? ` (${_printEsc(r.def.operator)})` : '';
+          body += `<div class="pr-sum-line">${_printEsc(_printSystemLabel(r.catalog))}${operator}: ${_fmtChips(chips)} (-${fmtNumber(r.used)} ints.)</div>`;
+        }
+        body += '</div>';
+      }
+      body += '</div>';
+    }
+  }
+
+  return `
+    <div class="pr-summary pr-attack--break">
+      <div class="pr-summary-title">Chip Changes — Blue</div>
+      <div class="pr-summary-note">Interceptors expended across all ${attacks.length} attack${attacks.length !== 1 ? 's' : ''}. One chip is one full load of one system.</div>
+      ${body}
+    </div>
+  `;
+}
+
+/** Plural threat-type headings for the Red summary, in engine type order. */
+const PRINT_RED_TYPE_HEADINGS = {
+  mrbm:           'Medium-Range Ballistic Missiles',
+  srbm:           'Short-Range Ballistic Missiles',
+  cruise_missile: 'Cruise Missiles',
+  drone_jet:      'Jet-Powered Drones',
+  drone:          'Drones',
+  fpv:            'FPV Drones',
+  hypersonic:     'Hypersonic Glide Vehicles'
+};
+
+/**
+ * Red platform losses: every platform launched in the report's attacks is
+ * spent, so the loss for a platform is the sum of its salvo sizes across all
+ * attacks. Grouped by threat type; platforms keep first-launch order.
+ */
+function _buildRedLossesSection(attacks) {
+  const byType = new Map();   // type → Map(platformId → count)
+  for (const snap of attacks) {
+    for (const m of (snap.attackManifest || [])) {
+      const cat  = PLATFORM_CATALOG[m.platformId];
+      const type = cat?.type || 'other';
+      if (!byType.has(type)) byType.set(type, new Map());
+      const plats = byType.get(type);
+      plats.set(m.platformId, (plats.get(m.platformId) || 0) + (m.count || 0));
+    }
+  }
+  const typeOrder = [...Object.keys(PRINT_RED_TYPE_HEADINGS), ...[...byType.keys()].filter(t => !(t in PRINT_RED_TYPE_HEADINGS))];
+
+  let body = '';
+  for (const type of typeOrder) {
+    const plats = byType.get(type);
+    if (!plats) continue;
+    body += `<div class="pr-sum-group"><div class="pr-sum-heading">${_printEsc(PRINT_RED_TYPE_HEADINGS[type] || THREAT_TYPE_LABELS[type] || type)}</div>`;
+    for (const [pid, count] of plats) {
+      body += `<div class="pr-sum-line">${_printEsc(PLATFORM_CATALOG[pid]?.name || pid)}: -${fmtNumber(count)}</div>`;
+    }
+    body += '</div>';
+  }
+
+  return `
+    <div class="pr-summary">
+      <div class="pr-summary-title">Platform Losses — Red</div>
+      <div class="pr-summary-note">Platforms launched across all ${attacks.length} attack${attacks.length !== 1 ? 's' : ''}.</div>
+      ${body || '<div class="pr-no-change">No platforms launched.</div>'}
+    </div>
   `;
 }
 
