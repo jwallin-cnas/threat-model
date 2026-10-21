@@ -187,6 +187,54 @@ function _applyInitialMagazine(def) {
 }
 
 /**
+ * A shared patrol asset is ONE asset even when several locations list it
+ * (same id, one pooled magazine). Its chips are one pool too: every listing
+ * carries the same `loadouts` and `reloads`. The pool comes from the first
+ * listing, in target order, that has chip data. Listings on `freshTargetId`
+ * (a target just reset to default) are used only when no other listing has
+ * chip data, so a reset cannot hand a spent pool fresh chips. Listings added
+ * by hand join the pool. Returns a warning for each asset whose listings
+ * disagreed on their chip total.
+ */
+function _unifySharedReserves(freshTargetId = null) {
+  const groups = new Map();   // def.id → [{ def, targetId }]
+  for (const t of appTargetCatalog) {
+    for (const def of t.defenses || []) {
+      if (!DEFENSE_CATALOG[def.system]?.isShared) continue;
+      if (!groups.has(def.id)) groups.set(def.id, []);
+      groups.get(def.id).push({ def, targetId: t.id });
+    }
+  }
+  const warnings = [];
+  for (const [id, list] of groups) {
+    if (list.length < 2) continue;
+    const withChips = list.filter(x => x.def.loadouts != null);
+    if (withChips.length === 0) continue;
+    const src = (withChips.find(x => x.targetId !== freshTargetId) || withChips[0]).def;
+    const totals = [...new Set(withChips.map(x => x.def.loadouts))];
+    if (totals.length > 1) {
+      warnings.push(`Shared asset "${id}" is listed at ${list.length} targets with different chips (${totals.join(', ')}) — using ${src.loadouts} as one pool`);
+    }
+    for (const { def } of list) {
+      def.loadouts   = src.loadouts;
+      def.reloads    = src.reloads;
+      def.reloadUnit = src.reloadUnit;
+    }
+  }
+  for (const w of warnings) console.warn('[chips]', w);
+  return warnings;
+}
+
+/** Write one entry's reserve to every listing with the same id (shared assets). */
+function _syncSharedReserve(def) {
+  for (const t of appTargetCatalog) {
+    for (const other of t.defenses || []) {
+      if (other !== def && other.id === def.id) other.reloads = def.reloads;
+    }
+  }
+}
+
+/**
  * One-time conversion of reload counts saved by earlier versions, which
  * counted one reload as a refill of the WHOLE entry. Reserve chips are
  * rebuilt from the entry's chip total minus what was already spent:
@@ -223,6 +271,7 @@ function _migrateReloadUnits() {
       def.reloadUnit = 'chip';
     }
   }
+  _unifySharedReserves();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appTargetCatalog)); } catch { /* non-critical */ }
   saveHistoryState();
   console.info(`[chips] Converted saved reload counts to chips for ${converted.size} entr${converted.size === 1 ? 'y' : 'ies'}.`);
@@ -415,6 +464,7 @@ async function loadData() {
     }
     appTargetCatalog = merged;
   }
+  _unifySharedReserves();   // one chip pool per shared patrol asset
 
   // Entries with 0 loadouts start empty. Only seed the empty state where no
   // magazine entry exists yet, so a saved session (or a manual edit) wins.
@@ -1476,6 +1526,7 @@ function addDefense(targetId, systemId, quantity, notes) {
       return;
     }
     target.defenses.push({ id: sharedId, system: systemId, quantity: 1, notes: notes || '' });
+    _unifySharedReserves();   // joins the asset's chip pool if it is listed elsewhere
     saveToStorage();
   } else {
     target.defenses.push({
@@ -1521,6 +1572,7 @@ async function resetTargetToDefault(targetId) {
   // Same conversion as loadData(): batteries scaling, operator default, loadouts.
   const raw = appDefaultDefenses[targetId];
   target.defenses = Array.isArray(raw) ? raw.map(d => _ingestDefenseEntry(d, target)) : [];
+  _unifySharedReserves(targetId);   // a shared asset keeps its existing chip pool
   saveToStorage();
 
   clearMagStateForTarget(targetId);   // also seeds the empty start for 0-loadout entries
@@ -3554,6 +3606,7 @@ async function importLaydown(file) {
       for (const def of applied) _applyInitialMagazine(def);   // 0 loadouts → starts empty
       targetsUpdated++;
     }
+    warnings.push(..._unifySharedReserves());   // one chip pool per shared patrol asset
 
     // ── Persist ───────────────────────────────────────────────────────────────
     saveToStorage();
@@ -3879,6 +3932,7 @@ function _importLaydownDirect(data) {
     for (const def of applied) _applyInitialMagazine(def);   // 0 loadouts → starts empty
     targetsUpdated++;
   }
+  warnings.push(..._unifySharedReserves());   // one chip pool per shared patrol asset
 
   saveToStorage();
   saveMagStateToStorage();
@@ -4261,8 +4315,11 @@ async function performGlobalReload() {
   let   refilledCount = 0;
   let   missilesAdded = 0;
 
+  const handled = new Set();   // a shared asset listed at several targets reloads once
   for (const target of appTargetCatalog) {
     for (const def of target.defenses || []) {
+      if (handled.has(def.id)) continue;
+      handled.add(def.id);
       if (def.reloads == null || def.reloads <= 0) continue;
 
       const catalog    = DEFENSE_CATALOG[def.system];
@@ -4291,6 +4348,7 @@ async function performGlobalReload() {
         if (toAdd > 0) globalMagState[def.id] = current + toAdd;
         def.reloads = 0;
       }
+      if (isShared) _syncSharedReserve(def);
       missilesAdded += globalMagState[def.id] - current;
       refilledCount++;
     }
