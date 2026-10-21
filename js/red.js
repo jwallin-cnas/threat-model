@@ -89,7 +89,7 @@ function buildColumn(index) {
     <div class="attack-builder">
       <div class="form-group">
         <label>Platform</label>
-        <select class="rc-platform"></select>
+        <div class="ta-wrap"><input type="text" class="rc-platform" placeholder="Type to search platforms…"></div>
       </div>
       <div class="red-add-row">
         <div class="form-group quantity-field">
@@ -109,12 +109,11 @@ function buildColumn(index) {
     </div>
     <div class="attack-manifest rc-manifest"></div>`;
 
-  const targetSel   = col.querySelector('.rc-target');
-  const platformSel = col.querySelector('.rc-platform');
-  const qtyInput    = col.querySelector('.rc-qty');
+  const targetSel     = col.querySelector('.rc-target');
+  const platformInput = col.querySelector('.rc-platform');
+  const qtyInput      = col.querySelector('.rc-qty');
 
   fillTargetSelect(targetSel);
-  fillPlatformSelect(platformSel);
   targetSel.value = attacks[index].targetId || '';
 
   targetSel.addEventListener('change', () => {
@@ -123,29 +122,29 @@ function buildColumn(index) {
     updateColumnState(index);
   });
 
-  // Mirrors updateSalvoSelect(): seed with the first salvo size, enable, focus
-  platformSel.addEventListener('change', () => {
-    const platform = platformSel.value ? PLATFORM_CATALOG[platformSel.value] : null;
-    if (!platform) {
-      qtyInput.value    = '';
-      qtyInput.disabled = true;
-      return;
-    }
-    qtyInput.value    = platform.salvo_sizes?.[0] ?? 1;
-    qtyInput.disabled = false;
-    qtyInput.focus();
-    qtyInput.select();
+  // Platform search box. Choosing a platform seeds Salvo with its first salvo
+  // size (as updateSalvoSelect() does); Enter or a click then moves focus to
+  // Salvo with the text selected, so the user keys the salvo in.
+  const platformTA = attachTypeAhead(platformInput, {
+    items:     platformTypeAheadItems(),
+    emptyText: 'No matching platforms',
+    onChange:  item => {
+      const platform = item ? PLATFORM_CATALOG[item.id] : null;
+      qtyInput.value    = platform ? (platform.salvo_sizes?.[0] ?? 1) : '';
+      qtyInput.disabled = !platform;
+    },
+    onEnter: () => { qtyInput.focus(); qtyInput.select(); }
   });
 
+  // Enter in Salvo adds the platform, then the row clears for the next one.
   const addFromRow = () => {
-    const platformId = platformSel.value;
+    const platformId = platformTA.value();
     const qty        = parseInt(qtyInput.value, 10) || 0;
-    if (!platformId) { showToast('Please select a platform.', true); return; }
+    if (!platformId) { showToast('Please choose a platform.', true); platformTA.focus(); return; }
     if (!qty)        { showToast('Please enter a quantity.', true);  return; }
     addPlatform(index, platformId, qty);
-    platformSel.value = '';
-    qtyInput.value    = '';
-    qtyInput.disabled = true;
+    platformTA.clear();
+    platformTA.focus();
   };
   col.querySelector('.rc-add').addEventListener('click', addFromRow);
   qtyInput.addEventListener('keydown', e => { if (e.key === 'Enter') addFromRow(); });

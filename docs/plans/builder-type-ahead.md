@@ -1,7 +1,14 @@
 # Plan: Type-ahead system and platform search in the Blue and Red builders
 
-Status: design agreed 2026-10-21. Not built. All decisions are recorded
-under "Decided" at the end.
+Status: built 2026-10-21 (`attachTypeAhead()` in `js/builder-common.js`;
+checks in `npm run e2e`, `--only blue|red`). All decisions are recorded under
+"Decided" at the end. Two details settled during the build:
+
+- Typing only filters. The chosen value stays until a new one is picked, so
+  text that matches nothing reverts to it on blur. An emptied System or
+  Platform box clears on blur.
+- Filtered rows show a short tag: "Preset" in Blue (systems have none), the
+  threat type in Red (MRBM, SRBM, Cruise missile, Drone, Jet drone, FPV).
 
 ## Goal
 

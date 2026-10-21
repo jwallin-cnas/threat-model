@@ -162,7 +162,7 @@ function fillCard(card, target) {
 
       <div class="form-group">
         <label>System</label>
-        <select class="tc-system"></select>
+        <div class="ta-wrap"><input type="text" class="tc-system" placeholder="Type to search systems…"></div>
       </div>
 
       <div class="form-group">
@@ -175,7 +175,7 @@ function fillCard(card, target) {
       <div class="form-row-2">
         <div class="form-group">
           <label>Operator</label>
-          <select class="tc-operator"></select>
+          <div class="ta-wrap"><input type="text" class="tc-operator" placeholder="Type to search nations…"></div>
         </div>
         <div class="form-group">
           <label>Chips <span class="label-hint">— one chip per full load, including the first</span></label>
@@ -202,17 +202,16 @@ function fillCard(card, target) {
     entries.forEach((entry, index) => list.appendChild(buildRow(target.id, entry, index)));
   }
 
-  // Form selects
-  const systemSel   = card.querySelector('.tc-system');
-  const qtyInput    = card.querySelector('.tc-qty');
-  const magInfo     = card.querySelector('.tc-mag');
-  const operatorSel = card.querySelector('.tc-operator');
-  const chipsSel    = card.querySelector('.tc-chips');
-  const notesInput  = card.querySelector('.tc-notes');
-  const form        = card.querySelector('.tc-add-form');
+  // Form fields. System and Operator are search boxes; Enter in each field
+  // moves to the next one (System → Quantity → Operator → Chips → Notes), and
+  // Enter in Notes adds the system.
+  const systemInput   = card.querySelector('.tc-system');
+  const qtyInput      = card.querySelector('.tc-qty');
+  const magInfo       = card.querySelector('.tc-mag');
+  const operatorInput = card.querySelector('.tc-operator');
+  const chipsSel      = card.querySelector('.tc-chips');
+  const notesInput    = card.querySelector('.tc-notes');
 
-  fillSystemSelect(systemSel);
-  fillOperatorSelect(operatorSel, 'United States');
   chipsSel.innerHTML = '';
   for (const n of CHIP_OPTIONS) {
     const opt = document.createElement('option');
@@ -223,52 +222,80 @@ function fillCard(card, target) {
   }
 
   const refreshMagInfo = () => {
-    const text = magazineInfoText(systemSel.value, parseInt(qtyInput.value, 10));
+    const text = magazineInfoText(card._ta?.system.value(), parseInt(qtyInput.value, 10));
     magInfo.classList.toggle('hidden', !text);
     magInfo.textContent = text || '';
   };
 
-  // Same behaviour as the main tool: presets and patrol assets lock quantity to 1.
-  systemSel.addEventListener('change', () => {
-    const val     = systemSel.value;
-    const preset  = getBuilderPreset(val);
-    const catalog = preset ? null : DEFENSE_CATALOG[val];
-    if (preset || catalog?.isShared) {
-      qtyInput.value    = 1;
-      qtyInput.disabled = true;
-    } else {
-      qtyInput.disabled = false;
-      qtyInput.value    = 1;   // file units — see header comment
-    }
-    refreshMagInfo();
+  const operatorTA = attachTypeAhead(operatorInput, {
+    items:     operatorTypeAheadItems(),
+    clearable: false,
+    emptyText: 'No matching nations',
+    onEnter:   () => chipsSel.focus()
   });
+
+  // Same behaviour as the main tool: presets and patrol assets lock quantity to 1.
+  const systemTA = attachTypeAhead(systemInput, {
+    items:     systemTypeAheadItems(),
+    emptyText: 'No matching systems',
+    onChange:  item => {
+      const preset  = item ? getBuilderPreset(item.id) : null;
+      const catalog = item && !preset ? DEFENSE_CATALOG[item.id] : null;
+      qtyInput.disabled = !!(preset || catalog?.isShared);
+      qtyInput.value    = 1;   // file units — see header comment
+      refreshMagInfo();
+    },
+    onEnter: () => {
+      if (qtyInput.disabled) { operatorInput.focus(); return; }
+      qtyInput.focus();
+      qtyInput.select();
+    }
+  });
+
+  card._ta = { system: systemTA, operator: operatorTA };
+  operatorTA.setValue('United States');
+
   qtyInput.addEventListener('input', refreshMagInfo);
+  qtyInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); operatorInput.focus(); }
+  });
+  // A closed <select> would open its menu on Enter; advance instead.
+  chipsSel.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); notesInput.focus(); }
+  });
 
   card.querySelector('.tc-btn-add').addEventListener('click', () => openForm(card));
   card.querySelector('.tc-cancel').addEventListener('click', () => closeForm(card));
   card.querySelector('.tc-confirm').addEventListener('click', () => {
-    const systemId = systemSel.value;
+    const systemId = systemTA.value();
     const qty      = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-    const operator = operatorSel.value || 'United States';
-    const chips = parseInt(chipsSel.value, 10);
+    const operator = operatorTA.value() || 'United States';
+    const chips    = parseInt(chipsSel.value, 10);
     const notes    = notesInput.value.trim();
 
-    if (!systemId) { showToast('Please select a system.', true); return; }
+    if (!systemId) { showToast('Please choose a system.', true); systemTA.focus(); return; }
 
     const added = addEntries(target.id, systemId, qty, notes, operator, Number.isInteger(chips) ? chips : DEFAULT_CHIPS);
     if (added > 0) {
       persistBlue();
       refreshCard(target.id);
       showToast(`Added ${added} system${added !== 1 ? 's' : ''} to ${target.name}.`);
+      // The card was rebuilt. Reopen its form for the next system, keeping the
+      // operator: consecutive systems at one target usually share one.
+      const fresh = document.getElementById(`tc-${target.id}`);
+      if (fresh?._ta) {
+        fresh._ta.operator.setValue(operator);
+        openForm(fresh);
+      }
     }
   });
 
-  // Enter in the notes field confirms, as a convenience
+  // Enter in the notes field confirms
   notesInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') card.querySelector('.tc-confirm').click();
+    if (e.key === 'Enter') { e.preventDefault(); card.querySelector('.tc-confirm').click(); }
   });
 
-  form.classList.add('hidden');
+  card.querySelector('.tc-add-form').classList.add('hidden');
 }
 
 function buildRow(targetId, entry, index) {
@@ -304,19 +331,17 @@ function openForm(card) {
   }
   const form = card.querySelector('.tc-add-form');
   form.classList.remove('hidden');
-  card.querySelector('.tc-system').focus();
+  card._ta.system.focus();
 }
 
 function closeForm(card) {
   const form = card.querySelector('.tc-add-form');
   form.classList.add('hidden');
-  card.querySelector('.tc-system').value   = '';
-  card.querySelector('.tc-qty').value      = '1';
-  card.querySelector('.tc-qty').disabled   = false;
-  card.querySelector('.tc-notes').value    = '';
+  card._ta.system.clear();                       // also unlocks quantity and hides the hint
+  card._ta.operator.setValue('United States');
+  card.querySelector('.tc-qty').value   = '1';
+  card.querySelector('.tc-notes').value = '';
   card.querySelector('.tc-chips').value = String(DEFAULT_CHIPS);
-  card.querySelector('.tc-operator').value = 'United States';
-  card.querySelector('.tc-mag').classList.add('hidden');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

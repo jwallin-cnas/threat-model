@@ -2197,6 +2197,68 @@ select option, select optgroup {
   color: var(--text-dim);
 }
 
+/* ── Type-ahead search boxes (builders) ──────────────────────────────────── */
+
+.ta-wrap { position: relative; }
+
+.ta-list {
+  position: absolute;               /* also the offsetParent of its rows */
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 260px;
+  overflow-y: auto;
+  list-style: none;
+  padding: 4px 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.ta-group {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}
+
+.ta-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ta-option.is-active,
+.ta-option:hover { background: var(--accent-dim); color: var(--text-bright); }
+
+.ta-option-label { min-width: 0; overflow-wrap: anywhere; }
+
+.ta-option-tag {
+  flex-shrink: 0;
+  max-width: 45%;
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ta-empty {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-dim);
+}
+
 /* ── Attack columns (red) ─────────────────────────────────────────────────── */
 
 .attack-grid {

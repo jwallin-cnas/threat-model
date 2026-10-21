@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -229,6 +229,156 @@ async function checkDoctrineBuilder(browser, base) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Blue builder — type-ahead System / Operator boxes, Enter moves field to field
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkBlueBuilder(browser, base) {
+  console.log('\n── blue builder ──');
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const errs = collectErrors(page);
+  await page.goto(base + '/blue/');
+  await page.waitForFunction(() => window._blueReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.removeItem('threatmodel_blue_builder_v1'));
+  await page.reload(); await page.waitForFunction(() => window._blueReady === true);
+  await page.evaluate(() => window._blueApplyData({ version: '1.0', defaults: {} }));   // start empty
+
+  const card   = '#tc-doha';
+  const active = () => page.evaluate(() => document.activeElement?.className || '');
+  const labels = sel => page.$$eval(`${sel} .ta-option .ta-option-label`, els => els.map(e => e.textContent));
+  const entries = () => page.evaluate(() => window._blueState().laydown.doha || []);
+  const center  = sel => page.$eval(sel, e => e.scrollIntoView({ block: 'center', behavior: 'instant' }));   // clear of the sticky header; instant, as the page scrolls smoothly
+
+  await center(`${card} .tc-btn-add`); await page.click(`${card} .tc-btn-add`);
+  const r1 = await page.evaluate(c => ({
+    focused: document.activeElement.classList.contains('tc-system'),
+    groups:  [...document.querySelectorAll(`${c} .tc-system + .ta-list .ta-group`)].map(g => g.textContent)
+  }), card);
+  check(r1.focused && r1.groups.join(',') === 'Presets,Systems', 'blue: opening the form focuses System and lists the grouped full list');
+
+  await page.keyboard.type('Pat');
+  const l1 = await labels(`${card} .tc-system + .ta-list`);
+  check(l1[0] === 'Patriot' && l1.slice(1).length === 3 && l1.slice(1).every(x => x.includes('Patrol')), 'blue: "Pat" lists Patriot first, then the three Patrol entries (' + l1.join(' | ') + ')');
+
+  await page.keyboard.press('Enter');
+  const a1 = await active();
+  await page.keyboard.type('4');   await page.keyboard.press('Enter');
+  const a2 = await active();
+  await page.keyboard.type('Bah'); await page.keyboard.press('Enter');
+  const a3 = await active();
+  await page.keyboard.type('6');   await page.keyboard.press('Enter');
+  const a4 = await active();
+  check(a1.includes('tc-qty') && a2.includes('tc-operator') && a3.includes('tc-chips') && a4.includes('tc-notes'),
+        'blue: Enter moves System → Quantity → Operator → Chips → Notes (' + [a1, a2, a3, a4].join(' / ') + ')');
+  await page.keyboard.press('Enter');
+  const e1 = await entries();
+  const after = await page.evaluate(c => ({
+    formOpen: !document.querySelector(`${c} .tc-add-form`).classList.contains('hidden'),
+    focused:  document.activeElement.classList.contains('tc-system'),
+    system:   document.querySelector(`${c} .tc-system`).value,
+    operator: document.querySelector(`${c} .tc-operator`).value,
+    qty:      document.querySelector(`${c} .tc-qty`).value,
+    chips:    document.querySelector(`${c} .tc-chips`).value
+  }), card);
+  const last = e1[e1.length - 1] || {};
+  check(e1.length === 1 && last.system === 'patriot' && last.quantity === 4 && last.operator === 'Bahrain' && last.chips === 6,
+        'blue: keyboard-only entry adds Patriot × 4, Bahrain, 6 chips ' + JSON.stringify(last));
+  check(after.formOpen && after.focused && after.system === '' && after.operator === 'Bahrain' && after.qty === '1' && after.chips === '1',
+        'blue: after an add the form stays open, System is focused and empty, Operator is kept ' + JSON.stringify(after));
+
+  await page.keyboard.type('Pat'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+  const r2 = await page.evaluate(c => ({ sys: document.querySelector(`${c} .tc-system`).value, qtyDisabled: document.querySelector(`${c} .tc-qty`).disabled, focused: document.activeElement.className }), card);
+  check(r2.sys.startsWith('F-15E Patrol') && r2.qtyDisabled && r2.focused.includes('tc-operator'), 'blue: ↓ picks the first Patrol; quantity is locked so focus skips to Operator ' + JSON.stringify(r2));
+
+  // Invalid operator text reverts on blur; Escape closes the popup first
+  await page.keyboard.type('Narnia');
+  const empty = await page.$eval(`${card} .tc-operator + .ta-list .ta-empty`, e => e.textContent).catch(() => null);
+  await page.keyboard.press('Enter');
+  const stillOp = await active();
+  await page.keyboard.press('Escape');
+  const popupClosed = await page.$eval(`${card} .tc-operator + .ta-list`, e => e.classList.contains('hidden'));
+  await page.keyboard.press('Tab');
+  const opAfter = await page.$eval(`${card} .tc-operator`, e => e.value);
+  check(empty === 'No matching nations' && stillOp.includes('tc-operator') && popupClosed && opAfter === 'Bahrain',
+        'blue: no match shows a message, Enter does nothing, Escape closes, blur reverts the operator (' + opAfter + ')');
+
+  // Click a row: focus System, type, click "Iron Dome"
+  await center(`${card} .tc-system`); await page.click(`${card} .tc-system`);
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');   // close, then clear
+  await page.keyboard.type('Iron');
+  await page.click(`${card} .tc-system + .ta-list .ta-option:has-text("Iron Dome")`);
+  const r3 = await page.evaluate(c => ({ sys: document.querySelector(`${c} .tc-system`).value, focused: document.activeElement.className, mag: document.querySelector(`${c} .tc-mag`).textContent }), card);
+  check(r3.sys === 'Iron Dome' && r3.focused.includes('tc-qty') && r3.mag.includes('interceptors'), 'blue: clicking a row chooses it and moves to Quantity ' + JSON.stringify(r3));
+
+  // Preset locks quantity; Add System button still works from any field
+  await center(`${card} .tc-system`); await page.click(`${card} .tc-system`);
+  await page.keyboard.type('carrier'); await page.keyboard.press('Enter');
+  const r4 = await page.evaluate(c => ({ qtyDisabled: document.querySelector(`${c} .tc-qty`).disabled, focused: document.activeElement.className }), card);
+  await center(`${card} .tc-confirm`); await page.click(`${card} .tc-confirm`);
+  const e2 = await entries();
+  check(r4.qtyDisabled && r4.focused.includes('tc-operator') && e2.length > 2, 'blue: a preset is found, locks quantity, and the Add button adds its components');
+
+  // Matching rules
+  const m = await page.evaluate(() => {
+    const sys = systemTypeAheadItems(), ops = operatorTypeAheadItems(), first = (items, q, n = 1) => typeAheadFilter(items, q).slice(0, n).map(i => i.id).join(',');
+    return { thaad: first(sys, 'thaad'), sm: first(sys, 'sm', 3), dome: first(sys, 'dome'), f15: first(sys, 'f15'), nasams: first(sys, 'nasams'),
+             uae: first(ops, 'uae'), us: first(ops, 'us'), arab: first(ops, 'arab', 2), zzz: typeAheadFilter(sys, 'zzz').length };
+  });
+  check(m.thaad === 'thaad' && m.sm === 'aegis_sm2,aegis_sm3,aegis_sm6' && m.dome === 'iron_dome' && m.f15 === 'f15e_patrol' && m.nasams === 'nasams'
+        && m.uae === 'United Arab Emirates' && m.us === 'United States' && m.arab === 'Saudi Arabia,United Arab Emirates' && m.zzz === 0,
+        'blue: matching by name, word, abbreviation and compact form ' + JSON.stringify(m));
+
+  // Export matches the entered values
+  const ex = await page.evaluate(() => window._blueBuildExport('T').defaults.doha);
+  check(ex[0].system === 'patriot' && ex[0].quantity === 4 && ex[0].operator === 'Bahrain' && ex[0].chips === 6, 'blue: export carries the type-ahead entry');
+
+  await page.evaluate(() => localStorage.removeItem('threatmodel_blue_builder_v1'));
+  check(errs.length === 0, 'blue: no page errors ' + JSON.stringify(errs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Red builder — type-ahead Platform box, Enter to Salvo, Enter adds
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkRedBuilder(browser, base) {
+  console.log('\n── red builder ──');
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const errs = collectErrors(page);
+  await page.goto(base + '/red/');
+  await page.waitForFunction(() => window._redReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.removeItem('threatmodel_red_builder_v1'));
+  await page.reload(); await page.waitForFunction(() => window._redReady === true);
+  const col    = '#attack-col-0';
+  const active = () => page.evaluate(() => document.activeElement?.className || '');
+
+  await page.click(`${col} .rc-platform`);
+  const groups = await page.$$eval(`${col} .ta-group`, els => els.map(e => e.textContent));
+  check(groups.length >= 5 && groups[0].startsWith('Medium-Range'), 'red: clicking the empty box lists platforms grouped by threat type');
+
+  await page.keyboard.type('Fat'); await page.keyboard.press('Enter');
+  const r1 = await page.evaluate(c => ({ focused: document.activeElement.className, qty: document.querySelector(`${c} .rc-qty`).value }), col);
+  const firstSalvo = await page.evaluate(() => String(PLATFORM_CATALOG.fateh_110.salvo_sizes?.[0] ?? 1));
+  check(r1.focused.includes('rc-qty') && r1.qty === firstSalvo, 'red: "Fat" + Enter focuses Salvo seeded with the first salvo size ' + JSON.stringify(r1));
+
+  await page.keyboard.type('12'); await page.keyboard.press('Enter');
+  const r2 = await page.evaluate(c => ({ manifest: window._redState().attacks[0].manifest, focused: document.activeElement.className,
+                                         box: document.querySelector(`${c} .rc-platform`).value, qtyDisabled: document.querySelector(`${c} .rc-qty`).disabled }), col);
+  check(JSON.stringify(r2.manifest) === '[{"platformId":"fateh_110","count":12}]' && r2.focused.includes('rc-platform') && r2.box === '' && r2.qtyDisabled,
+        'red: typing replaces the seeded salvo; Enter adds 12 × Fateh-110 and returns to an empty Platform box ' + JSON.stringify(r2));
+
+  await page.keyboard.type('mrbm');
+  const tags = await page.$$eval(`${col} .ta-option-tag`, els => els.map(e => e.textContent));
+  check(tags.length >= 4 && tags.every(t => t === 'MRBM'), 'red: "mrbm" lists the MRBMs, each tagged MRBM (' + tags.length + ')');
+
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  await page.keyboard.type('Sha'); await page.keyboard.press('Tab');
+  const r3 = await page.evaluate(c => ({ box: document.querySelector(`${c} .rc-platform`).value, focused: document.activeElement.className }), col);
+  check(r3.box === 'Shahab-3' && r3.focused.includes('rc-qty'), 'red: Tab takes the highlighted platform and moves to Salvo ' + JSON.stringify(r3));
+
+  await page.evaluate(() => localStorage.removeItem('threatmodel_red_builder_v1'));
+  check(errs.length === 0, 'red: no page errors ' + JSON.stringify(errs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
 const { server, base } = await startServer();
@@ -237,6 +387,8 @@ try {
   if (!ONLY || ONLY === 'tool')     await checkTool(browser, base);
   if (!ONLY || ONLY === 'pk')       await checkPkBuilder(browser, base);
   if (!ONLY || ONLY === 'doctrine') await checkDoctrineBuilder(browser, base);
+  if (!ONLY || ONLY === 'blue')     await checkBlueBuilder(browser, base);
+  if (!ONLY || ONLY === 'red')      await checkRedBuilder(browser, base);
 } finally {
   await browser.close();
   server.close();
