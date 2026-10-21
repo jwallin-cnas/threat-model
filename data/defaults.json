@@ -7,7 +7,8 @@
       "system": "System ID from defenses.json (see available_systems below).",
       "quantity": "Number of batteries / systems (integer ≥ 1).",
       "notes": "Optional free-text annotation. Use empty string for none.",
-      "operator": "Nation or organisation operating this system at this location. Used to determine cross-target default enable/disable state: US-operated systems are enabled by default when they can cover a neighbouring target; all others are disabled by default."
+      "operator": "Nation or organisation operating this system at this location. Used to determine cross-target default enable/disable state: US-operated systems are enabled by default when they can cover a neighbouring target; all others are disabled by default.",
+      "chips": "Total number of full loadouts, INCLUDING the one the system starts with (one chip on the game board per loadout). 0 = starts empty. Absent = 1."
     },
     "available_systems": [
       "aegis_sm3",
@@ -94,52 +95,6 @@
     ]
   },
   "defaults": {
-    "doha": [
-      {
-        "id": "doha_d1",
-        "system": "patriot",
-        "quantity": 3,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 4
-      },
-      {
-        "id": "doha_d2",
-        "system": "nasams",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 6
-      }
-    ],
-    "ras_laffan_lng": [
-      {
-        "id": "ras_laffan_d1",
-        "system": "merops",
-        "quantity": 2,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 7
-      }
-    ],
-    "hamad_port": [
-      {
-        "id": "hamad_port_d1",
-        "system": "patriot",
-        "quantity": 3,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 4
-      },
-      {
-        "id": "hamad_port_d2",
-        "system": "merops",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 4
-      }
-    ],
     "us_fifth_fleet": [
       {
         "id": "us_fifth_fleet_d1",
@@ -147,335 +102,17 @@
         "quantity": 1,
         "notes": "",
         "operator": "Bahrain",
-        "chips": 2
+        "chips": 1
       }
     ],
-    "muwaffaq_al_salti_ab": [
+    "isa_ab": [
       {
-        "id": "muwaffaq_al_salti_ab_d1",
+        "id": "isa_ab_d1",
         "system": "patriot",
         "quantity": 1,
         "notes": "",
-        "operator": "United States",
-        "chips": 2
-      }
-    ],
-    "jebel_ali_port": [
-      {
-        "id": "jebel_ali_port_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 2
-      },
-      {
-        "id": "jebel_ali_port_d2",
-        "system": "cheongung2",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 4
-      },
-      {
-        "id": "jebel_ali_port_d3",
-        "system": "merops",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 2
-      }
-    ],
-    "al_dhafra_ab": [
-      {
-        "id": "al_dhafra_ab_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 3
-      },
-      {
-        "id": "al_dhafra_ab_d2",
-        "system": "cheongung2",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 4
-      }
-    ],
-    "dubai": [
-      {
-        "id": "dubai_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 3
-      }
-    ],
-    "abu_dhabi": [
-      {
-        "id": "abu_dhabi_d1",
-        "system": "thaad",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 2
-      }
-    ],
-    "ruwais_refinery": [
-      {
-        "id": "ruwais_refinery_d1",
-        "system": "thaad",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 2
-      },
-      {
-        "id": "ruwais_refinery_d2",
-        "system": "patriot",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 2
-      }
-    ],
-    "fujairah_port": [
-      {
-        "id": "fujairah_port_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 3
-      },
-      {
-        "id": "fujairah_port_d2",
-        "system": "fslids",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 3
-      }
-    ],
-    "murban_bab_hashah": [
-      {
-        "id": "murban_bab_hashah_d1",
-        "system": "merops",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United Arab Emirates",
-        "chips": 2
-      }
-    ],
-    "prince_sultan_ab": [
-      {
-        "id": "prince_sultan_ab_d1",
-        "system": "patriot",
-        "quantity": 4,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      },
-      {
-        "id": "prince_sultan_ab_d2",
-        "system": "fslids",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      },
-      {
-        "id": "prince_sultan_ab_d3",
-        "system": "merops",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      }
-    ],
-    "king_khalid_ab": [
-      {
-        "id": "king_khalid_ab_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      },
-      {
-        "id": "king_khalid_ab_d2",
-        "system": "merops",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      }
-    ],
-    "aramco_persian_gulf_corridor": [
-      {
-        "id": "aramco_persian_gulf_corridor_d1",
-        "system": "patriot",
-        "quantity": 4,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      }
-    ],
-    "aramco_riyadh": [
-      {
-        "id": "aramco_riyadh_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      }
-    ],
-    "dammam": [
-      {
-        "id": "dammam_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      }
-    ],
-    "aramco_red_sea_corridor": [
-      {
-        "id": "aramco_red_sea_corridor_d1",
-        "system": "patriot",
-        "quantity": 2,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 3
-      }
-    ],
-    "riyadh": [
-      {
-        "id": "riyadh_d1",
-        "system": "thaad",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 2
-      }
-    ],
-    "jeddah": [
-      {
-        "id": "jeddah_d1",
-        "system": "thaad",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Saudi Arabia",
-        "chips": 2
-      }
-    ],
-    "ali_al_salem_ab": [
-      {
-        "id": "ali_al_salem_ab_d1",
-        "system": "patriot",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Kuwait",
-        "chips": 2
-      }
-    ],
-    "camp_arifjan": [
-      {
-        "id": "camp_arifjan_d1",
-        "system": "patriot",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Kuwait",
-        "chips": 2
-      }
-    ],
-    "thumrait_ab": [
-      {
-        "id": "thumrait_ab_d1",
-        "system": "nasams",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Oman",
-        "chips": 6
-      }
-    ],
-    "al_udeid_ab": [
-      {
-        "id": "al_udeid_ab_d1",
-        "system": "patriot",
-        "quantity": 3,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 3
-      },
-      {
-        "id": "al_udeid_ab_d2",
-        "system": "nasams",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 6
-      },
-      {
-        "id": "al_udeid_ab_d3",
-        "system": "fslids",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Qatar",
-        "chips": 3
-      }
-    ],
-    "muscat": [
-      {
-        "id": "muscat_d1",
-        "system": "nasams",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Oman",
-        "chips": 6
-      }
-    ],
-    "tel_nof_ab": [
-      {
-        "id": "tel_nof_ab_d1",
-        "system": "davids_sling",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Israel",
-        "chips": 4
-      },
-      {
-        "id": "tel_nof_ab_d2",
-        "system": "f15i_patrol",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Israel",
-        "chips": 2
-      }
-    ],
-    "ramat_david_ab": [
-      {
-        "id": "ramat_david_ab_d1",
-        "system": "arrow",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Israel",
-        "chips": 4
-      }
-    ],
-    "nevatim_ab": [
-      {
-        "id": "nevatim_ab_d1",
-        "system": "arrow",
-        "quantity": 1,
-        "notes": "",
-        "operator": "Israel",
-        "chips": 4
+        "operator": "Bahrain",
+        "chips": 1
       }
     ],
     "tel_aviv": [
@@ -485,7 +122,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "chips": 4
+        "chips": 3
       },
       {
         "id": "tel_aviv_d2",
@@ -493,7 +130,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "chips": 7
+        "chips": 6
       }
     ],
     "haifa": [
@@ -503,7 +140,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "chips": 4
+        "chips": 3
       },
       {
         "id": "haifa_d2",
@@ -511,7 +148,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "chips": 7
+        "chips": 6
       },
       {
         "id": "haifa_d3",
@@ -529,7 +166,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "chips": 4
+        "chips": 3
       },
       {
         "id": "jerusalem_d2",
@@ -537,7 +174,7 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "chips": 7
+        "chips": 6
       }
     ],
     "beer_sheva": [
@@ -547,7 +184,7 @@
         "quantity": 1,
         "notes": "",
         "operator": "Israel",
-        "chips": 2
+        "chips": 3
       },
       {
         "id": "beer_sheva_d2",
@@ -555,26 +192,448 @@
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
+        "chips": 6
+      }
+    ],
+    "tel_nof_ab": [
+      {
+        "id": "tel_nof_ab_d1",
+        "system": "davids_sling",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Israel",
+        "chips": 3
+      },
+      {
+        "id": "shared_f15i_patrol",
+        "system": "f15i_patrol",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Israel",
         "chips": 2
+      }
+    ],
+    "ramat_david_ab": [
+      {
+        "id": "ramat_david_ab_d1",
+        "system": "arrow",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Israel",
+        "chips": 3
       }
     ],
     "hatzerim_ab": [
       {
-        "id": "hatzerim_d1",
+        "id": "hatzerim_ab_d1",
         "system": "iron_dome",
         "quantity": 2,
         "notes": "",
         "operator": "Israel",
-        "chips": 7
+        "chips": 6
       }
     ],
-    "isa_ab": [
+    "nevatim_ab": [
       {
-        "id": "isa_ab_d1",
+        "id": "nevatim_ab_d1",
+        "system": "arrow",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Israel",
+        "chips": 3
+      }
+    ],
+    "ali_al_salem_ab": [
+      {
+        "id": "ali_al_salem_ab_d1",
         "system": "patriot",
         "quantity": 1,
         "notes": "",
-        "operator": "Bahrain",
+        "operator": "Kuwait",
+        "chips": 1
+      }
+    ],
+    "camp_arifjan": [
+      {
+        "id": "camp_arifjan_d1",
+        "system": "patriot",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Kuwait",
+        "chips": 1
+      }
+    ],
+    "muscat": [
+      {
+        "id": "muscat_d1",
+        "system": "nasams",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Oman",
+        "chips": 5
+      }
+    ],
+    "thumrait_ab": [
+      {
+        "id": "thumrait_ab_d1",
+        "system": "nasams",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Oman",
+        "chips": 5
+      }
+    ],
+    "doha": [
+      {
+        "id": "doha_d1",
+        "system": "patriot",
+        "quantity": 3,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 3
+      },
+      {
+        "id": "doha_d2",
+        "system": "nasams",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 5
+      }
+    ],
+    "hamad_port": [
+      {
+        "id": "hamad_port_d1",
+        "system": "patriot",
+        "quantity": 3,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 3
+      },
+      {
+        "id": "hamad_port_d2",
+        "system": "merops",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 3
+      }
+    ],
+    "al_udeid_ab": [
+      {
+        "id": "al_udeid_ab_d1",
+        "system": "patriot",
+        "quantity": 3,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 3
+      },
+      {
+        "id": "al_udeid_ab_d2",
+        "system": "nasams",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 5
+      },
+      {
+        "id": "al_udeid_ab_d3",
+        "system": "fslids",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 2
+      }
+    ],
+    "ras_laffan_lng": [
+      {
+        "id": "ras_laffan_lng_d1",
+        "system": "merops",
+        "quantity": 2,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 6
+      },
+      {
+        "id": "ras_laffan_lng_d2",
+        "system": "patriot",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Qatar",
+        "chips": 1
+      }
+    ],
+    "riyadh": [
+      {
+        "id": "riyadh_d1",
+        "system": "thaad",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 1
+      }
+    ],
+    "dammam": [
+      {
+        "id": "dammam_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 2
+      }
+    ],
+    "king_khalid_ab": [
+      {
+        "id": "king_khalid_ab_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 2
+      },
+      {
+        "id": "king_khalid_ab_d2",
+        "system": "merops",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 1
+      }
+    ],
+    "jeddah": [
+      {
+        "id": "jeddah_d1",
+        "system": "thaad",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 1
+      }
+    ],
+    "prince_sultan_ab": [
+      {
+        "id": "prince_sultan_ab_d1",
+        "system": "patriot",
+        "quantity": 4,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 4
+      },
+      {
+        "id": "prince_sultan_ab_d2",
+        "system": "fslids",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 2
+      },
+      {
+        "id": "prince_sultan_ab_d3",
+        "system": "merops",
+        "quantity": 1,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 1
+      }
+    ],
+    "aramco_persian_gulf_corridor": [
+      {
+        "id": "aramco_persian_gulf_corridor_d1",
+        "system": "patriot",
+        "quantity": 4,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 4
+      }
+    ],
+    "aramco_riyadh": [
+      {
+        "id": "aramco_riyadh_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 2
+      }
+    ],
+    "aramco_red_sea_corridor": [
+      {
+        "id": "aramco_red_sea_corridor_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "Saudi Arabia",
+        "chips": 2
+      }
+    ],
+    "ruwais_refinery": [
+      {
+        "id": "ruwais_refinery_d1",
+        "system": "thaad",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 1
+      },
+      {
+        "id": "ruwais_refinery_d2",
+        "system": "patriot",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 1
+      }
+    ],
+    "murban_bab_hashah": [
+      {
+        "id": "murban_bab_hashah_d1",
+        "system": "merops",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 5
+      }
+    ],
+    "fujairah_port": [
+      {
+        "id": "fujairah_port_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 2
+      },
+      {
+        "id": "fujairah_port_d2",
+        "system": "fslids",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 2
+      }
+    ],
+    "dubai": [
+      {
+        "id": "dubai_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 2
+      }
+    ],
+    "abu_dhabi": [
+      {
+        "id": "abu_dhabi_d1",
+        "system": "thaad",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 1
+      }
+    ],
+    "al_dhafra_ab": [
+      {
+        "id": "al_dhafra_ab_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 2
+      },
+      {
+        "id": "al_dhafra_ab_d2",
+        "system": "cheongung2",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 3
+      }
+    ],
+    "jebel_ali_port": [
+      {
+        "id": "jebel_ali_port_d1",
+        "system": "patriot",
+        "quantity": 2,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 2
+      },
+      {
+        "id": "jebel_ali_port_d2",
+        "system": "cheongung2",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 3
+      },
+      {
+        "id": "jebel_ali_port_d3",
+        "system": "merops",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United Arab Emirates",
+        "chips": 5
+      }
+    ],
+    "persian_gulf_place_point": [
+      {
+        "id": "persian_gulf_place_point_d1",
+        "system": "aegis_sm3",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
+        "chips": 2
+      },
+      {
+        "id": "persian_gulf_place_point_d2",
+        "system": "aegis_sm6",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
+        "chips": 2
+      },
+      {
+        "id": "persian_gulf_place_point_d3",
+        "system": "aegis_sm2",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
+        "chips": 2
+      }
+    ],
+    "gulf_of_oman_place_point": [
+      {
+        "id": "shared_fa18_patrol",
+        "system": "fa18_patrol",
+        "quantity": 1,
+        "notes": "CAP",
+        "operator": "United States",
+        "chips": 2
+      },
+      {
+        "id": "gulf_of_oman_place_point_d1",
+        "system": "aegis_sm3",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
+        "chips": 2
+      },
+      {
+        "id": "gulf_of_oman_place_point_d2",
+        "system": "aegis_sm6",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
+        "chips": 2
+      },
+      {
+        "id": "gulf_of_oman_place_point_d3",
+        "system": "aegis_sm2",
+        "quantity": 1,
+        "notes": "",
+        "operator": "United States",
         "chips": 2
       }
     ]
