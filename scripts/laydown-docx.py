@@ -9,10 +9,15 @@ other package is needed.
 Document layout (all Times New Roman):
   • Title: the laydown's "name" in ALL CAPS — 14 pt, bold, centered.
   • "Generated at: <date, time>" — 12 pt, centered, timestamp of the run.
-  • One block per location, in the order the file lists them:
-      – location display name (targets.json "name") — 12 pt, bold, left.
-      – one line per system at that location — 12 pt, left:
-            "<System> (<Operator>) -- Quantity: <n>, Chips: <n>"
+  • Locations grouped by country (targets.json "country"). Countries appear
+    in the order they first occur in the laydown file; locations keep their
+    file order within a country. Each group is:
+      – country name — 12 pt, bold, left.
+      – one block per location in that country:
+          · location display name (targets.json "name") — 12 pt, bold, left.
+          · one line per system at that location — 12 pt, left:
+                "<System> (<Operator>) -- Quantity: <n>, Chips: <n>"
+    A target id that is not in targets.json goes under "Other", last.
 
 Quantity is the file value (file units, not batteries). Chips is the file's
 `chips` field; a legacy `reloads` field is read when `chips` is absent, and
@@ -44,6 +49,8 @@ ROOT          = pathlib.Path(__file__).resolve().parent.parent
 TARGETS_PATH  = ROOT / 'data' / 'targets.json'
 DEFENSES_PATH = ROOT / 'data' / 'defenses.json'
 
+OTHER_COUNTRY = 'Other'   # heading for target ids missing from targets.json
+
 FONT      = 'Times New Roman'
 TITLE_PT  = 14
 BODY_PT   = 12
@@ -51,10 +58,12 @@ BODY_PT   = 12
 
 # ── Display-name lookups ──────────────────────────────────────────────────────
 
-def load_target_names(path: pathlib.Path) -> dict:
+def load_targets(path: pathlib.Path) -> dict:
+    """{ target id: (display name, country) } from targets.json."""
     data = json.loads(path.read_text(encoding='utf-8'))
     items = data.get('targets', data) if isinstance(data, dict) else data
-    return {t['id']: t.get('name', t['id']) for t in items if 'id' in t}
+    return {t['id']: (t.get('name', t['id']), t.get('country') or OTHER_COUNTRY)
+            for t in items if 'id' in t}
 
 
 def load_system_names(path: pathlib.Path) -> dict:
@@ -115,19 +124,29 @@ def empty_paragraph() -> str:
     return '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>'
 
 
-def build_document_xml(title: str, generated_line: str, blocks: list) -> str:
-    """blocks: list of (location_name, [system_line, ...])."""
+def build_document_xml(title: str, generated_line: str, groups: list) -> str:
+    """groups: list of (country, [(location_name, [system_line, ...]), ...]).
+
+    The country heading sits directly above its first location. A blank
+    line separates consecutive locations, within a country and across
+    countries alike.
+    """
     body = [
         paragraph(title, TITLE_PT, bold=True, center=True),
         paragraph(generated_line, BODY_PT, center=True),
         empty_paragraph(),
     ]
-    for i, (loc, lines) in enumerate(blocks):
-        body.append(paragraph(loc, BODY_PT, bold=True))
-        for line in lines:
-            body.append(paragraph(line, BODY_PT))
-        if i < len(blocks) - 1:
-            body.append(empty_paragraph())
+    first = True
+    for country, blocks in groups:
+        for j, (loc, lines) in enumerate(blocks):
+            if not first:
+                body.append(empty_paragraph())
+            first = False
+            if j == 0:
+                body.append(paragraph(country, BODY_PT, bold=True))
+            body.append(paragraph(loc, BODY_PT, bold=True))
+            for line in lines:
+                body.append(paragraph(line, BODY_PT))
     body.append(
         '<w:sectPr>'
         '<w:pgSz w:w="12240" w:h="15840"/>'
@@ -250,7 +269,7 @@ def main(argv=None) -> int:
     ap.add_argument('--out-dir', type=pathlib.Path, default=None,
                     help='directory for the .docx (default: next to the input file)')
     ap.add_argument('--targets', type=pathlib.Path, default=TARGETS_PATH,
-                    help=f'targets catalog for location display names (default: {TARGETS_PATH})')
+                    help=f'targets catalog for location names and countries (default: {TARGETS_PATH})')
     ap.add_argument('--defenses', type=pathlib.Path, default=DEFENSES_PATH,
                     help=f'defenses catalog for system display names (default: {DEFENSES_PATH})')
     args = ap.parse_args(argv)
@@ -266,7 +285,7 @@ def main(argv=None) -> int:
         return 1
 
     try:
-        target_names = load_target_names(args.targets)
+        targets      = load_targets(args.targets)
         system_names = load_system_names(args.defenses)
     except (OSError, ValueError, KeyError) as err:
         print(f'[laydown-docx] Cannot read catalog: {err}', file=sys.stderr)
@@ -280,14 +299,15 @@ def main(argv=None) -> int:
     generated_line = f'Generated at: {now.strftime("%H:%M, %B %-d, %Y")}'
 
     unknown_targets, unknown_systems = [], []
-    blocks = []
+    by_country = {}   # country → [(location, lines)], insertion order = first occurrence
     for target_id, entries in defaults.items():
         if not isinstance(entries, list) or not entries:
             continue
-        loc = target_names.get(target_id)
-        if loc is None:
+        if target_id in targets:
+            loc, country = targets[target_id]
+        else:
             unknown_targets.append(target_id)
-            loc = fallback_name(target_id)
+            loc, country = fallback_name(target_id), OTHER_COUNTRY
         lines = []
         for e in entries:
             if not isinstance(e, dict) or not e.get('system'):
@@ -302,20 +322,26 @@ def main(argv=None) -> int:
             label = f'{sys_name} ({operator})' if operator else sys_name
             lines.append(f'{label} -- Quantity: {fmt_num(qty)}, Chips: {fmt_num(chips_of(e))}')
         if lines:
-            blocks.append((loc, lines))
+            by_country.setdefault(country, []).append((loc, lines))
+
+    # "Other" (ids missing from targets.json) always goes last.
+    groups = [(c, b) for c, b in by_country.items() if c != OTHER_COUNTRY]
+    if OTHER_COUNTRY in by_country:
+        groups.append((OTHER_COUNTRY, by_country[OTHER_COUNTRY]))
+    n_locations = sum(len(b) for _, b in groups)
 
     out_dir = args.out_dir or args.laydown.resolve().parent
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f'{safe_filename(name)}_{now.strftime("%Y-%m-%d_%H%M")}.docx'
 
-    document_xml = build_document_xml(name.upper(), generated_line, blocks)
+    document_xml = build_document_xml(name.upper(), generated_line, groups)
     write_docx(out_path, document_xml, name, _dt.datetime.utcnow())
 
     for t in sorted(set(unknown_targets)):
         print(f'[laydown-docx] Unknown target id "{t}" — used "{fallback_name(t)}"', file=sys.stderr)
     for s in sorted(set(unknown_systems)):
         print(f'[laydown-docx] Unknown system id "{s}" — used "{fallback_name(s)}"', file=sys.stderr)
-    print(f'[laydown-docx] {len(blocks)} location(s) → {out_path}')
+    print(f'[laydown-docx] {n_locations} location(s) in {len(groups)} country group(s) → {out_path}')
     return 0
 
 
