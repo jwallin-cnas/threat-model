@@ -12,7 +12,7 @@ Document layout (all Times New Roman):
   • Locations grouped by country (targets.json "country"). Countries appear
     in the order they first occur in the laydown file; locations keep their
     file order within a country. Each group is:
-      – country name — 12 pt, bold, left.
+      – country name — 12 pt, bold, underlined, left.
       – one block per location in that country:
           · location display name (targets.json "name") — 12 pt, bold, left.
           · one line per system at that location — 12 pt, left:
@@ -101,25 +101,26 @@ def fmt_num(n) -> str:
 
 # ── WordprocessingML ──────────────────────────────────────────────────────────
 
-def run_props(size_pt: int, bold: bool) -> str:
+def run_props(size_pt: int, bold: bool, underline: bool = False) -> str:
     half_points = size_pt * 2
     return (
         '<w:rPr>'
         f'<w:rFonts w:ascii="{FONT}" w:hAnsi="{FONT}" w:cs="{FONT}" w:eastAsia="{FONT}"/>'
         + ('<w:b/><w:bCs/>' if bold else '')
         + f'<w:sz w:val="{half_points}"/><w:szCs w:val="{half_points}"/>'
-        '</w:rPr>'
+        + ('<w:u w:val="single"/>' if underline else '')
+        + '</w:rPr>'
     )
 
 
 def paragraph(text: str, size_pt: int, bold: bool = False, center: bool = False,
-              space_after_twips: int = 0) -> str:
+              space_after_twips: int = 0, underline: bool = False) -> str:
     jc = '<w:jc w:val="center"/>' if center else ''
     spacing = f'<w:spacing w:after="{space_after_twips}"/>'
     return (
         '<w:p>'
         f'<w:pPr>{spacing}{jc}</w:pPr>'
-        f'<w:r>{run_props(size_pt, bold)}'
+        f'<w:r>{run_props(size_pt, bold, underline)}'
         f'<w:t xml:space="preserve">{escape(text)}</w:t>'
         '</w:r>'
         '</w:p>'
@@ -149,7 +150,7 @@ def build_document_xml(title: str, generated_line: str, groups: list) -> str:
                 body.append(empty_paragraph())
             first = False
             if j == 0:
-                body.append(paragraph(country, BODY_PT, bold=True))
+                body.append(paragraph(country, BODY_PT, bold=True, underline=True))
             body.append(paragraph(loc, BODY_PT, bold=True))
             for line in lines:
                 body.append(paragraph(line, BODY_PT))
