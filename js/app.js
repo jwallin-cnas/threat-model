@@ -105,28 +105,54 @@ function clearMagStateForTarget(targetId) {
   }
 }
 
-// ── Chips (loadouts) ─────────────────────────────────────────────────────────
-// A laydown file's `chips` value is the TOTAL number of full loadouts a
-// system gets, INCLUDING the one it starts with. A chip is the physical
-// game-board token for one loadout. In memory the entry keeps both numbers:
-// `loadouts` is that total and `reloads` is the resupply still available
-// (total − 1, never below 0). The Reload button and the history snapshots
-// work on `reloads` only. An entry with 0 chips starts with an empty
-// magazine and can never be reloaded. Files written before the rename used
-// `reloads` for the same total; that field is still read as a fallback.
+// ── Chips ────────────────────────────────────────────────────────────────────
+// A chip is the physical game-board token for ONE FULL LOAD OF ONE SYSTEM:
+// magazinePerBattery × that system's `batteries` (Patriot 12 × 3 = 36, THAAD
+// 48 × 1 = 48). A shared patrol asset's chip is its whole magazine.
+//
+// A laydown file's `chips` value is the entry's TOTAL chips, INCLUDING those
+// its systems start loaded with. An entry of N systems starts by using N
+// chips; the rest are reserve. In memory the entry keeps:
+//   loadouts — the file's chip total
+//   reloads  — reserve chips still available (chips − N, never below 0),
+//              fractional after partial reloads
+// The Reload button spends reserve chips one system load at a time, so 1
+// chip can only partly refill an entry of 3 Patriots (36 of 108). An entry
+// with fewer chips than systems starts partly loaded (chips × chip size); 0
+// chips starts empty. Files written before the rename used `reloads` for the
+// same total; that field is still read as a fallback.
 
-/** Parse a file-level `chips` value into a loadout count (absent or invalid → 1). */
+/** Parse a file-level `chips` value (absent or invalid → 1). */
 function parseLoadouts(raw) {
   if (raw == null || raw === '') return 1;
   const n = parseFloat(raw);
   return Number.isFinite(n) ? Math.max(0, n) : 1;
 }
 
+/** defenses.json `batteries` for a system (1 when unspecified). */
+function _batteriesPerSystem(systemId) {
+  return appDefenseSystems.find(s => s.id === systemId)?.batteries ?? 1;
+}
+
+/** Interceptors in one chip for this entry's system (0 = no magazine). */
+function chipSizeFor(def) {
+  const catalog    = DEFENSE_CATALOG[def.system];
+  const perBattery = catalog?.magazinePerBattery || 0;
+  if (perBattery === 0) return 0;
+  return catalog.isShared ? perBattery : perBattery * _batteriesPerSystem(def.system);
+}
+
+/** Number of systems (file units) in an in-memory entry; a patrol asset is 1. */
+function systemsInEntry(def) {
+  if (DEFENSE_CATALOG[def.system]?.isShared) return 1;
+  return (def.quantity || 1) / _batteriesPerSystem(def.system);
+}
+
 /**
  * Convert one raw laydown entry (defaults.json or an imported laydown file)
  * into the in-memory shape: quantity scaled by the system's `batteries`,
  * operator defaulted to the host country, and the file's `chips` total
- * (legacy files: `reloads`) split into `loadouts` / `reloads`.
+ * (legacy files: `reloads`) kept as `loadouts` with the reserve as `reloads`.
  *
  * @param {object} d        raw entry from the file
  * @param {object} target   the target that owns the entry
@@ -134,24 +160,85 @@ function parseLoadouts(raw) {
  */
 function _ingestDefenseEntry(d, target, qty = d.quantity ?? 1) {
   const sysData  = appDefenseSystems.find(s => s.id === d.system);
-  const loadouts = parseLoadouts(d.chips ?? d.reloads);
+  const isShared = !!(sysData?.shared || DEFENSE_CATALOG[d.system]?.isShared);
+  const chips    = parseLoadouts(d.chips ?? d.reloads);
+  const systems  = isShared ? 1 : qty;
   const { chips: _chips, ...rest } = d;
   return {
     ...rest,
-    quantity: qty * (sysData?.batteries ?? 1),
-    operator: d.operator || target.country || '',
-    loadouts,
-    reloads:  Math.max(0, loadouts - 1)
+    quantity:   qty * (sysData?.batteries ?? 1),
+    operator:   d.operator || target.country || '',
+    loadouts:   chips,
+    reloads:    Math.max(0, chips - systems),
+    reloadUnit: 'chip'
   };
 }
 
 /**
- * Apply the starting magazine implied by an entry's loadouts. An entry with
- * 0 loadouts starts empty (explicit 0 in globalMagState). Every other entry
- * starts full, which is the absence of a key.
+ * Apply the starting magazine implied by an entry's chips. With at least one
+ * chip per system the entry starts full (the absence of a key). With fewer,
+ * it starts with chips × chip size interceptors; 0 chips starts empty.
  */
 function _applyInitialMagazine(def) {
-  if (def.loadouts === 0) globalMagState[def.id] = 0;
+  if (def.loadouts == null) return;
+  const systems = systemsInEntry(def);
+  if (def.loadouts >= systems) return;
+  globalMagState[def.id] = Math.floor(def.loadouts * chipSizeFor(def));
+}
+
+/**
+ * One-time conversion of reload counts saved by earlier versions, which
+ * counted one reload as a refill of the WHOLE entry. Reserve chips are
+ * rebuilt from the entry's chip total minus what was already spent:
+ *   spent chips = (old total − 1 − old reloads) × systems
+ *   reserve     = max(0, chips − systems − spent chips)
+ * The same rule converts the reload counts stored in history snapshots.
+ * Entries ingested by this version carry reloadUnit 'chip' and are skipped.
+ */
+function _migrateReloadUnits() {
+  const converted = new Map();   // def.id → def (old unit)
+  for (const t of appTargetCatalog) {
+    for (const def of t.defenses || []) {
+      if (def.reloadUnit === 'chip' || def.loadouts == null || converted.has(def.id)) continue;
+      converted.set(def.id, def);
+    }
+  }
+  if (converted.size === 0) return false;
+  const toChips = (def, oldReloads) => {
+    const systems = systemsInEntry(def);
+    const spent   = Math.max(0, def.loadouts - 1 - (oldReloads ?? Math.max(0, def.loadouts - 1))) * systems;
+    return Math.round(Math.max(0, def.loadouts - systems - spent) * 1e6) / 1e6;
+  };
+  for (const snap of simHistory) {
+    if (!snap.reloadsState) continue;
+    for (const [id, def] of converted) {
+      if (id in snap.reloadsState) snap.reloadsState[id] = toChips(def, snap.reloadsState[id]);
+    }
+  }
+  for (const t of appTargetCatalog) {
+    for (const def of t.defenses || []) {
+      const src = converted.get(def.id);
+      if (!src || def.reloadUnit === 'chip') continue;
+      def.reloads    = toChips(def, def.reloads);
+      def.reloadUnit = 'chip';
+    }
+  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appTargetCatalog)); } catch { /* non-critical */ }
+  saveHistoryState();
+  console.info(`[chips] Converted saved reload counts to chips for ${converted.size} entr${converted.size === 1 ? 'y' : 'ies'}.`);
+  return true;
+}
+
+/**
+ * Card note for an entry still at a reduced starting load (fewer chips than
+ * systems): "(no chips — starts empty)" or "(starts with 2 chips)". Null when
+ * the entry starts full or its magazine has moved off the starting value.
+ */
+function _startNote(def, remaining) {
+  if (def.loadouts == null || def.loadouts >= systemsInEntry(def)) return null;
+  if (remaining !== Math.floor(def.loadouts * chipSizeFor(def))) return null;
+  if (def.loadouts === 0) return '(no chips — starts empty)';
+  return `(starts with ${fmtReloads(def.loadouts)} chip${def.loadouts === 1 ? '' : 's'})`;
 }
 
 /** Find a defense entry by id on any target, or null. */
@@ -163,7 +250,7 @@ function findDefenseEntryById(defId) {
   return null;
 }
 
-/** Reset one defense's magazine to its starting state: full, or empty for a 0-loadout entry. */
+/** Reset one defense's magazine to its starting state: full, or partly loaded / empty when it has fewer chips than systems. */
 function resetMagEntry(defId) {
   delete globalMagState[defId];
   const def = findDefenseEntryById(defId);
@@ -978,7 +1065,7 @@ function buildSharedDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} missiles</span>
-          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no chips — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${_startNote(def, simRemaining) ?? (expended > 0 ? `(${expended} expended)` : '(none expended)')}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -996,7 +1083,7 @@ function buildSharedDefenseCard(def, targetId) {
 
   const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
   const reloadHtml = _rd != null
-    ? `<div class="defense-reloads">↻ ${_rd} reload${_rd !== '1' ? 's' : ''}</div>`
+    ? `<div class="defense-reloads" title="Reserve chips: each refills one system">↻ ${_rd} reserve chip${_rd !== '1' ? 's' : ''}</div>`
     : '';
 
   const card = document.createElement('div');
@@ -1076,7 +1163,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} interceptors</span>
-          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no chips — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${_startNote(def, simRemaining) ?? (expended > 0 ? `(${expended} expended)` : '(none expended)')}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -1115,7 +1202,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
 
   const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
   const reloadHtml = _rd != null
-    ? `<div class="defense-reloads">↻ ${_rd} reload${_rd !== '1' ? 's' : ''}</div>`
+    ? `<div class="defense-reloads" title="Reserve chips: each refills one system">↻ ${_rd} reserve chip${_rd !== '1' ? 's' : ''}</div>`
     : '';
 
   const card = document.createElement('div');
@@ -1251,7 +1338,7 @@ function buildDefenseCard(def, targetId) {
       magHtml = `
         <div class="defense-card-mag">
           <span class="defense-magazine${usedClass}"><span ${ea}>${simRemaining}</span> / ${initialMag} interceptors</span>
-          <span class="mag-expended">${def.loadouts === 0 && simRemaining === 0 ? '(no chips — starts empty)' : expended > 0 ? `(${expended} expended)` : '(none expended)'}</span>
+          <span class="mag-expended">${_startNote(def, simRemaining) ?? (expended > 0 ? `(${expended} expended)` : '(none expended)')}</span>
           ${resetBtn}
         </div>`;
     } else {
@@ -1275,7 +1362,7 @@ function buildDefenseCard(def, targetId) {
 
   const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
   const reloadHtml = _rd != null
-    ? `<div class="defense-reloads">↻ ${_rd} reload${_rd !== '1' ? 's' : ''}</div>`
+    ? `<div class="defense-reloads" title="Reserve chips: each refills one system">↻ ${_rd} reserve chip${_rd !== '1' ? 's' : ''}</div>`
     : '';
 
   const qAttr = `class="qty-count-editable" data-defense-id="${def.id}" data-target-id="${targetId}" data-system="${def.system}"`;
@@ -2712,7 +2799,7 @@ function _restoreReloadsState(reloadsState) {
   }
 }
 
-/** Format a (potentially fractional) reload count for display: 1.0→"1", 0.5→"0.5". */
+/** Format a (potentially fractional) reserve-chip count for display: 1.0→"1", 0.5→"0.5". */
 function fmtReloads(n) {
   return parseFloat(n.toFixed(2)).toString();
 }
@@ -3299,10 +3386,7 @@ function _buildChipChangesSection(attacks) {
       for (const [locName, rows] of locs) {
         body += `<div class="pr-sum-block"><div class="pr-sum-location">${_printEsc(locName)}</div>`;
         for (const r of rows) {
-          const isShared  = r.catalog.isShared;
-          const perSystem = isShared ? r.catalog.magazinePerBattery
-                                     : r.catalog.magazinePerBattery * (appDefenseSystems.find(s => s.id === r.def.system)?.batteries ?? 1);
-          const chips     = r.used / perSystem;
+          const chips     = r.used / chipSizeFor(r.def);
           const operator  = r.def.operator ? ` (${_printEsc(r.def.operator)})` : '';
           body += `<div class="pr-sum-line">${_printEsc(_printSystemLabel(r.catalog))}${operator}: ${_fmtChips(chips)} (-${fmtNumber(r.used)} ints.)</div>`;
         }
@@ -4185,21 +4269,25 @@ async function performGlobalReload() {
       const perBattery = catalog?.magazinePerBattery || 0;
       if (perBattery === 0) continue;   // directed-energy / no magazine
 
+      // One chip refills one system: chipSize interceptors. An entry of
+      // several systems may need several chips, and a short supply refills
+      // it only partly.
       const isShared = catalog?.isShared || false;
       const fullMag  = isShared ? perBattery : perBattery * def.quantity;
+      const chipSize = chipSizeFor(def);
       const current  = globalMagState[def.id] ?? fullMag;
       const needed   = fullMag - current;
-      if (needed <= 0) continue;        // already at full capacity
+      if (needed <= 0 || chipSize <= 0) continue;   // already at full capacity
 
-      const costFraction = needed / fullMag;
+      const costChips = needed / chipSize;
 
-      if (def.reloads >= costFraction) {
+      if (def.reloads >= costChips) {
         // Full refill
         globalMagState[def.id] = fullMag;
-        def.reloads = Math.round((def.reloads - costFraction) * 1e6) / 1e6;
+        def.reloads = Math.round((def.reloads - costChips) * 1e6) / 1e6;
       } else {
-        // Partial refill — add as many whole missiles as the remaining reloads allow
-        const toAdd = Math.floor(def.reloads * fullMag);
+        // Partial refill — add as many whole missiles as the reserve chips allow
+        const toAdd = Math.floor(def.reloads * chipSize);
         if (toAdd > 0) globalMagState[def.id] = current + toAdd;
         def.reloads = 0;
       }
@@ -4209,7 +4297,7 @@ async function performGlobalReload() {
   }
 
   if (refilledCount === 0) {
-    showToast('Nothing to reload — all magazines full or no reloads remaining.', true);
+    showToast('Nothing to reload — all magazines full or no reserve chips remaining.', true);
     return;
   }
 
@@ -4528,6 +4616,7 @@ async function init() {
   renderDefenseLayers(null);
   wireEvents();
   _restoreSession();
+  if (_migrateReloadUnits() && selectedTargetId) renderDefenseLayers(selectedTargetId);
   // Signal to the batch runner (and any other automation) that the app is ready
   window._appReady = true;
 }

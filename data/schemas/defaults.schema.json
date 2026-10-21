@@ -66,7 +66,7 @@
         "chips": {
           "type": "number",
           "minimum": 0,
-          "description": "Total number of full loadouts this entry gets, INCLUDING the one it starts with. A chip is the physical game-board token for one loadout. 0 means the system starts with an empty magazine and can never be reloaded. Absent means 1 (the initial load only). The tool holds total − 1 as the resupply available to the Reload button."
+          "description": "Total chips for this entry, INCLUDING those its systems start loaded with. A chip is the physical game-board token for one full load of ONE system (magazine per battery × the system's batteries; a patrol asset's whole magazine). An entry of N systems starts by using N chips; the rest are reserve chips that the Reload button spends one system load at a time. Fewer chips than systems starts partly loaded; 0 starts empty. Absent means 1."
         },
         "reloads": {
           "type": "number",

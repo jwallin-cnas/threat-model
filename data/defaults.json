@@ -8,7 +8,7 @@
       "quantity": "Number of batteries / systems (integer ≥ 1).",
       "notes": "Optional free-text annotation. Use empty string for none.",
       "operator": "Nation or organisation operating this system at this location. Used to determine cross-target default enable/disable state: US-operated systems are enabled by default when they can cover a neighbouring target; all others are disabled by default.",
-      "chips": "Total number of full loadouts, INCLUDING the one the system starts with (one chip on the game board per loadout). 0 = starts empty. Absent = 1."
+      "chips": "Total chips for the entry, INCLUDING those its systems start loaded with. One chip = one full load of ONE system (one token on the game board). An entry of N systems starts by using N chips; the rest are reserve for the Reload button. 0 = starts empty. Absent = 1."
     },
     "available_systems": [
       "aegis_sm3",

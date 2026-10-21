@@ -10,11 +10,12 @@
  * stores). importLaydown() multiplies by defenses.json `batteries`, so one
  * Patriot "system" becomes 3 batteries (36 interceptors) inside the tool.
  *
- * Chip semantics: a chip is the physical game-board token for one full
- * loadout. "Chips" is the TOTAL number of full loads a system gets,
- * including the one it starts with. It is written to the file's `chips`
- * field. 0 means the system starts empty and can never reload; 1 means the
- * initial load only. The tool holds total − 1 as reloads.
+ * Chip semantics: a chip is the physical game-board token for one full load
+ * of ONE system (36 interceptors for a Patriot, 48 for THAAD). "Chips" is
+ * the entry's TOTAL, including the chips its systems start loaded with, and
+ * is written to the file's `chips` field. An entry of N systems starts by
+ * using N chips; the tool holds the rest as reserve chips for the Reload
+ * button. Fewer chips than systems starts partly loaded; 0 starts empty.
  *
  * State is held in memory and mirrored to localStorage under its own key so
  * an accidental reload doesn't lose work. Nothing here touches app.js state.
@@ -178,7 +179,7 @@ function fillCard(card, target) {
           <div class="ta-wrap"><input type="text" class="tc-operator" placeholder="Type to search nations…"></div>
         </div>
         <div class="form-group">
-          <label>Chips <span class="label-hint">— one chip per full load, including the first</span></label>
+          <label>Chips <span class="label-hint">— one chip per system load, including the first</span></label>
           <select class="tc-chips"></select>
         </div>
       </div>

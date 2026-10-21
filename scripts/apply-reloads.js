@@ -12,8 +12,9 @@
  *                            is left unchanged
  *   • Values are NOT additive — the spreadsheet value is the total reload
  *     count, not a delta on top of anything else
- *   • The JSON field is `chips`: the TOTAL number of loadouts including the
- *     initial one (0 = starts empty); one chip on the game board per loadout.
+ *   • The JSON field is `chips`: the entry's TOTAL chips, including those its
+ *     systems start loaded with (0 = starts empty). One chip is one full load
+ *     of ONE system, so an entry of N systems starts by using N chips.
  *     Spreadsheet values must be expressed as totals before this script is
  *     run. Any legacy `reloads` field on an entry is replaced by `chips`.
  *
