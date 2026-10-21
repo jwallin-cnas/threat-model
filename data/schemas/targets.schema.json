@@ -98,7 +98,7 @@
 
         "threat": {
           "type": "string",
-          "enum": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"],
+          "enum": ["srbm", "mrbm", "cruise_missile", "drone_jet", "drone", "fpv"],
           "description": "Type of threat that caused the damage."
         },
         "volume": {

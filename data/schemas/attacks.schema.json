@@ -37,8 +37,8 @@
         },
         "type": {
           "type": "string",
-          "enum": ["srbm", "mrbm", "cruise_missile", "drone", "fpv"],
-          "description": "Category of attack system. srbm = short-range ballistic missile (< ~1000 km); mrbm = medium-range ballistic missile (≥ 1000 km); fpv = FPV/close-range drone."
+          "enum": ["srbm", "mrbm", "cruise_missile", "drone_jet", "drone", "fpv"],
+          "description": "Category of attack system. srbm = short-range ballistic missile (< ~1000 km); mrbm = medium-range ballistic missile (≥ 1000 km); drone_jet = jet-powered one-way attack drone; drone = propeller-driven drone / loitering munition; fpv = FPV/close-range drone."
         },
         "payload_kg": {
           "type": "number",
