@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Strike Assessment Tool \u2014 Layered Air Defense Adjudicator",
+  "description": "Strike Assessment Tool — Layered Air Defense Adjudicator",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "batch": "node scripts/batch-sim.js",
     "defaults": "node scripts/generate-engagement-defaults.js --ref 9bded9b --clone vampire=ifpc2 --insert f15i_patrol:after=fa18_patrol --lock f15i_patrol",
     "parity": "node scripts/parity-check.js --old-ref 9bded9b",
-    "e2e": "node scripts/e2e-check.js"
+    "e2e": "node scripts/e2e-check.js",
+    "sync-laydown": "node scripts/sync-laydown.js"
   },
   "devDependencies": {
     "vitest": "^1.6.0"

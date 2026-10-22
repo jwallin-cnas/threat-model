@@ -1,0 +1,63 @@
+# Keeps data/defaults.json (the tool's default Blue laydown) in step with the
+# authoritative laydown file on Box.
+#
+# Setup (once): Settings → Secrets and variables → Actions → New repository
+# secret named BOX_LAYDOWN_URL, holding the Box shared link of the laydown
+# file, shared with "People with the link". The link stays private: it is
+# never written to the repository or printed in the logs.
+#
+# Runs every hour and on demand (Actions → "Sync default laydown from Box" →
+# Run workflow). An invalid file fails the run and changes nothing; the
+# laydown already live stays live.
+name: Sync default laydown from Box
+
+on:
+  schedule:
+    - cron: '17 * * * *'     # hourly, at :17 past
+  workflow_dispatch:
+
+permissions:
+  contents: write            # commit data/defaults.json
+  pages: write               # request a GitHub Pages rebuild
+
+concurrency:
+  group: sync-laydown
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch and validate the Box laydown
+        id: sync
+        env:
+          BOX_LAYDOWN_URL: ${{ secrets.BOX_LAYDOWN_URL }}
+        run: |
+          if [ -z "$BOX_LAYDOWN_URL" ]; then
+            echo "::error::The repository secret BOX_LAYDOWN_URL is not set."
+            exit 1
+          fi
+          node scripts/sync-laydown.js "$BOX_LAYDOWN_URL" --summary "$RUNNER_TEMP/commit-message.txt"
+
+      - name: Commit and push
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data/defaults.json
+          git commit -F "$RUNNER_TEMP/commit-message.txt"
+          git push
+
+      - name: Rebuild the site
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" >/dev/null \
+            || echo "::warning::Could not request a Pages build; the push itself normally triggers one."
