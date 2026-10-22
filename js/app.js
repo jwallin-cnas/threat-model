@@ -50,6 +50,7 @@ let lastSimTarget   = null;   // stored alongside lastSimResults
 let lastSimDefenses = [];     // allDefenses passed to the last runSimulation call
 let preSimMagState  = {};     // snapshot of globalMagState before the last simulation depleted it
 let manualOverrides = {};     // { [threatType]: { [defId]: { survived:number, disengaged:bool } } }
+let lastSimSnapshotId = null; // id of the history snapshot that recorded lastSimResults
 
 // ── Simulation history ────────────────────────────────────────────────────────
 let simHistory       = [];    // ordered array of snapshots; index 0 is always the initial state
@@ -2098,6 +2099,8 @@ async function simulate() {
         attackManifest
       }));
       simHistoryCursor = simHistory.length - 1;
+      lastSimSnapshotId = simHistory[simHistoryCursor].id;
+      _saveTargetState(selectedTargetId);
       saveHistoryState();
     }
 
@@ -2226,23 +2229,111 @@ function computeAdjustedResults(originalResults, overrides) {
   return { ...originalResults, totalOut: adjTotalOut, finalThreats, byThreatType: adjustedByThreatType };
 }
 
-/** Store an override for one layer and re-render results. */
+/** Store an override for one layer, adjust magazines, and re-render results. */
 function applyLayerOverride(threatType, platformId, defId, survived, disengaged = false) {
-  const t = manualOverrides[threatType] || (manualOverrides[threatType] = {});
-  const p = t[platformId] || (t[platformId] = {});
-  p[defId] = { survived, disengaged };
-  rerenderWithOverrides();
+  _changeOverrides(() => {
+    const t = manualOverrides[threatType] || (manualOverrides[threatType] = {});
+    const p = t[platformId] || (t[platformId] = {});
+    p[defId] = { survived, disengaged };
+  });
 }
 
-/** Remove the override for one layer and re-render. */
+/** Remove the override for one layer, adjust magazines, and re-render. */
 function clearLayerOverride(threatType, platformId, defId) {
-  const t = manualOverrides[threatType];
-  if (t && t[platformId]) {
-    delete t[platformId][defId];
-    if (Object.keys(t[platformId]).length === 0) delete t[platformId];
-    if (Object.keys(t).length === 0) delete manualOverrides[threatType];
+  _changeOverrides(() => {
+    const t = manualOverrides[threatType];
+    if (t && t[platformId]) {
+      delete t[platformId][defId];
+      if (Object.keys(t[platformId]).length === 0) delete t[platformId];
+      if (Object.keys(t).length === 0) delete manualOverrides[threatType];
+    }
+  });
+}
+
+/** Full magazine of a defense entry from the shown attack (0 when it has none). */
+function _fullMagOf(defId) {
+  const def = lastSimDefenses.find(d => d.id === defId) || findDefenseEntryById(defId);
+  const catalog = def ? DEFENSE_CATALOG[def.system] : null;
+  if (!catalog) return 0;
+  return catalog.isShared ? (catalog.magazinePerBattery || 0) : (catalog.magazinePerBattery || 0) * (def.quantity || 1);
+}
+
+/** Add `delta` interceptors to a magazine map entry (absent = full), clamped to 0..full. */
+function _shiftMag(map, defId, delta, full) {
+  const next = Math.max(0, Math.min(full, (defId in map ? map[defId] : full) + delta));
+  if (next >= full) delete map[defId];
+  else map[defId] = next;
+}
+
+/** The history snapshot that recorded the shown attack, or null. */
+function _shownAttackSnapshotIndex() {
+  if (lastSimSnapshotId) {
+    const i = simHistory.findIndex(s => s.id === lastSimSnapshotId);
+    if (i >= 0) return i;
   }
-  rerenderWithOverrides();
+  // Sessions saved before snapshot ids: the latest attack on this target.
+  for (let i = simHistory.length - 1; i > 0; i--) {
+    if (simHistory[i].type === 'attack' && simHistory[i].targetId === lastSimTarget?.id) return i;
+  }
+  return -1;
+}
+
+/**
+ * Change the shown attack's manual overrides and account for the result.
+ *
+ * Magazines move by the DIFFERENCE the change makes to that attack's
+ * interceptor use, never to absolute levels, so reloads, resets and later
+ * attacks are kept. The attack's own snapshot records its new end state and
+ * overrides; every later snapshot shifts by the same difference so the
+ * history and the PDF report stay consistent.
+ */
+function _changeOverrides(mutate) {
+  if (!lastSimResults) { mutate(); return; }
+  const snapIdx = _shownAttackSnapshotIndex();
+  const snap    = snapIdx >= 0 ? simHistory[snapIdx] : null;
+
+  // Interceptors left after the attack, before the change (from its snapshot)
+  const before = snap ? snap.magStateAfter : null;
+  const prevDisplay = before ? null : _computeDisplayResults();
+  mutate();
+  const display = _computeDisplayResults();
+
+  const after    = extractMagazineState(display);
+  const original = extractMagazineState(lastSimResults);
+  const prevMap  = prevDisplay ? extractMagazineState(prevDisplay) : null;
+  const ids = new Set([...Object.keys(after), ...Object.keys(original), ...Object.keys(prevMap || {})]);
+  if (snap) {
+    for (const id of new Set([...Object.keys(snap.magStateAfter), ...Object.keys(snap.preSimMagState)])) {
+      if (snap.magStateAfter[id] !== snap.preSimMagState[id]) ids.add(id);
+    }
+  }
+
+  for (const id of ids) {
+    const full = _fullMagOf(id);
+    if (full <= 0) continue;
+    const startOf = m => (id in m ? m[id] : full);
+    const newRem  = id in after ? after[id] : startOf(preSimMagState);
+    const oldRem  = before ? startOf(before) : (id in prevMap ? prevMap[id] : startOf(preSimMagState));
+    const delta   = newRem - oldRem;
+    if (delta === 0) continue;
+    _shiftMag(globalMagState, id, delta, full);
+    if (snap) {
+      _shiftMag(snap.magStateAfter, id, delta, full);
+      for (let k = snapIdx + 1; k < simHistory.length; k++) {
+        _shiftMag(simHistory[k].preSimMagState, id, delta, full);
+        _shiftMag(simHistory[k].magStateAfter,  id, delta, full);
+      }
+    }
+  }
+
+  if (snap) {
+    snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
+    if (snap.stats) snap.stats = { totalIn: display.totalIn, totalOut: display.totalOut };
+    saveHistoryState();
+  }
+  saveMagStateToStorage();
+  _saveTargetState(selectedTargetId);
+  rerenderWithOverrides(display);
 }
 
 /**
@@ -2262,15 +2353,17 @@ function _normalizeOverrides(ov) {
   return ov;
 }
 
-/** Remove all overrides and re-render. */
+/** Remove all overrides, adjust magazines, and re-render. */
 function clearAllOverrides() {
-  manualOverrides = {};
-  rerenderWithOverrides();
+  _changeOverrides(() => { manualOverrides = {}; });
 }
 
-/** Re-render results panel applying current manualOverrides (or original if none). */
-function rerenderWithOverrides() {
-  if (!lastSimResults) return;
+/**
+ * The shown attack's results with the current manualOverrides applied (the
+ * original results when there are none). Pure: reads the shown attack's
+ * inputs and changes no state.
+ */
+function _computeDisplayResults() {
 
   const hasOv = Object.keys(manualOverrides).length > 0;
   let displayResults = lastSimResults;
@@ -2318,34 +2411,19 @@ function rerenderWithOverrides() {
       : baseResults;
   }
 
-  // Sync globalMagState to match displayResults.
-  //
-  // We cannot simply spread preSimMagState as the base because it only
-  // contains keys for systems that had already been used before this
-  // simulation — systems at full magazine have no entry at all, so their
-  // depleted value from the original run would remain in globalMagState
-  // untouched (the THAAD-disengage restoration bug).
-  //
-  // Correct algorithm:
-  //   1. For every system that fired in the ORIGINAL sim but is absent from
-  //      the adjusted results (disengaged / no longer needed):
-  //        • If a pre-sim entry exists, restore to that value.
-  //        • Otherwise delete the key so the card shows "full magazine".
-  //   2. Apply the actual post-fire levels from the adjusted results.
-  const firedInDisplay  = extractMagazineState(displayResults);
-  const firedInOriginal = extractMagazineState(lastSimResults);
+  return displayResults;
+}
 
-  for (const defId of Object.keys(firedInOriginal)) {
-    if (!(defId in firedInDisplay)) {
-      if (defId in preSimMagState) {
-        globalMagState[defId] = preSimMagState[defId];
-      } else {
-        delete globalMagState[defId];   // was at full magazine before the sim
-      }
-    }
-  }
-  Object.assign(globalMagState, firedInDisplay);
-  saveMagStateToStorage();
+/**
+ * Re-render the results panel for the shown attack. Display only: it never
+ * changes magazines or history. Switching targets and stepping through
+ * history call it; override changes go through _changeOverrides(), which
+ * accounts for their effect first and passes the computed results in.
+ */
+function rerenderWithOverrides(displayResults = null) {
+  if (!lastSimResults) return;
+  const hasOv = Object.keys(manualOverrides).length > 0;
+  displayResults = displayResults || _computeDisplayResults();
 
   document.getElementById('override-notice')?.classList.toggle('hidden', !hasOv);
   _renderConfigNotice();
@@ -2355,16 +2433,6 @@ function rerenderWithOverrides() {
   renderResultsFinal(displayResults);
   // Refresh defense cards so magazine counters reflect the adjusted state
   if (selectedTargetId) renderDefenseLayers(selectedTargetId);
-
-  // Keep the current history snapshot in sync with any override-adjusted state
-  if (simHistoryCursor >= 0 && simHistory[simHistoryCursor]) {
-    const snap = simHistory[simHistoryCursor];
-    snap.magStateAfter   = JSON.parse(JSON.stringify(globalMagState));
-    snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
-    if (snap.stats) {
-      snap.stats = { totalIn: displayResults.totalIn, totalOut: displayResults.totalOut };
-    }
-  }
 }
 
 /**
@@ -2788,7 +2856,8 @@ function _saveTargetState(targetId) {
     lastSimDefenses:    JSON.parse(JSON.stringify(lastSimDefenses)),
     preSimMagState:     JSON.parse(JSON.stringify(preSimMagState)),
     manualOverrides:    JSON.parse(JSON.stringify(manualOverrides)),
-    _manifestUnchanged: _manifestUnchanged
+    _manifestUnchanged: _manifestUnchanged,
+    snapshotId:         lastSimSnapshotId
   };
   saveSessionState();
 }
@@ -2807,6 +2876,7 @@ function _loadTargetState(targetId) {
     preSimMagState     = JSON.parse(JSON.stringify(s.preSimMagState));
     manualOverrides    = _normalizeOverrides(JSON.parse(JSON.stringify(s.manualOverrides || {})));
     _manifestUnchanged = s._manifestUnchanged;
+    lastSimSnapshotId  = s.snapshotId ?? null;
   } else {
     attackManifest     = [];
     lastSimResults     = null;
@@ -2815,6 +2885,7 @@ function _loadTargetState(targetId) {
     preSimMagState     = {};
     manualOverrides    = {};
     _manifestUnchanged = false;
+    lastSimSnapshotId  = null;
   }
 }
 
@@ -2942,6 +3013,7 @@ function navigateToSnapshot(index) {
   preSimMagState   = JSON.parse(JSON.stringify(snap.preSimMagState));
   manualOverrides  = _normalizeOverrides(JSON.parse(JSON.stringify(snap.manualOverrides || {})));
   attackManifest   = JSON.parse(JSON.stringify(snap.attackManifest));
+  lastSimSnapshotId = snap.results ? snap.id : null;
   simHistoryCursor = index;
   _manifestUnchanged = !!snap.results;
   saveHistoryState();
@@ -4286,6 +4358,7 @@ function _runOneQueuedAttack(entry) {
     }));
     simHistoryCursor = simHistory.length - 1;
   }
+  const snapshotId = simHistory[simHistoryCursor]?.id ?? null;
 
   // Persist per-target state so switching to this target later shows the result
   perTargetState[entry.targetId] = {
@@ -4295,7 +4368,8 @@ function _runOneQueuedAttack(entry) {
     lastSimDefenses:    JSON.parse(JSON.stringify(allDefenses)),
     preSimMagState:     JSON.parse(JSON.stringify(preSimSnap)),
     manualOverrides:    {},
-    _manifestUnchanged: true
+    _manifestUnchanged: true,
+    snapshotId
   };
 }
 

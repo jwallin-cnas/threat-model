@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -139,6 +139,121 @@ async function checkTool(browser, base) {
   const r5 = await page.evaluate(() => document.getElementById('pk-badge').textContent + '/' + document.getElementById('doctrine-badge').textContent);
   check(r5 === 'Default/Default', 'tool: clearing storage restores the defaults');
   check(errs.length === 0, 'tool: no page errors ' + JSON.stringify(errs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reload and target switching — magazines survive revisits; Reload spends chips
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkReloadAndSwitching(browser, base) {
+  console.log('\n── reload & switching ──');
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const errs = collectErrors(page);
+  const fresh = async () => {
+    await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+    await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  };
+  const queue = attacks => page.evaluate(a => { window._setSeed(0); window._importAttackQueueDirect({ version: '1.0', attacks: a }); window._simulateQueueDirect(); }, attacks);
+  // 'full' when the magazine is at capacity (absent key or an explicit full count)
+  const magExpr = `(i => { const v = globalMagState[i]; const d = findDefenseEntryById(i); const c = DEFENSE_CATALOG[d.system];
+    const full = c.isShared ? c.magazinePerBattery : c.magazinePerBattery * d.quantity; return (v == null || v >= full) ? 'full' : v; })`;
+  const mag   = id => page.evaluate(`${magExpr}(${JSON.stringify(id)})`);
+  const res   = id => page.evaluate(i => findDefenseEntryById(i).reloads, id);
+  const pick  = id => page.selectOption('#target-select', id);
+  const reloadBtn = async () => { await page.click('#btn-reload-all'); await page.waitForTimeout(100); };
+  const A = 'al_udeid_ab_d1';   // Al Udeid Patriot (3 systems, 108), covers Doha
+  const D50 = [{ targetId: 'doha', platforms: [{ platformId: 'shahed_136', quantity: 50 }] }];
+
+  // 1. Card reset at home, then switch to the covered target
+  await fresh(); await queue(D50);
+  const a0 = await mag(A);
+  await pick('al_udeid_ab'); await page.click(`.btn-reset-sys-loadout[data-defense-id="${A}"]`); await page.waitForTimeout(50);
+  const a1 = await mag(A); await pick('doha'); const a2 = await mag(A);
+  check(a0 < 108 && a1 === 'full' && a2 === 'full', `switching: a card reset survives a switch to a covered target (${a0} → ${a1} → ${a2})`);
+
+  // 2. Reload, then switch: the refill stays and the chips stay spent
+  await fresh(); await page.evaluate(i => { findDefenseEntryById(i).reloads = 3; }, A); await queue(D50);
+  await pick('al_udeid_ab'); await reloadBtn();
+  const r1 = { mag: await mag(A), res: await res(A) };
+  await pick('doha');
+  const r2 = { mag: await mag(A), res: await res(A), snap: await page.evaluate(i => simHistory[simHistory.length - 1].magStateAfter[i] ?? 'full', A) };
+  check(r1.mag === 'full' && r2.mag === 'full' && r2.res === r1.res && (r2.snap === 'full' || r2.snap >= 108), 'switching: a Reload survives a switch, and its snapshot keeps the refill ' + JSON.stringify({ r1, r2 }));
+
+  // 3. Two attacks, then switch back to the first target: no interceptors appear
+  await fresh(); await queue([{ targetId: 'doha', platforms: [{ platformId: 'shahed_136', quantity: 30 }] }, { targetId: 'al_udeid_ab', platforms: [{ platformId: 'shahed_136', quantity: 30 }] }]);
+  const t1 = await mag(A); await pick('doha'); const t2 = await mag(A); await pick('al_udeid_ab'); const t3 = await mag(A);
+  check(t1 === t2 && t2 === t3, `switching: revisiting an older attack leaves magazines alone (${t1}, ${t2}, ${t3})`);
+
+  // 4. The report is unchanged by the switch
+  const chipLine = () => page.evaluate(() => { const d = document.createElement('div'); d.innerHTML = window._buildPrintDocument();
+    return [...d.querySelectorAll('.pr-sum-block')].filter(x => /Al Udeid/.test(x.querySelector('.pr-sum-location').textContent)).map(x => x.textContent.replace(/\s+/g, ' ').trim()).join('|'); });
+  const rep1 = await chipLine(); await pick('doha'); const rep2 = await chipLine();
+  check(rep1 === rep2 && /-2\.83 chips \(-102 ints\.\)/.test(rep1), 'switching: the PDF chip summary does not change on a switch (' + rep1 + ')');
+
+  // 5. Override on an OLDER attack: magazines and later history move by the difference only
+  await pick('doha');
+  const o = await page.evaluate(i => {
+    const before = { live: globalMagState[i], laterPre: simHistory[2].preSimMagState[i], laterAfter: simHistory[2].magStateAfter[i] };
+    applyLayerOverride('drone', 'shahed_136', i, 0, true);   // disengage A from the Doha attack
+    const after = { live: globalMagState[i] ?? 'full', laterPre: simHistory[2].preSimMagState[i] ?? 'full', laterAfter: simHistory[2].magStateAfter[i] ?? 'full', dohaAfter: simHistory[1].magStateAfter[i] ?? 'full' };
+    clearAllOverrides();
+    const undone = { live: globalMagState[i] ?? 'full', laterAfter: simHistory[2].magStateAfter[i] ?? 'full' };
+    return { before, after, undone };
+  }, A);
+  const used = 108 - o.before.laterPre;   // what A fired at Doha
+  check(o.after.live === o.before.live + used && o.after.laterPre === 'full' && o.after.laterAfter === o.before.laterAfter + used && o.after.dohaAfter === 'full'
+        && o.undone.live === o.before.live && o.undone.laterAfter === o.before.laterAfter,
+        'overrides: disengaging a system in an older attack returns only what it fired there, through later history ' + JSON.stringify(o));
+
+  // 6. Reload decrements chips and refills: full refill, half refill on 0.5 chip, fractional cost
+  await fresh();
+  const rl = await page.evaluate(async () => {
+    const t = getTarget('doha');
+    const mk = (id, sys, q, chips) => _ingestDefenseEntry({ id, system: sys, quantity: q, notes: '', operator: 'Qatar', chips }, t);
+    t.defenses = [mk('R_full', 'patriot', 1, 2), mk('R_half', 'patriot', 1, 1.5), mk('R_two', 'patriot', 2, 3), mk('R_part', 'patriot', 1, 2), mk('R_none', 'patriot', 1, 1)];
+    globalMagState.R_full = 0; globalMagState.R_half = 0; globalMagState.R_two = 0; globalMagState.R_part = 18; globalMagState.R_none = 0;
+    const res0 = Object.fromEntries(t.defenses.map(d => [d.id, d.reloads]));
+    saveToStorage();
+    return res0;
+  });
+  await pick('doha'); await reloadBtn();
+  const rl2 = await page.evaluate(() => {
+    const ids = ['R_full', 'R_half', 'R_two', 'R_part', 'R_none'];
+    const cards = Object.fromEntries(ids.map(id => [id, document.querySelector(`[data-defense-id="${id}"]`)?.closest('.defense-card')?.querySelector('.defense-reloads')?.textContent.trim()]));
+    const m = i => { const v = globalMagState[i]; const d = findDefenseEntryById(i); return (v == null || v >= DEFENSE_CATALOG[d.system].magazinePerBattery * d.quantity) ? 'full' : v; };
+    return { mag: Object.fromEntries(ids.map(id => [id, m(id)])), res: Object.fromEntries(ids.map(id => [id, findDefenseEntryById(id).reloads])), cards,
+             snap: simHistory[simHistory.length - 1].type };
+  });
+  check(JSON.stringify(rl) === JSON.stringify({ R_full: 1, R_half: 0.5, R_two: 1, R_part: 1, R_none: 0 }), 'reload: reserve chips at start ' + JSON.stringify(rl));
+  check(rl2.mag.R_full === 'full' && rl2.res.R_full === 0, 'reload: 1 reserve chip refills an empty Patriot (36) and is spent');
+  check(rl2.mag.R_half === 18 && rl2.res.R_half === 0, 'reload: 0.5 reserve chip refills an empty Patriot to half (18 of 36)');
+  check(rl2.mag.R_two === 36 && rl2.res.R_two === 0, 'reload: 1 chip on an empty 2-system entry refills one system (36 of 72)');
+  check(rl2.mag.R_part === 'full' && rl2.res.R_part === 0.5, 'reload: topping up 18 of 36 costs 0.5 chip and keeps 0.5');
+  check(rl2.mag.R_none === 0 && rl2.res.R_none === 0, 'reload: an entry with no reserve chips stays empty');
+  check(rl2.cards.R_part === '↻ 0.5 reserve chips' && rl2.cards.R_full === '↻ 0 reserve chips' && rl2.snap === 'reload', 'reload: cards show reserve chips; a reload snapshot is recorded ' + JSON.stringify(rl2.cards));
+
+  // 7. A second Reload spends the kept 0.5 chip on the next shortfall, then nothing is left
+  await page.evaluate(() => { globalMagState.R_part = 0; }); await reloadBtn();
+  const rl3 = await page.evaluate(() => ({ mag: globalMagState.R_part ?? 'full', res: findDefenseEntryById('R_part').reloads }));
+  check(rl3.mag === 18 && rl3.res === 0, 'reload: the kept 0.5 chip later refills 18 interceptors ' + JSON.stringify(rl3));
+
+  // 8. Undo and redo through the reload restore magazines and chips
+  const u = await page.evaluate(() => {
+    const last = simHistory.length - 1;
+    const m = () => { const v = globalMagState.R_part; return (v == null || v >= 36) ? 'full' : v; };
+    navigateToSnapshot(last - 1); const back = { mag: m(), res: findDefenseEntryById('R_part').reloads };
+    navigateToSnapshot(last);     const fwd  = { mag: m(), res: findDefenseEntryById('R_part').reloads };
+    return { back, fwd };
+  });
+  check(u.back.mag === 'full' && u.back.res === 0.5 && u.fwd.mag === 18 && u.fwd.res === 0, 'reload: undo and redo restore magazine and reserve chips ' + JSON.stringify(u));
+
+  // 9. Reload persists across a page reload
+  await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  const p9 = await page.evaluate(() => ({ mag: globalMagState.R_part ?? 'full', res: findDefenseEntryById('R_part')?.reloads, half: globalMagState.R_half ?? 'full' }));
+  check(p9.mag === 18 && p9.res === 0 && p9.half === 18, 'reload: magazines and reserve chips survive a page reload ' + JSON.stringify(p9));
+
+  const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
+  check(realErrs.length === 0, 'reload & switching: no page errors ' + JSON.stringify(realErrs));
   await page.close();
 }
 
@@ -422,6 +537,7 @@ const browser = await chromium.launch();
 try {
   if (!ONLY || ONLY === 'tool')     await checkTool(browser, base);
   if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'pk')       await checkPkBuilder(browser, base);
   if (!ONLY || ONLY === 'doctrine') await checkDoctrineBuilder(browser, base);
   if (!ONLY || ONLY === 'blue')     await checkBlueBuilder(browser, base);
