@@ -104,6 +104,16 @@ header {
   min-width: 0;
 }
 
+/* One column per builder: the builder (or export) on top, its import below.
+   Columns wrap as units on narrow screens, so each pair stays stacked. */
+.hc-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hc-col > .btn { width: 100%; line-height: 18px; }   /* links and buttons the same height */
+
 .laydown-indicator {
   display: flex;
   align-items: center;

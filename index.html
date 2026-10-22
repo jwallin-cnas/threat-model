@@ -36,18 +36,31 @@
         </div>
       </div>
       <div class="header-controls">
-        <a href="blue/" class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Build a defensive laydown file (Blue Team)">Blue Builder</a>
-        <a href="red/"  class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Build an attack file (Red Team)">Red Builder</a>
-        <a href="pk/"   class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Edit per-shot Pk and shots for every system × platform">Pk Builder</a>
-        <a href="doctrine/" class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Set which systems engage each threat type, and in what order">Doctrine Builder</a>
-        <button id="btn-history"        class="btn btn-secondary">History</button>
-        <button id="btn-import-laydown"  class="btn btn-secondary">Import Laydown</button>
-        <button id="btn-export-laydown"  class="btn btn-secondary" title="Save every deployed system with its remaining ammunition as chips, as a laydown file that Import Laydown accepts">Export Laydown</button>
-        <button id="btn-import-attacks" class="btn btn-secondary">Import Attacks</button>
-        <button id="btn-import-pk"      class="btn btn-secondary" title="Load a Pk table JSON file (per-shot Pk and shots for every system × platform)">Import Pk Table</button>
-        <button id="btn-import-doctrine" class="btn btn-secondary" title="Load an engagement doctrine JSON file (which systems engage each threat type, in what order)">Import Doctrine</button>
-        <button id="btn-export-pdf"     class="btn btn-secondary">Export PDF</button>
-        <button id="btn-reset"      class="btn btn-danger">Reset to Default</button>
+        <!-- Columns: top row = builders and exports, bottom row = the matching import (then History, Reset). -->
+        <div class="hc-col">
+          <a href="blue/" class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Build a defensive laydown file (Blue Team)">Blue Builder</a>
+          <button id="btn-import-laydown"  class="btn btn-secondary">Import Laydown</button>
+        </div>
+        <div class="hc-col">
+          <a href="red/"  class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Build an attack file (Red Team)">Red Builder</a>
+          <button id="btn-import-attacks" class="btn btn-secondary">Import Attacks</button>
+        </div>
+        <div class="hc-col">
+          <a href="pk/"   class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Edit per-shot Pk and shots for every system × platform">Pk Builder</a>
+          <button id="btn-import-pk"      class="btn btn-secondary" title="Load a Pk table JSON file (per-shot Pk and shots for every system × platform)">Import Pk Table</button>
+        </div>
+        <div class="hc-col">
+          <a href="doctrine/" class="btn btn-secondary btn-link-nav" target="_blank" rel="noopener" title="Set which systems engage each threat type, and in what order">Doctrine Builder</a>
+          <button id="btn-import-doctrine" class="btn btn-secondary" title="Load an engagement doctrine JSON file (which systems engage each threat type, in what order)">Import Doctrine</button>
+        </div>
+        <div class="hc-col">
+          <button id="btn-export-laydown"  class="btn btn-secondary" title="Save every deployed system with its remaining ammunition as chips, as a laydown file that Import Laydown accepts">Export Laydown</button>
+          <button id="btn-history"        class="btn btn-secondary">History</button>
+        </div>
+        <div class="hc-col">
+          <button id="btn-export-pdf"     class="btn btn-secondary">Export PDF</button>
+          <button id="btn-reset"      class="btn btn-danger">Reset to Default</button>
+        </div>
       </div>
     </div>
   </header>
