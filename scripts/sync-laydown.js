@@ -14,7 +14,7 @@
  *   • `defaults` is a non-empty object of target id → array of entries
  *   • every target id exists in data/targets.json
  *   • every entry has id, system, quantity, operator; only the known fields
- *     id, system, quantity, notes, operator, chips (legacy: reloads)
+ *     id, system, quantity, notes, operator, chips, disabled (legacy: reloads)
  *   • system exists in data/defenses.json; quantity is an integer ≥ 1;
  *     chips is a number ≥ 0 when present; operator is a non-empty string
  *   • entry ids are unique, except a shared patrol id (shared_<system>),
@@ -41,7 +41,7 @@ const ROOT          = path.join(path.dirname(fileURLToPath(import.meta.url)), '.
 const DEFAULTS_PATH = path.join(ROOT, 'data', 'defaults.json');
 const TARGETS_PATH  = path.join(ROOT, 'data', 'targets.json');
 const DEFENSES_PATH = path.join(ROOT, 'data', 'defenses.json');
-const ENTRY_FIELDS  = ['id', 'system', 'quantity', 'notes', 'operator', 'chips'];
+const ENTRY_FIELDS  = ['id', 'system', 'quantity', 'notes', 'operator', 'chips', 'disabled'];
 
 const args    = process.argv.slice(2);
 const source  = args.find(a => !a.startsWith('--') && args[args.indexOf(a) - 1] !== '--summary');
@@ -110,6 +110,7 @@ function validate(data, targets, systems) {
       if (!Number.isInteger(e.quantity) || e.quantity < 1)  errors.push(`${where}: quantity must be a whole number ≥ 1 (got ${JSON.stringify(e.quantity)})`);
       if (typeof e.operator !== 'string' || !e.operator)    errors.push(`${where}: missing "operator"`);
       if (e.notes != null && typeof e.notes !== 'string')   errors.push(`${where}: "notes" must be text`);
+      if (e.disabled != null && typeof e.disabled !== 'boolean') errors.push(`${where}: "disabled" must be true or false`);
       const chips = e.chips ?? e.reloads;
       if (chips != null && !(typeof chips === 'number' && Number.isFinite(chips) && chips >= 0)) {
         errors.push(`${where}: chips must be a number ≥ 0 (got ${JSON.stringify(chips)})`);
@@ -129,6 +130,7 @@ function validate(data, targets, systems) {
       }
       const entry = { id: e.id, system: e.system, quantity: e.quantity, notes: e.notes ?? '', operator: e.operator };
       if (chips != null) entry.chips = chips;
+      if (e.disabled === true) entry.disabled = true;
       out[targetId].push(entry);
       entries++;
     });

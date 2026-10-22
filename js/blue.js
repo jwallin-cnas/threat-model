@@ -439,7 +439,8 @@ function applyLaydownData(data) {
         quantity: catalog.isShared ? 1 : qty,
         notes:    typeof d.notes === 'string' ? d.notes : '',
         operator: d.operator || target.country || 'United States',
-        chips
+        chips,
+        ...(d.disabled === true ? { disabled: true } : {})
       });
     }
     if (applied.length) next[targetId] = applied;
@@ -556,7 +557,8 @@ function buildLaydownExport(name) {
         quantity: e.quantity,
         notes:    e.notes || '',
         operator: e.operator,
-        chips:    e.chips
+        chips:    e.chips,
+        ...(e.disabled ? { disabled: true } : {})
       };
     });
   }

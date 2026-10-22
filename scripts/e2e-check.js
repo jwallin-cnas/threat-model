@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -142,6 +142,89 @@ async function checkTool(browser, base) {
   await page.close();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Export Laydown — current state as chips, re-imported with Import Laydown
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkLaydownExport(browser, base) {
+  console.log('\n── export laydown ──');
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const errs = collectErrors(page);
+  await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+
+  // 1. The stated example: Patriot at 0 of 36 with 2 reserve chips → exports 2 chips → imports 36 of 36 with 1 reserve chip
+  const ex = await page.evaluate(() => {
+    const t = getTarget('isa_ab');
+    t.defenses = [_ingestDefenseEntry({ id: 'isa_ab_d1', system: 'patriot', quantity: 1, notes: '', operator: 'Bahrain', chips: 3 }, t)];
+    globalMagState.isa_ab_d1 = 0;
+    const out = buildLaydownStateExport().data;
+    const entry = out.defaults.isa_ab[0];
+    window._importLaydownDirect(out);
+    return { chips: entry.chips, mag: globalMagState.isa_ab_d1 ?? 36, reserve: findDefenseEntryById('isa_ab_d1').reloads };
+  });
+  check(ex.chips === 2 && ex.mag === 36 && ex.reserve === 1, 'export: Patriot 0/36 + 2 reserve chips → 2 chips → 36/36 + 1 reserve chip ' + JSON.stringify(ex));
+
+  // 2. Round trip after real attacks, a Reload, a switched-off system and a fractional THAAD magazine
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  const rt = await page.evaluate(async () => {
+    window.showModal = async () => true;
+    window._setSeed(0);
+    window._importAttackQueueDirect({ version: '1.0', attacks: [
+      { targetId: 'doha',     platforms: [{ platformId: 'shahed_136', quantity: 60 }, { platformId: 'fateh_110', quantity: 10 }] },
+      { targetId: 'tel_aviv', platforms: [{ platformId: 'geran_2', quantity: 80 }, { platformId: 'shahab_3', quantity: 6 }] },
+      { targetId: 'dubai',    platforms: [{ platformId: 'shahed_136', quantity: 40 }] } ] });
+    window._simulateQueueDirect();
+    await performGlobalReload();
+    globalMagState.riyadh_d1 = 40.5;                     // THAAD after 1.5-shot salvos
+    toggleOwnDefenseDisabled('jeddah', 'jeddah_d1');     // switched off
+    const ammo = () => { const m = {}; for (const t of appTargetCatalog) for (const d of t.defenses || []) { const size = chipSizeFor(d); if (!size) continue;
+      const c = DEFENSE_CATALOG[d.system]; const full = c.isShared ? c.magazinePerBattery : c.magazinePerBattery * d.quantity;
+      m[`${t.id}/${d.id}`] = Math.round(((d.id in globalMagState ? globalMagState[d.id] : full) + (d.reloads ?? 0) * size) * 1e4) / 1e4; } return m; };
+    const shape = () => appTargetCatalog.flatMap(t => (t.defenses || []).map(d => [t.id, d.id, d.system, d.quantity, d.operator, d.notes || '', !!d.disabled].join('|')));
+    const before = { ammo: ammo(), shape: shape() };
+    const { data, warnings } = buildLaydownStateExport();
+    const r = window._importLaydownDirect(data);
+    const after = { ammo: ammo(), shape: shape() };
+    const diffs = Object.keys({ ...before.ammo, ...after.ammo }).filter(k => Math.abs((before.ammo[k] ?? -1) - (after.ammo[k] ?? -1)) > 1e-3).map(k => `${k}: ${before.ammo[k]} → ${after.ammo[k]}`);
+    return { warnings, importWarnings: r.warnings, n: Object.values(data.defaults).flat().length, name: data.name, diffs, shapeSame: JSON.stringify(before.shape) === JSON.stringify(after.shape),
+             spent: Object.values(before.ammo).filter((v, i) => v < Object.values(after.ammo)[i] + 1).length,
+             thaad: { mag: globalMagState.riyadh_d1, chips: data.defaults.riyadh[0].chips }, jeddahOff: !!findDefenseEntryById('jeddah_d1').disabled, data };
+  });
+  check(rt.warnings.length === 0 && rt.importWarnings.length === 0 && rt.n === 59, `export: ${rt.n} systems exported and re-imported without warnings`);
+  check(rt.diffs.length === 0, 'export: every system keeps its total ammunition (loaded + reserve) through export and import ' + JSON.stringify(rt.diffs.slice(0, 4)));
+  check(rt.shapeSame, 'export: placements, quantities, operators, notes and on/off switches are unchanged');
+  check(rt.thaad.chips === 0.84375 && rt.thaad.mag === 40.5 && rt.jeddahOff, 'export: a fractional THAAD magazine (40.5 of 48) and a switched-off system survive ' + JSON.stringify(rt.thaad));
+  check(/ — state after 3 attacks$/.test(rt.name), 'export: the file is named for the state it holds (' + rt.name + ')');
+
+  // 3. The exported file passes the Box sync validator and the Blue Builder import
+  const tmp = path.join(ROOT, 'output', `e2e_export_${Date.now()}.json`);
+  fs.mkdirSync(path.dirname(tmp), { recursive: true }); fs.writeFileSync(tmp, JSON.stringify(rt.data));
+  const { spawnSync } = await import('child_process');
+  const v = spawnSync('node', [path.join(ROOT, 'scripts', 'sync-laydown.js'), tmp, '--check'], { encoding: 'utf8' });
+  fs.unlinkSync(tmp);
+  check(v.status === 0 && /Valid: 35 locations, 59 systems/.test(v.stdout), 'export: the file passes the laydown validator (' + (v.stdout + v.stderr).trim().split('\n')[0] + ')');
+  const blue = await browser.newPage(); await blue.goto(base + '/blue/'); await blue.waitForFunction(() => window._blueReady === true);
+  const b = await blue.evaluate(d => { const w = window._blueApplyData(d); const ex2 = window._blueBuildExport(d.name);
+    const pick = o => Object.fromEntries(Object.entries(o.defaults).map(([t, l]) => [t, l.map(e => [e.system, e.quantity, e.operator, e.chips, !!e.disabled].join('|'))]));
+    localStorage.removeItem('threatmodel_blue_builder_v1');
+    return { w: w.length, same: JSON.stringify(pick(ex2)) === JSON.stringify(pick(d)) }; }, rt.data);
+  check(b.w === 0 && b.same, 'export: the Blue Builder imports it and re-exports the same systems, chips and switches');
+  await blue.close();
+
+  // 4. A battery count edited to a part system: rounded with a warning, same ammunition
+  const q = await page.evaluate(() => { const d = findDefenseEntryById('dubai_d1'); d.quantity = 4; delete globalMagState.dubai_d1;
+    const { data, warnings } = buildLaydownStateExport(); const e = data.defaults.dubai.find(x => x.id === 'dubai_d1'); return { warnings, q: e.quantity, chips: e.chips }; });
+  check(q.warnings.length === 1 && q.q === 1 && q.chips === 1.333333, 'export: 4 Patriot batteries (1.33 systems, full) export as 1 system and 1.333333 chips (48 interceptors) with a warning ' + JSON.stringify(q));
+
+  // 5. The header button downloads the file
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-export-laydown')]);
+  const file = await dl.path(); const got = JSON.parse(fs.readFileSync(file, 'utf8'));
+  check(/^.+_state_after_\d+_attacks?_\d{4}-\d\d-\d\d_\d{4}\.json$/.test(dl.suggestedFilename()) && Object.keys(got.defaults).length === 35, 'export: the Export Laydown button downloads ' + dl.suggestedFilename());
+
+  const realErrs = errs.filter(e => !/status of 403/.test(e));
+  check(realErrs.length === 0, 'export: no page errors ' + JSON.stringify(realErrs));
+  await page.close();
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // Reload and target switching — magazines survive revisits; Reload spends chips
 // ─────────────────────────────────────────────────────────────────────────────
@@ -538,6 +621,7 @@ try {
   if (!ONLY || ONLY === 'tool')     await checkTool(browser, base);
   if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);
   if (!ONLY || ONLY === 'pk')       await checkPkBuilder(browser, base);
   if (!ONLY || ONLY === 'doctrine') await checkDoctrineBuilder(browser, base);
   if (!ONLY || ONLY === 'blue')     await checkBlueBuilder(browser, base);

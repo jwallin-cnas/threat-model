@@ -184,7 +184,19 @@ function _applyInitialMagazine(def) {
   if (def.loadouts == null) return;
   const systems = systemsInEntry(def);
   if (def.loadouts >= systems) return;
-  globalMagState[def.id] = Math.floor(def.loadouts * chipSizeFor(def));
+  globalMagState[def.id] = _startingMag(def);
+}
+
+/**
+ * Interceptors an entry with fewer chips than systems starts with:
+ * chips × chip size. Snapped to the nearest half interceptor when within
+ * 0.01 (exported chip fractions are rounded to 6 decimals; THAAD's 1.5-shot
+ * salvos leave halves), otherwise kept to 6 decimals.
+ */
+function _startingMag(def) {
+  const x = def.loadouts * chipSizeFor(def);
+  const half = Math.round(x * 2) / 2;
+  return Math.abs(x - half) < 0.01 ? half : Math.round(x * 1e6) / 1e6;
 }
 
 /**
@@ -286,7 +298,7 @@ function _migrateReloadUnits() {
  */
 function _startNote(def, remaining) {
   if (def.loadouts == null || def.loadouts >= systemsInEntry(def)) return null;
-  if (remaining !== Math.floor(def.loadouts * chipSizeFor(def))) return null;
+  if (remaining !== _startingMag(def)) return null;
   if (def.loadouts === 0) return '(no chips — starts empty)';
   return `(starts with ${fmtReloads(def.loadouts)} chip${def.loadouts === 1 ? '' : 's'})`;
 }
@@ -3579,6 +3591,95 @@ function _buildRedLossesSection(attacks) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Laydown export — the current state, re-importable with Import Laydown
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build a laydown file (defaults.json format) from the CURRENT state: every
+ * system at every location, with its operator, notes, on/off switch and its
+ * remaining ammunition expressed as chips.
+ *
+ * Chips = interceptors now loaded ÷ chip size + reserve chips. Importing the
+ * file reloads each system from those chips, so the total ammunition is
+ * unchanged: a Patriot at 0 of 36 with 2 reserve chips exports as 2 chips
+ * and imports at 36 of 36 with 1 reserve chip; a 3-Patriot entry at 51 of
+ * 108 with no reserve exports as 1.416667 chips and imports at 51 of 108.
+ * Systems with no magazine keep their chip total as it was.
+ *
+ * Not carried (the format has no place for them): cross-target coverage
+ * switches, which return to their defaults, and history. A battery count
+ * edited to a non-whole number of systems is rounded to whole systems, with
+ * the same ammunition; each such entry is listed in `warnings`.
+ *
+ * @returns {{ data: object, warnings: string[], systems: number, locations: number }}
+ */
+function buildLaydownStateExport() {
+  const warnings = [];
+  const defaults = {};
+  let systems = 0;
+  const round6 = x => Math.round(x * 1e6) / 1e6;
+
+  for (const target of appTargetCatalog) {
+    const list = [];
+    for (const def of target.defenses || []) {
+      const catalog = DEFENSE_CATALOG[def.system];
+      if (!catalog) { warnings.push(`${target.name}: unknown system "${def.system}" left out`); continue; }
+
+      let quantity = catalog.isShared ? 1 : systemsInEntry(def);
+      if (!Number.isInteger(quantity)) {
+        const q = Math.max(1, Math.round(quantity));
+        warnings.push(`${target.name}: ${catalog.name} has ${def.quantity} batteries (${round6(quantity)} systems); exported as ${q} system${q !== 1 ? 's' : ''} with the same ammunition`);
+        quantity = q;
+      }
+
+      const size = chipSizeFor(def);
+      let chips;
+      if (size > 0) {
+        const full   = catalog.isShared ? catalog.magazinePerBattery : catalog.magazinePerBattery * def.quantity;
+        const loaded = def.id in globalMagState ? globalMagState[def.id] : full;
+        chips = round6(loaded / size + (def.reloads ?? 0));
+      } else {
+        chips = def.loadouts ?? null;   // no magazine: nothing is spent
+      }
+
+      const entry = { id: def.id, system: def.system, quantity, notes: def.notes || '', operator: def.operator || target.country || '' };
+      if (chips != null) entry.chips = chips;
+      if (def.disabled) entry.disabled = true;
+      list.push(entry);
+      systems++;
+    }
+    if (list.length) defaults[target.id] = list;
+  }
+
+  const base    = (document.getElementById('laydown-badge')?.textContent || '').trim() || 'Default';
+  const attacks = simHistory.slice(1, simHistoryCursor + 1).filter(s => s.type === 'attack').length;
+  const name    = `${base.replace(/ — state after .*$/, '')} — state after ${attacks} attack${attacks !== 1 ? 's' : ''}`;
+  return { data: { version: '1.0', name, defaults }, warnings, systems, locations: Object.keys(defaults).length };
+}
+
+/** Download the current laydown state as a JSON file. */
+function exportLaydownState() {
+  const { data, warnings, systems, locations } = buildLaydownStateExport();
+  if (systems === 0) { showToast('No systems are deployed — nothing to export.', true); return; }
+
+  const now   = new Date();
+  const pad   = n => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const slug  = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'laydown';
+  const blob  = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href = url; a.download = `${slug}_${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  for (const w of warnings) console.warn('[export laydown]', w);
+  showToast(`Laydown exported — ${systems} system${systems !== 1 ? 's' : ''} at ${locations} location${locations !== 1 ? 's' : ''}. `
+          + `Ammunition is saved as chips; importing reloads each system from them.`
+          + (warnings.length ? ` ${warnings.length} warning${warnings.length !== 1 ? 's' : ''} (see console).` : ''), warnings.length > 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Laydown import
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -4418,7 +4519,7 @@ async function performGlobalReload() {
         def.reloads = Math.round((def.reloads - costChips) * 1e6) / 1e6;
       } else {
         // Partial refill — add as many whole missiles as the reserve chips allow
-        const toAdd = Math.floor(def.reloads * chipSize);
+        const toAdd = Math.floor(def.reloads * chipSize + 0.01);   // reserves are kept to 6 decimals
         if (toAdd > 0) globalMagState[def.id] = current + toAdd;
         def.reloads = 0;
       }
@@ -4625,6 +4726,7 @@ function wireEvents() {
   document.getElementById('btn-clear-overrides').addEventListener('click', clearAllOverrides);
 
   // Import laydown — button triggers the hidden file input
+  document.getElementById('btn-export-laydown').addEventListener('click', exportLaydownState);
   document.getElementById('btn-import-laydown').addEventListener('click', () => {
     document.getElementById('import-laydown-input').click();
   });
