@@ -515,9 +515,15 @@ async function checkBlueBuilder(browser, base) {
   const last = e1[e1.length - 1] || {};
   check(e1.length === 1 && last.system === 'patriot' && last.quantity === 4 && last.operator === 'Bahrain' && last.chips === 6,
         'blue: keyboard-only entry adds Patriot × 4, Bahrain, 6 chips ' + JSON.stringify(last));
-  check(after.formOpen && after.focused && after.system === '' && after.operator === 'Bahrain' && after.qty === '1' && after.chips === '1',
-        'blue: after an add the form stays open, System is focused and empty, Operator is kept ' + JSON.stringify(after));
+  check(!after.formOpen, 'blue: after an add the form closes ' + JSON.stringify(after));
 
+  await center(`${card} .tc-btn-add`); await page.click(`${card} .tc-btn-add`);
+  const reopened = await page.evaluate(c => ({ system: document.querySelector(`${c} .tc-system`).value, operator: document.querySelector(`${c} .tc-operator`).value, chips: document.querySelector(`${c} .tc-chips`).value }), card);
+  check(reopened.system === '' && reopened.operator === 'United States' && reopened.chips === '1', 'blue: reopening the form starts from the defaults ' + JSON.stringify(reopened));
+  await page.keyboard.press('Escape');   // close the System list that opening the form shows
+  await page.click(`${card} .tc-operator`); await page.keyboard.type('Bah'); await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  await page.click(`${card} .tc-system`);
   await page.keyboard.type('Pat'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
   const r2 = await page.evaluate(c => ({ sys: document.querySelector(`${c} .tc-system`).value, qtyDisabled: document.querySelector(`${c} .tc-qty`).disabled, focused: document.activeElement.className }), card);
   check(r2.sys.startsWith('F-15E Patrol') && r2.qtyDisabled && r2.focused.includes('tc-operator'), 'blue: ↓ picks the first Patrol; quantity is locked so focus skips to Operator ' + JSON.stringify(r2));
@@ -550,6 +556,45 @@ async function checkBlueBuilder(browser, base) {
   const e2 = await entries();
   check(r4.qtyDisabled && r4.focused.includes('tc-operator') && e2.length > 2, 'blue: a preset is found, locks quantity, and the Add button adds its components');
 
+  // Fractional chips in the add form; invalid chips are refused
+  await center(`${card} .tc-btn-add`); await page.click(`${card} .tc-btn-add`);   // the form closed after the last add
+  await page.keyboard.type('nasams'); await page.keyboard.press('Enter');   // → Quantity
+  await page.keyboard.press('Enter');                                       // → Operator
+  await page.keyboard.press('Enter');                                       // → Chips
+  await page.keyboard.type('abc'); await page.keyboard.press('Enter');
+  const stayed = await active();
+  await page.keyboard.type('0.5'); await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
+  const nas = (await entries()).find(e => e.system === 'nasams');
+  check(stayed.includes('tc-chips') && nas && nas.chips === 0.5, 'blue: chips accept 0.5 typed in the form; "abc" is refused and focus stays ' + JSON.stringify(nas));
+
+  // Click-to-edit an added system's chips: Enter saves, clicking away saves, Escape cancels, bad text is refused
+  const rowChip = async sys => page.evaluate(([c, s]) => { const i = window._blueState().laydown.doha.findIndex(e => e.system === s);
+    return document.querySelectorAll(`${c} .tc-defense-row`)[i]?.querySelector('.tc-chips-edit')?.textContent; }, [card, sys]);
+  const clickChip = async sys => { const i = (await entries()).findIndex(e => e.system === sys);
+    const sel = `${card} .tc-defense-row:nth-child(${i + 1}) .tc-chips-edit`; await center(sel); await page.click(sel); };
+  await clickChip('patriot');
+  const editing = await page.evaluate(() => document.activeElement.className);
+  await page.keyboard.type('2.5'); await page.keyboard.press('Enter');
+  const ce1 = { label: await rowChip('patriot'), value: (await entries()).find(e => e.system === 'patriot').chips };
+  await clickChip('patriot'); await page.keyboard.type('3'); await page.click(`${card} .target-card-name`);
+  const ce2 = (await entries()).find(e => e.system === 'patriot').chips;
+  await clickChip('patriot'); await page.keyboard.type('9'); await page.keyboard.press('Escape');
+  const ce3 = (await entries()).find(e => e.system === 'patriot').chips;
+  await clickChip('patriot'); await page.keyboard.type('-2'); await page.keyboard.press('Enter');
+  const ce4 = { value: (await entries()).find(e => e.system === 'patriot').chips, label: await rowChip('patriot') };
+  check(editing.includes('tc-chips-input') && ce1.value === 2.5 && ce1.label === '2.5 chips', 'blue: clicking a chip count opens it for editing; Enter saves 2.5 ' + JSON.stringify(ce1));
+  check(ce2 === 3 && ce3 === 3 && ce4.value === 3 && ce4.label === '3 chips', `blue: clicking away saves (3), Escape cancels, "-2" is refused (${ce2}, ${ce3}, ${JSON.stringify(ce4)})`);
+  await page.reload(); await page.waitForFunction(() => window._blueReady === true);
+  const persisted = (await entries()).find(e => e.system === 'patriot').chips;
+  check(persisted === 3, 'blue: an edited chip count survives a page reload (' + persisted + ')');
+
+  // Editing a row keeps an open add form and what was typed in it
+  await center(`${card} .tc-btn-add`); await page.click(`${card} .tc-btn-add`);
+  await page.fill(`${card} .tc-notes`, 'keep me');
+  await clickChip('nasams'); await page.keyboard.type('1.25'); await page.keyboard.press('Enter');
+  const kept = await page.evaluate(c => ({ open: !document.querySelector(`${c} .tc-add-form`).classList.contains('hidden'), notes: document.querySelector(`${c} .tc-notes`).value }), card);
+  check(kept.open && kept.notes === 'keep me' && (await entries()).find(e => e.system === 'nasams').chips === 1.25, 'blue: editing a row keeps the open add form ' + JSON.stringify(kept));
+
   // Matching rules
   const m = await page.evaluate(() => {
     const sys = systemTypeAheadItems(), ops = operatorTypeAheadItems(), first = (items, q, n = 1) => typeAheadFilter(items, q).slice(0, n).map(i => i.id).join(',');
@@ -562,7 +607,8 @@ async function checkBlueBuilder(browser, base) {
 
   // Export matches the entered values
   const ex = await page.evaluate(() => window._blueBuildExport('T').defaults.doha);
-  check(ex[0].system === 'patriot' && ex[0].quantity === 4 && ex[0].operator === 'Bahrain' && ex[0].chips === 6, 'blue: export carries the type-ahead entry');
+  check(ex[0].system === 'patriot' && ex[0].quantity === 4 && ex[0].operator === 'Bahrain' && ex[0].chips === 3 && ex.find(e => e.system === 'nasams').chips === 1.25,
+        'blue: export carries the typed and edited chip counts (3, 1.25)');
 
   await page.evaluate(() => localStorage.removeItem('threatmodel_blue_builder_v1'));
   check(errs.length === 0, 'blue: no page errors ' + JSON.stringify(errs));

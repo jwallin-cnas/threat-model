@@ -2203,6 +2203,20 @@ select option, select optgroup {
 
 .tc-add-form { margin-top: 4px; }
 
+/* Click-to-edit chip count on an added system */
+.tc-chips-edit {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--text-dim);
+}
+.tc-chips-edit:hover,
+.tc-chips-edit:focus { color: var(--text-bright); border-bottom-color: var(--accent); outline: none; }
+.tc-chips-input {
+  width: 64px !important;
+  padding: 1px 4px !important;
+  font-size: 11px !important;
+  font-family: var(--font-mono);
+}
+
 .form-row-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

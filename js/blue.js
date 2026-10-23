@@ -23,8 +23,21 @@
 
 const BLUE_STORAGE_KEY   = 'threatmodel_blue_builder_v1';
 const BLUE_DEFAULT_NAME  = 'Blue Laydown';   // used when the name field is left blank
-const CHIP_OPTIONS       = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const DEFAULT_CHIPS      = 1;                // initial load only
+
+/** Parse a typed chip count: a number ≥ 0, fractions allowed (0.5). Null when invalid. */
+function parseChipsInput(text) {
+  const t = String(text ?? '').trim().replace(',', '.');
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6) / 1e6 : null;
+}
+
+/** "1 chip", "0.5 chips", "0 chips (starts empty)". */
+function chipText(chips) {
+  if (chips === 0) return '0 chips (starts empty)';
+  return `${chips} chip${chips === 1 ? '' : 's'}`;
+}
 
 let laydown     = {};   // { [targetId]: [ { system, quantity, notes, operator, chips } ] }
 let laydownName = '';
@@ -180,7 +193,7 @@ function fillCard(card, target) {
         </div>
         <div class="form-group">
           <label>Chips <span class="label-hint">— one chip per system load, including the first</span></label>
-          <select class="tc-chips"></select>
+          <input type="text" class="tc-chips" inputmode="decimal" value="1" placeholder="e.g. 1 or 0.5" autocomplete="off" spellcheck="false">
         </div>
       </div>
 
@@ -210,17 +223,8 @@ function fillCard(card, target) {
   const qtyInput      = card.querySelector('.tc-qty');
   const magInfo       = card.querySelector('.tc-mag');
   const operatorInput = card.querySelector('.tc-operator');
-  const chipsSel      = card.querySelector('.tc-chips');
+  const chipsInput    = card.querySelector('.tc-chips');
   const notesInput    = card.querySelector('.tc-notes');
-
-  chipsSel.innerHTML = '';
-  for (const n of CHIP_OPTIONS) {
-    const opt = document.createElement('option');
-    opt.value = String(n);
-    opt.textContent = n === 0 ? '0 — starts empty' : String(n);
-    if (n === DEFAULT_CHIPS) opt.selected = true;
-    chipsSel.appendChild(opt);
-  }
 
   const refreshMagInfo = () => {
     const text = magazineInfoText(card._ta?.system.value(), parseInt(qtyInput.value, 10));
@@ -232,7 +236,7 @@ function fillCard(card, target) {
     items:     operatorTypeAheadItems(),
     clearable: false,
     emptyText: 'No matching nations',
-    onEnter:   () => chipsSel.focus()
+    onEnter:   () => { chipsInput.focus(); chipsInput.select(); }
   });
 
   // Same behaviour as the main tool: presets and patrol assets lock quantity to 1.
@@ -260,9 +264,12 @@ function fillCard(card, target) {
   qtyInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); operatorInput.focus(); }
   });
-  // A closed <select> would open its menu on Enter; advance instead.
-  chipsSel.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); notesInput.focus(); }
+  chipsInput.addEventListener('focus', () => chipsInput.select());
+  chipsInput.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (parseChipsInput(chipsInput.value) == null) { showToast('Chips must be a number of 0 or more, e.g. 1 or 0.5.', true); chipsInput.select(); return; }
+    notesInput.focus();
   });
 
   card.querySelector('.tc-btn-add').addEventListener('click', () => openForm(card));
@@ -271,23 +278,17 @@ function fillCard(card, target) {
     const systemId = systemTA.value();
     const qty      = Math.max(1, parseInt(qtyInput.value, 10) || 1);
     const operator = operatorTA.value() || 'United States';
-    const chips    = parseInt(chipsSel.value, 10);
+    const chips    = parseChipsInput(chipsInput.value);
     const notes    = notesInput.value.trim();
 
     if (!systemId) { showToast('Please choose a system.', true); systemTA.focus(); return; }
+    if (chips == null) { showToast('Chips must be a number of 0 or more, e.g. 1 or 0.5.', true); chipsInput.focus(); return; }
 
-    const added = addEntries(target.id, systemId, qty, notes, operator, Number.isInteger(chips) ? chips : DEFAULT_CHIPS);
+    const added = addEntries(target.id, systemId, qty, notes, operator, chips);
     if (added > 0) {
       persistBlue();
-      refreshCard(target.id);
+      refreshCard(target.id);   // rebuilds the card with its form closed
       showToast(`Added ${added} system${added !== 1 ? 's' : ''} to ${target.name}.`);
-      // The card was rebuilt. Reopen its form for the next system, keeping the
-      // operator: consecutive systems at one target usually share one.
-      const fresh = document.getElementById(`tc-${target.id}`);
-      if (fresh?._ta) {
-        fresh._ta.operator.setValue(operator);
-        openForm(fresh);
-      }
     }
   });
 
@@ -306,12 +307,10 @@ function buildRow(targetId, entry, index) {
   row.style.setProperty('--tier-color', TIER_COLORS[catalog?.tier] || '#888');
 
   const qtyLabel = catalog?.isShared ? 'patrol asset' : `${entry.quantity} system${entry.quantity !== 1 ? 's' : ''}`;
-  const chips = entry.chips;
-  const chipLabel = chips === 0 ? '0 chips (starts empty)' : `${chips} chip${chips !== 1 ? 's' : ''}`;
   row.innerHTML = `
     <div class="tc-defense-main">
       <span class="tc-defense-name">${escapeHtml(catalog?.name || entry.system)}</span>
-      <span class="tc-defense-sub">${qtyLabel} · ${escapeHtml(entry.operator || '')} · ${chipLabel}</span>
+      <span class="tc-defense-sub">${qtyLabel} · ${escapeHtml(entry.operator || '')} · <span class="tc-chips-edit" role="button" tabindex="0" title="Click to change the chips">${chipText(entry.chips)}</span></span>
       ${entry.notes ? `<span class="tc-defense-notes">${escapeHtml(entry.notes)}</span>` : ''}
     </div>
     <button type="button" class="btn-icon tc-btn-remove" title="Remove">✕</button>`;
@@ -319,7 +318,52 @@ function buildRow(targetId, entry, index) {
   row.querySelector('.tc-btn-remove').addEventListener('click', () => {
     removeEntry(targetId, index);
   });
+  const chipSpan = row.querySelector('.tc-chips-edit');
+  chipSpan.addEventListener('click', () => editRowChips(targetId, index, row, chipSpan));
+  chipSpan.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editRowChips(targetId, index, row, chipSpan); }
+  });
   return row;
+}
+
+/**
+ * Edit an added system's chips in place. Enter or clicking away saves;
+ * Escape cancels. Fractions are allowed (0.5); invalid text is rejected and
+ * the old value kept. Only the row is redrawn, so an open add form is kept.
+ */
+function editRowChips(targetId, index, row, span) {
+  const entry = laydown[targetId]?.[index];
+  if (!entry) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.inputMode = 'decimal';
+  input.className = 'tc-chips-input';
+  input.value = String(entry.chips);
+  input.setAttribute('aria-label', 'Chips');
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const finish = save => {
+    if (done) return;
+    done = true;
+    if (save) {
+      const v = parseChipsInput(input.value);
+      if (v == null) {
+        showToast('Chips must be a number of 0 or more, e.g. 1 or 0.5.', true);
+      } else if (v !== entry.chips) {
+        entry.chips = v;
+        persistBlue();
+      }
+    }
+    row.replaceWith(buildRow(targetId, entry, index));
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
