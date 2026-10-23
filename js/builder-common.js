@@ -468,6 +468,15 @@ function readJSONFile(file) {
   });
 }
 
+/**
+ * Default export name when the name field is left blank:
+ * "<prefix>_YYYY-MM-DD_HHMM" in local time, e.g. blue_laydown_2026-10-23_1430.
+ */
+function timestampedName(prefix, now = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${prefix}_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+}
+
 function slugify(s) {
   return String(s || '')
     .toLowerCase()

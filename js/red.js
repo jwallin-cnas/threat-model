@@ -11,7 +11,7 @@
  */
 
 const RED_STORAGE_KEY   = 'threatmodel_red_builder_v1';
-const RED_DEFAULT_NAME  = 'Red Attacks';   // used when the name field is left blank
+const RED_DEFAULT_PREFIX = 'red_attacks';  // blank name → red_attacks_YYYY-MM-DD_HHMM
 const ATTACK_SLOTS    = 5;
 
 // Same ordering the main tool uses for its manifest rows
@@ -375,7 +375,8 @@ function buildAttacksExport(name) {
 
 function exportAttacks() {
   const input = document.getElementById('attacks-name');
-  const name  = (input.value || '').trim() || RED_DEFAULT_NAME;
+  const typed = (input.value || '').trim();
+  const name  = typed || timestampedName(RED_DEFAULT_PREFIX);
   const complete = completeAttacks().length;
   if (complete === 0) {
     showToast('Each attack needs a target and at least one platform before exporting.', true);
@@ -384,7 +385,8 @@ function exportAttacks() {
   const partial = attacks.filter(a => !isComplete(a) && (a.targetId || a.manifest.length > 0)).length;
 
   const file = buildAttacksExport(name);
-  downloadJSON(`${slugify(name) || 'attacks'}_attacks.json`, file);
+  // A typed name gets the "_attacks" suffix; the default name already says it.
+  downloadJSON(typed ? `${slugify(typed) || 'attacks'}_attacks.json` : `${name}.json`, file);
 
   let msg = `Exported "${name}" — ${complete} attack${complete !== 1 ? 's' : ''}.`;
   if (partial) msg += ` ${partial} incomplete column${partial !== 1 ? 's' : ''} skipped.`;

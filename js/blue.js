@@ -22,7 +22,7 @@
  */
 
 const BLUE_STORAGE_KEY   = 'threatmodel_blue_builder_v1';
-const BLUE_DEFAULT_NAME  = 'Blue Laydown';   // used when the name field is left blank
+const BLUE_DEFAULT_PREFIX = 'blue_laydown';  // blank name → blue_laydown_YYYY-MM-DD_HHMM
 const DEFAULT_CHIPS      = 1;                // initial load only
 
 /** Parse a typed chip count: a number ≥ 0, fractions allowed (0.5). Null when invalid. */
@@ -611,13 +611,15 @@ function buildLaydownExport(name) {
 
 function exportLaydown() {
   const input = document.getElementById('laydown-name');
-  const name  = (input.value || '').trim() || BLUE_DEFAULT_NAME;
+  const typed = (input.value || '').trim();
+  const name  = typed || timestampedName(BLUE_DEFAULT_PREFIX);
   if (totalEntries() === 0) {
     showToast('Add at least one defense system before exporting.', true);
     return;
   }
   const file = buildLaydownExport(name);
-  downloadJSON(`${slugify(name) || 'laydown'}_laydown.json`, file);
+  // A typed name gets the "_laydown" suffix; the default name already says it.
+  downloadJSON(typed ? `${slugify(typed) || 'laydown'}_laydown.json` : `${name}.json`, file);
   const n = totalEntries(), t = targetsWithEntries();
   showToast(`Exported "${name}" — ${n} system${n !== 1 ? 's' : ''} across ${t} target${t !== 1 ? 's' : ''}.`);
 }
