@@ -576,66 +576,6 @@
         "operator": "United Arab Emirates",
         "chips": 5
       }
-    ],
-    "persian_gulf_place_point": [
-      {
-        "id": "persian_gulf_place_point_d1",
-        "system": "aegis_sm3",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United States",
-        "chips": 2
-      },
-      {
-        "id": "persian_gulf_place_point_d2",
-        "system": "aegis_sm6",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United States",
-        "chips": 2
-      },
-      {
-        "id": "persian_gulf_place_point_d3",
-        "system": "aegis_sm2",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United States",
-        "chips": 2
-      }
-    ],
-    "gulf_of_oman_place_point": [
-      {
-        "id": "shared_fa18_patrol",
-        "system": "fa18_patrol",
-        "quantity": 1,
-        "notes": "CAP",
-        "operator": "United States",
-        "chips": 2
-      },
-      {
-        "id": "gulf_of_oman_place_point_d1",
-        "system": "aegis_sm3",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United States",
-        "chips": 2
-      },
-      {
-        "id": "gulf_of_oman_place_point_d2",
-        "system": "aegis_sm6",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United States",
-        "chips": 2
-      },
-      {
-        "id": "gulf_of_oman_place_point_d3",
-        "system": "aegis_sm2",
-        "quantity": 1,
-        "notes": "",
-        "operator": "United States",
-        "chips": 2
-      }
     ]
   }
 }
