@@ -615,8 +615,9 @@ async function checkBlueBuilder(browser, base) {
     return { file: d.suggestedFilename(), name: JSON.parse(fs.readFileSync(await d.path(), 'utf8')).name }; };
   await page.fill('#laydown-name', ''); const n1 = await dlName();
   await page.fill('#laydown-name', 'Gulf Plan'); const n2 = await dlName();
-  check(/^blue_laydown_\d{4}-\d\d-\d\d_\d{4}$/.test(n1.name) && n1.file === n1.name + '.json' && n2.name === 'Gulf Plan' && n2.file === 'gulf_plan_laydown.json',
-        'blue: a blank name exports as blue_laydown_<date>_<time>; a typed name is kept ' + JSON.stringify([n1, n2]));
+  await page.fill('#laydown-name', 'Blue Laydown'); const n3 = await dlName();
+  check(/^blue_laydown_\d{4}-\d\d-\d\d_\d{4}$/.test(n1.name) && n1.file === n1.name + '.json' && n2.name === 'Gulf Plan' && n2.file === 'gulf_plan_laydown.json'
+        && n3.file === 'blue_laydown.json', 'blue: a blank name exports as blue_laydown_<date>_<time>; a typed name is kept, without a doubled suffix ' + JSON.stringify([n1, n2, n3]));
 
   await page.evaluate(() => localStorage.removeItem('threatmodel_blue_builder_v1'));
   check(errs.length === 0, 'blue: no page errors ' + JSON.stringify(errs));
@@ -667,8 +668,9 @@ async function checkRedBuilder(browser, base) {
     return { file: d.suggestedFilename(), name: JSON.parse(fs.readFileSync(await d.path(), 'utf8')).name }; };
   await page.fill('#attacks-name', ''); const n1 = await dlName();
   await page.fill('#attacks-name', 'Opening Salvo'); const n2 = await dlName();
-  check(/^red_attacks_\d{4}-\d\d-\d\d_\d{4}$/.test(n1.name) && n1.file === n1.name + '.json' && n2.name === 'Opening Salvo' && n2.file === 'opening_salvo_attacks.json',
-        'red: a blank name exports as red_attacks_<date>_<time>; a typed name is kept ' + JSON.stringify([n1, n2]));
+  await page.fill('#attacks-name', 'Red Attacks'); const n3 = await dlName();
+  check(/^red_attacks_\d{4}-\d\d-\d\d_\d{4}$/.test(n1.name) && n1.file === n1.name + '.json' && n2.name === 'Opening Salvo' && n2.file === 'opening_salvo_attacks.json'
+        && n3.file === 'red_attacks.json', 'red: a blank name exports as red_attacks_<date>_<time>; a typed name is kept, without a doubled suffix ' + JSON.stringify([n1, n2, n3]));
 
   await page.evaluate(() => localStorage.removeItem('threatmodel_red_builder_v1'));
   check(errs.length === 0, 'red: no page errors ' + JSON.stringify(errs));

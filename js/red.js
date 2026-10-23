@@ -385,8 +385,10 @@ function exportAttacks() {
   const partial = attacks.filter(a => !isComplete(a) && (a.targetId || a.manifest.length > 0)).length;
 
   const file = buildAttacksExport(name);
-  // A typed name gets the "_attacks" suffix; the default name already says it.
-  downloadJSON(typed ? `${slugify(typed) || 'attacks'}_attacks.json` : `${name}.json`, file);
+  // A typed name gets an "_attacks" suffix unless it already ends with one
+  // ("Red Attacks" → red_attacks.json); the default name already says it.
+  const slug = slugify(typed) || 'attacks';
+  downloadJSON(typed ? `${/(^|_)attacks$/.test(slug) ? slug : slug + '_attacks'}.json` : `${name}.json`, file);
 
   let msg = `Exported "${name}" — ${complete} attack${complete !== 1 ? 's' : ''}.`;
   if (partial) msg += ` ${partial} incomplete column${partial !== 1 ? 's' : ''} skipped.`;

@@ -618,8 +618,10 @@ function exportLaydown() {
     return;
   }
   const file = buildLaydownExport(name);
-  // A typed name gets the "_laydown" suffix; the default name already says it.
-  downloadJSON(typed ? `${slugify(typed) || 'laydown'}_laydown.json` : `${name}.json`, file);
+  // A typed name gets a "_laydown" suffix unless it already ends with one
+  // ("Blue Laydown" → blue_laydown.json); the default name already says it.
+  const slug = slugify(typed) || 'laydown';
+  downloadJSON(typed ? `${/(^|_)laydown$/.test(slug) ? slug : slug + '_laydown'}.json` : `${name}.json`, file);
   const n = totalEntries(), t = targetsWithEntries();
   showToast(`Exported "${name}" — ${n} system${n !== 1 ? 's' : ''} across ${t} target${t !== 1 ? 's' : ''}.`);
 }
