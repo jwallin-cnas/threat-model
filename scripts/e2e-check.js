@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -139,6 +139,129 @@ async function checkTool(browser, base) {
   const r5 = await page.evaluate(() => document.getElementById('pk-badge').textContent + '/' + document.getElementById('doctrine-badge').textContent);
   check(r5 === 'Default/Default', 'tool: clearing storage restores the defaults');
   check(errs.length === 0, 'tool: no page errors ' + JSON.stringify(errs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Independent patrols — each its own magazine, cap and number; old shared ids still pooled
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkIndependentPatrols(browser, base) {
+  console.log('\n── independent patrols ──');
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const errs = collectErrors(page);
+  await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+
+  // 1. Add three F-15E patrols: one at Tel Aviv, two at Al Dhafra
+  const add = await page.evaluate(async () => {
+    addDefense('tel_aviv', 'f15e_patrol', 1, '');
+    await new Promise(r => setTimeout(r, 2));
+    addDefense('al_dhafra_ab', 'f15e_patrol', 1, '');
+    await new Promise(r => setTimeout(r, 2));
+    addDefense('al_dhafra_ab', 'f15e_patrol', 1, 'second');
+    const ids = appTargetCatalog.flatMap(t => (t.defenses || []).filter(d => d.system === 'f15e_patrol').map(d => ({ t: t.id, id: d.id, q: d.quantity, op: d.operator })));
+    const nums = patrolNumbers();
+    return { ids, labels: ids.map(x => `${x.t}: ${defLabel(x.id, 'F-15E')}`) };
+  });
+  const uniq = new Set(add.ids.map(x => x.id)).size;
+  check(add.ids.length === 3 && uniq === 3 && add.ids.every(x => x.q === 1 && x.op === 'United States'), 'patrols: three F-15E patrols added, two at one location, each with its own id ' + JSON.stringify(add.ids.map(x => x.id)));
+  check(JSON.stringify(add.labels) === JSON.stringify(['tel_aviv: F-15E #1', 'al_dhafra_ab: F-15E #2', 'al_dhafra_ab: F-15E #3']), 'patrols: numbered #1–#3 in target order ' + JSON.stringify(add.labels));
+  await page.selectOption('#target-select', 'al_dhafra_ab');
+  const cards = await page.$$eval('.defense-name', els => els.map(e => e.textContent.trim()).filter(t => /F-15E/.test(t)));
+  check(cards.includes('F-15E Patrol (×4) #2') && cards.includes('F-15E Patrol (×4) #3'), 'patrols: Al Dhafra cards show #2 and #3 ' + JSON.stringify(cards));
+
+  // 2. An attack on Al Dhafra: the two patrols fire from separate magazines with separate caps
+  await page.selectOption('#target-select', 'dubai');   // the direct queue hook stores results for other targets only
+  const sim = await page.evaluate(() => {
+    const ids = getTarget('al_dhafra_ab').defenses.filter(d => d.system === 'f15e_patrol').map(d => d.id);
+    window._setSeed(0);
+    window._importAttackQueueDirect({ version: '1.0', attacks: [{ targetId: 'al_dhafra_ab', platforms: [{ platformId: 'shahed_136', quantity: 300 }] }] });
+    return null;
+  });
+  await page.waitForTimeout(5);
+  const run = await page.evaluate(() => {
+    window._simulateQueueDirect();
+    const s = simHistory[simHistory.length - 1];
+    const pat = allEngagements(s.results).filter(e => e.systemId === 'f15e_patrol');
+    const div = document.createElement('div'); div.innerHTML = window._buildPrintDocument();
+    const block = [...div.querySelectorAll('.pr-sum-block')].find(b => /Al Dhafra/.test(b.querySelector('.pr-sum-location').textContent));
+    const lines = block ? [...block.querySelectorAll('.pr-sum-line')].map(e => e.textContent).filter(t => /F-15E/.test(t)) : [];
+    const rows = [...div.querySelectorAll('.pr-table td:first-child')].map(td => td.textContent.trim()).filter(t => /F-15E/.test(t));
+    return { pat: pat.map(e => ({ id: e.defId, label: defLabel(e.defId, 'F-15E'), killed: e.killed, used: e.interceptorsUsed, left: e.magazineRemaining, in: e.threatsIn })), lines, rows: [...new Set(rows)] };
+  });
+  await page.selectOption('#target-select', 'dubai'); await page.selectOption('#target-select', 'al_dhafra_ab');   // open the attacked location as a user would
+  run.results = await page.$$eval('#simulation-results .eng-name', els => [...new Set(els.map(e => e.textContent.trim()).filter(t => /F-15E/.test(t)))]);
+  const [p2, p3] = run.pat;
+  check(run.pat.length === 2 && p2.id !== p3.id && p2.left >= 0 && p3.in === p2.in - p2.killed, 'patrols: both Al Dhafra patrols engage in turn, each from its own magazine ' + JSON.stringify(run.pat));
+  check(run.lines.length === 2 && run.lines.some(l => l.startsWith('F-15E Patrol (×4) #2 (United States)')) && run.lines.some(l => l.startsWith('F-15E Patrol (×4) #3 (United States)')),
+        'patrols: the report chip summary lists #2 and #3 under Al Dhafra ' + JSON.stringify(run.lines));
+  check(run.rows.some(r => /#2/.test(r)) && run.rows.some(r => /#3/.test(r)) && run.results.includes('F-15E Patrol (×4) #2') && run.results.includes('F-15E Patrol (×4) #3'), 'patrols: report tables and the results panel carry the numbers ' + JSON.stringify({ rows: run.rows, results: run.results }));
+
+  // 3. Reset All Loadouts at Al Dhafra resets both patrols; removing one renumbers
+  const rr = await page.evaluate(() => {
+    selectedTargetId = 'al_dhafra_ab'; resetLoadouts();
+    const ids = getTarget('al_dhafra_ab').defenses.filter(d => d.system === 'f15e_patrol').map(d => d.id);
+    const afterReset = ids.map(id => globalMagState[id] ?? 'full');
+    removeDefense('al_dhafra_ab', ids[0]);
+    const left = appTargetCatalog.flatMap(t => (t.defenses || []).filter(d => d.system === 'f15e_patrol').map(d => `${t.id}: ${defLabel(d.id, 'F-15E')}`));
+    return { afterReset, removedMag: ids[0] in globalMagState, left };
+  });
+  check(rr.afterReset.every(v => v === 'full') && !rr.removedMag && JSON.stringify(rr.left) === JSON.stringify(['tel_aviv: F-15E #1', 'al_dhafra_ab: F-15E #2']),
+        'patrols: Reset All Loadouts refills both; removing one drops its magazine and renumbers ' + JSON.stringify(rr));
+
+  // 4. An older laydown with one shared patrol id at two locations still pools
+  const legacy = await page.evaluate(() => {
+    const e = (t, c) => ({ id: 'shared_fa18_patrol', system: 'fa18_patrol', quantity: 1, notes: '', operator: 'United States', chips: c });
+    window._importLaydownDirect({ version: '1.0', defaults: { gulf_of_oman_place_point: [e('gulf_of_oman_place_point', 2)], fujairah_port: [e('fujairah_port', 2)] } });
+    const sel = document.getElementById('target-select'); sel.value = 'fujairah_port'; sel.dispatchEvent(new Event('change'));
+    globalMagState.shared_fa18_patrol = 10;
+    const label = defLabel('shared_fa18_patrol', 'F/A-18');
+    selectedTargetId = 'fujairah_port'; resetLoadouts();   // listed elsewhere too → left alone
+    const keptAfterReset = globalMagState.shared_fa18_patrol;
+    const exported = buildLaydownStateExport().data.defaults;
+    return { label, keptAfterReset, reserves: [findDefenseEntryById('shared_fa18_patrol').reloads],
+             exportIds: [exported.gulf_of_oman_place_point?.[0]?.id, exported.fujairah_port?.[0]?.id] };
+  });
+  check(legacy.label === 'F/A-18' && legacy.keptAfterReset === 10 && legacy.exportIds.every(id => id === 'shared_fa18_patrol'),
+        'patrols: an older shared patrol at two locations is still one unnumbered patrol, kept by a reset and by export ' + JSON.stringify(legacy));
+
+  // 5. Blue Builder: repeated patrols allowed, numbered across cards, unique ids on export; old shared id kept
+  const blue = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await blue.goto(base + '/blue/'); await blue.waitForFunction(() => window._blueReady === true);
+  const b = await blue.evaluate(() => {
+    window._blueApplyData({ version: '1.0', defaults: { gulf_of_oman_place_point: [{ id: 'shared_fa18_patrol', system: 'fa18_patrol', quantity: 1, notes: '', operator: 'United States', chips: 2 }] } });
+    addEntries('doha', 'f15e_patrol', 1, '', 'United States', 1); refreshCard('doha');
+    addEntries('doha', 'f15e_patrol', 1, '', 'United States', 1);
+    addEntries('tel_aviv', 'f15e_patrol', 1, '', 'United States', 1);
+    refreshPatrolCards('f15e_patrol');
+    const names = id => [...document.querySelectorAll(`#tc-${id} .tc-defense-name`)].map(e => e.textContent.trim());
+    const ex = window._blueBuildExport('T').defaults;
+    localStorage.removeItem('threatmodel_blue_builder_v1');
+    return { doha: names('doha').filter(n => /F-15E/.test(n)), telAviv: names('tel_aviv').filter(n => /F-15E/.test(n)), fa18: names('gulf_of_oman_place_point').filter(n => /F\/A-18/.test(n)),
+             ids: [...ex.doha.map(e => e.id), ...ex.tel_aviv.map(e => e.id)], fa18Id: ex.gulf_of_oman_place_point[0].id, file: ex };
+  });
+  check(JSON.stringify(b.telAviv) === JSON.stringify(['F-15E Patrol (×4) #1']) && JSON.stringify(b.doha) === JSON.stringify(['F-15E Patrol (×4) #2', 'F-15E Patrol (×4) #3']) && JSON.stringify(b.fa18) === JSON.stringify(['F/A-18 Patrol (×4)']),
+        'builder: two F-15Es at one location allowed, numbered #1–#3 across cards; a single patrol is unnumbered ' + JSON.stringify([b.telAviv, b.doha, b.fa18]));
+  check(new Set(b.ids).size === 3 && b.ids.every(id => !/^shared_/.test(id)) && b.fa18Id === 'shared_fa18_patrol', 'builder: new patrols export with their own ids; the old shared id is kept ' + JSON.stringify({ ids: b.ids, fa18: b.fa18Id }));
+  await blue.close();
+
+  // 6. The tool imports the builder file: three independent F-15Es; the laydown document numbers them the same way
+  const back = await page.evaluate(d => { const r = window._importLaydownDirect({ version: '1.0', name: 'T', defaults: d });
+    return { w: r.warnings, labels: appTargetCatalog.flatMap(t => (t.defenses || []).filter(x => x.system === 'f15e_patrol').map(x => `${t.id}: ${defLabel(x.id, 'F-15E')}`)) }; }, b.file);
+  check(back.w.length === 0 && JSON.stringify(back.labels) === JSON.stringify(['tel_aviv: F-15E #1', 'doha: F-15E #2', 'doha: F-15E #3']), 'patrols: the tool imports the builder file with the same numbering ' + JSON.stringify(back));
+  const tmp = path.join(ROOT, 'output', `e2e_patrols_${Date.now()}`); fs.mkdirSync(tmp, { recursive: true });
+  fs.writeFileSync(path.join(tmp, 'p.json'), JSON.stringify({ version: '1.0', name: 'Patrol Test', defaults: b.file }));
+  const { spawnSync } = await import('child_process');
+  const py = spawnSync('python3', [path.join(ROOT, 'scripts', 'laydown-docx.py'), path.join(tmp, 'p.json'), '--out-dir', tmp], { encoding: 'utf8' });
+  const docx = fs.readdirSync(tmp).find(f => f.endsWith('.docx'));
+  const xml = docx ? spawnSync('unzip', ['-p', path.join(tmp, docx), 'word/document.xml'], { encoding: 'utf8' }).stdout : '';
+  const docLines = [...xml.matchAll(/<w:t[^>]*>([^<]*F-15E[^<]*)<\/w:t>/g)].map(m => m[1]);
+  fs.rmSync(tmp, { recursive: true, force: true });
+  check(py.status === 0 && docLines.length === 3 && docLines.some(l => l.startsWith('F-15E Patrol (×4) #1 ')) && docLines.filter(l => /#2 |#3 /.test(l)).length === 2,
+        'patrols: the laydown document numbers them #1–#3 too ' + JSON.stringify(docLines));
+
+  const realErrs = errs.filter(e => !/status of 403/.test(e));
+  check(realErrs.length === 0, 'patrols: no page errors ' + JSON.stringify(realErrs));
   await page.close();
 }
 
@@ -687,6 +810,7 @@ try {
   if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'patrols') await checkIndependentPatrols(browser, base);
   if (!ONLY || ONLY === 'pk')       await checkPkBuilder(browser, base);
   if (!ONLY || ONLY === 'doctrine') await checkDoctrineBuilder(browser, base);
   if (!ONLY || ONLY === 'blue')     await checkBlueBuilder(browser, base);

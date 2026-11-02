@@ -288,6 +288,7 @@ function fillCard(card, target) {
     if (added > 0) {
       persistBlue();
       refreshCard(target.id);   // rebuilds the card with its form closed
+      if (DEFENSE_CATALOG[systemId]?.isShared) refreshPatrolCards(systemId);
       showToast(`Added ${added} system${added !== 1 ? 's' : ''} to ${target.name}.`);
     }
   });
@@ -309,7 +310,7 @@ function buildRow(targetId, entry, index) {
   const qtyLabel = catalog?.isShared ? 'patrol asset' : `${entry.quantity} system${entry.quantity !== 1 ? 's' : ''}`;
   row.innerHTML = `
     <div class="tc-defense-main">
-      <span class="tc-defense-name">${escapeHtml(catalog?.name || entry.system)}</span>
+      <span class="tc-defense-name">${escapeHtml(catalog?.name || entry.system)}${builderPatrolNumber(entry) ? ` #${builderPatrolNumber(entry)}` : ''}</span>
       <span class="tc-defense-sub">${qtyLabel} · ${escapeHtml(entry.operator || '')} · <span class="tc-chips-edit" role="button" tabindex="0" title="Click to change the chips">${chipText(entry.chips)}</span></span>
       ${entry.notes ? `<span class="tc-defense-notes">${escapeHtml(entry.notes)}</span>` : ''}
     </div>
@@ -412,12 +413,9 @@ function addOneEntry(targetId, systemId, quantity, notes, operator, chips) {
 
   laydown[targetId] = laydown[targetId] || [];
 
-  // Shared patrol assets: one per target (same rule as the tool)
+  // Patrols: each one added is a new, independent four-ship (quantity 1),
+  // even when the same patrol type is already here or elsewhere.
   if (catalog.isShared) {
-    if (laydown[targetId].some(e => e.system === systemId)) {
-      showToast(`${catalog.name} is already assigned to this target.`, true);
-      return 0;
-    }
     laydown[targetId].push({ system: systemId, quantity: 1, notes: notes || '', operator, chips });
     return 1;
   }
@@ -435,10 +433,38 @@ function addOneEntry(targetId, systemId, quantity, notes, operator, chips) {
 function removeEntry(targetId, index) {
   const arr = laydown[targetId];
   if (!arr || index < 0 || index >= arr.length) return;
-  arr.splice(index, 1);
+  const [removed] = arr.splice(index, 1);
   if (arr.length === 0) delete laydown[targetId];
   persistBlue();
   refreshCard(targetId);
+  if (DEFENSE_CATALOG[removed?.system]?.isShared) refreshPatrolCards(removed.system);
+}
+
+/**
+ * Patrol number for a builder entry, matching the tool: each patrol type with
+ * two or more patrols numbers them #1, #2, … in target-list order, then list
+ * order. Entries that kept an older laydown's shared id (sharedId) are one
+ * patrol wherever they are listed. Null when the type has a single patrol.
+ */
+function builderPatrolNumber(entry) {
+  if (!DEFENSE_CATALOG[entry.system]?.isShared) return null;
+  const keys = [];
+  for (const t of BUILDER_DATA.targets) {
+    for (const e of laydown[t.id] || []) {
+      if (e.system !== entry.system) continue;
+      const k = e.sharedId || e;
+      if (!keys.includes(k)) keys.push(k);
+    }
+  }
+  if (keys.length < 2) return null;
+  return keys.indexOf(entry.sharedId || entry) + 1;
+}
+
+/** Redraw every card that lists a patrol type, so all their numbers stay right. */
+function refreshPatrolCards(systemId) {
+  for (const t of BUILDER_DATA.targets) {
+    if ((laydown[t.id] || []).some(e => e.system === systemId)) refreshCard(t.id);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -484,7 +510,10 @@ function applyLaydownData(data) {
         notes:    typeof d.notes === 'string' ? d.notes : '',
         operator: d.operator || target.country || 'United States',
         chips,
-        ...(d.disabled === true ? { disabled: true } : {})
+        ...(d.disabled === true ? { disabled: true } : {}),
+        // An older laydown's shared patrol id is kept, so it stays one patrol
+        // wherever it is listed; new patrols get their own ids on export.
+        ...(catalog.isShared && d.id === `shared_${d.system}` ? { sharedId: d.id } : {})
       });
     }
     if (applied.length) next[targetId] = applied;
@@ -581,9 +610,10 @@ async function clearAll() {
 
 /**
  * Build the laydown file object. Entry ids follow the defaults.json
- * convention `${targetId}_d${n}`; shared patrol assets use `shared_<system>`
- * so their magazine pools across targets exactly as addDefense() does.
- * Targets are emitted in targets.json order. The file's `chips` field
+ * convention `${targetId}_d${n}`, patrols included, so each patrol is an
+ * independent asset. A shared patrol id from an older laydown
+ * (`shared_<system>`) is kept, so that patrol stays one asset wherever it is
+ * listed, as the tool treats it. Targets are emitted in targets.json order. The file's `chips` field
  * carries the total loadouts (including the initial load).
  */
 function buildLaydownExport(name) {
@@ -593,8 +623,9 @@ function buildLaydownExport(name) {
     if (!entries || entries.length === 0) continue;
     let n = 0;
     defaults[t.id] = entries.map(e => {
-      const catalog = DEFENSE_CATALOG[e.system];
-      const id      = catalog?.isShared ? `shared_${e.system}` : `${t.id}_d${++n}`;
+      // Every entry gets its own id, patrols included (each an independent
+      // patrol); a kept shared id from an older laydown is written back as is.
+      const id = e.sharedId || `${t.id}_d${++n}`;
       return {
         id,
         system:   e.system,

@@ -73,6 +73,7 @@ const ENGAGEMENT_MODELS = {
   // limits the expected kills against one threat type in one run; kills
   // already made in this type pass (pass.kills) reduce what is left.
   directed_energy: {
+    usesRemaining: true,      // P depends on the threats left; re-resolved per entry
     usesMagazine: false,
     probability({ pkShot, params, remaining, pass }) {
       const cap = params?.killCapPerPass;
@@ -96,6 +97,7 @@ const ENGAGEMENT_MODELS = {
   // its target with probability pk. Expressed per threat so that
   // applyEngagement() charges bursts × shots rounds for a full pass.
   gun: {
+    usesRemaining: true,      // P depends on the threats left; re-resolved per entry
     usesMagazine: true,
     _burstsLeft({ params, pass }) {
       return Math.max(0, (params?.burstsPerPass ?? 1) - (pass?.bursts || 0));
@@ -127,6 +129,7 @@ const ENGAGEMENT_MODELS = {
   // per shot. Threats already engaged in this type pass (pass.engaged) count
   // toward the cap. The two bands are folded into one effective P.
   patrol: {
+    usesRemaining: true,      // P depends on the threats left; re-resolved per entry
     usesMagazine: true,
     probability({ pkShot, shots, params, remaining, pass }) {
       if (remaining <= 0 || shots <= 0) return 0;

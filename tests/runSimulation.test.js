@@ -271,6 +271,24 @@ describe('runSimulationCore — models', () => {
     expect(b.engagements[0].killed).toBe(13);   // 5 + 7.5 → 12.5 → 13 (round half up)
   });
 
+  it('gives two independent patrols (distinct ids) their own magazine and cap', () => {
+    const doctrineRaw = { ...MOCK_DOCTRINE, engage: { ...MOCK_DOCTRINE.engage, drone: ['cap'] } };
+    // 50 drones; patrol A: 20 at pk 1 + 30 at 0.5 = 35 killed, 50 fired — its magazine is now empty.
+    // Patrol B then faces the 15 survivors with its own full magazine and its own cap: 15 at pk 1.
+    const r = run([{ platformId: 'drone_a', count: 50 }], [mkDef('tel_aviv_d1', 'cap'), mkDef('al_dhafra_ab_d1', 'cap')], {}, {}, buildMockConfig({ doctrineRaw }));
+    const [a, b] = allEngagements(r);
+    expect(a).toMatchObject({ defId: 'tel_aviv_d1', killed: 35, interceptorsUsed: 50, magazineRemaining: 0 });
+    expect(b).toMatchObject({ defId: 'al_dhafra_ab_d1', killed: 15, interceptorsUsed: 15, magazineRemaining: 35 });
+    expect(r.totalOut).toBe(0);
+  });
+
+  it('treats two listings of one id as a single patrol', () => {
+    const doctrineRaw = { ...MOCK_DOCTRINE, engage: { ...MOCK_DOCTRINE.engage, drone: ['cap'] } };
+    const r = run([{ platformId: 'drone_a', count: 50 }], [mkDef('shared_cap', 'cap'), mkDef('shared_cap', 'cap')], {}, {}, buildMockConfig({ doctrineRaw }));
+    expect(allEngagements(r).filter(e => e.defId === 'shared_cap')).toHaveLength(1);
+    expect(r.totalOut).toBe(15);
+  });
+
   it('resets caps for each threat type', () => {
     const doctrineRaw = { ...MOCK_DOCTRINE, engage: { ...MOCK_DOCTRINE.engage, drone: ['cap'], cruise_missile: ['cap'] } };
     const r = run([{ platformId: 'cm_a', count: 20 }, { platformId: 'drone_a', count: 20 }], [mkDef('shared_cap', 'cap')], {}, {}, buildMockConfig({ doctrineRaw }));

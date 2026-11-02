@@ -441,8 +441,19 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
           return { e, ctx, tier, mult, pkShot, ...r };
         });
 
-        for (const { e, ctx, tier, mult, pkShot, P, shotsPerThreat, shotsTier } of resolved) {
+        for (const r0 of resolved) {
           if (remaining <= 0) break;
+          const { e, tier, mult, pkShot, shotsTier } = r0;
+          // Models whose P depends on how many threats are left (patrol cap,
+          // laser kill cap, gun bursts) are re-resolved with the threats this
+          // entry actually faces — a second patrol of the same type sees the
+          // survivors of the first, not the whole wave. Their resolve() draws
+          // no random numbers, so the draw sequence is unchanged.
+          let ctx = r0.ctx, P = r0.P, shotsPerThreat = r0.shotsPerThreat;
+          if (model.usesRemaining && remaining !== ctx.remaining) {
+            ctx = { ...ctx, remaining };
+            ({ P, shotsPerThreat } = model.resolve(ctx));
+          }
           const magazineBefore = e.magazineRemaining;
           const result = applyEngagement(remaining, P, magazineBefore, shotsPerThreat,
             (shotsLeft, engagedFull) => model.partialProbability(ctx, shotsLeft, engagedFull));

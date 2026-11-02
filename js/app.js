@@ -98,12 +98,46 @@ function setMagEntry(defId, value) { globalMagState[defId] = value; }
  */
 function clearMagStateForTarget(targetId) {
   for (const def of getTargetDefenses(targetId)) {
-    // Leave shared patrol asset magazines intact — they are shared across
-    // targets and can only be reset explicitly from their card.
-    if (DEFENSE_CATALOG[def.system]?.isShared) continue;
+    // Leave a magazine shared with another location intact (an older
+    // laydown's patrol listed at several places); reset it from its card.
+    if (isListedElsewhere(def.id, targetId)) continue;
     delete globalMagState[def.id];
     _applyInitialMagazine(def);
   }
+}
+
+/** True when an entry id is also listed at a location other than targetId. */
+function isListedElsewhere(defId, targetId) {
+  return appTargetCatalog.some(t => t.id !== targetId && (t.defenses || []).some(d => d.id === defId));
+}
+
+/**
+ * Patrol numbers. Each patrol type with two or more independent patrols
+ * (distinct entry ids) numbers them #1, #2, … in target-list order, then in
+ * the order listed at a location, so the report can tell F-15E #1 at Tel
+ * Aviv from F-15E #2 at Al Dhafra. A type with one patrol is not numbered.
+ * An older laydown's patrol listed at several locations is one patrol and
+ * keeps one number everywhere.
+ */
+function patrolNumbers() {
+  const bySystem = new Map();
+  for (const t of appTargetCatalog) {
+    for (const d of t.defenses || []) {
+      if (!DEFENSE_CATALOG[d.system]?.isShared) continue;
+      const ids = bySystem.get(d.system) || [];
+      if (!ids.includes(d.id)) ids.push(d.id);
+      bySystem.set(d.system, ids);
+    }
+  }
+  const out = new Map();
+  for (const ids of bySystem.values()) if (ids.length > 1) ids.forEach((id, i) => out.set(id, i + 1));
+  return out;
+}
+
+/** Display name for an entry: the system name, plus "#n" for a numbered patrol. */
+function defLabel(defId, baseName) {
+  const n = patrolNumbers().get(defId);
+  return n ? `${baseName} #${n}` : baseName;
 }
 
 // ── Chips ────────────────────────────────────────────────────────────────────
@@ -1017,7 +1051,7 @@ function updateMinimap(target) {
       weight:      1.5,
       opacity:     1,
       fillOpacity: 1
-    }).bindTooltip(`${catalog.name} @ ${sourceTarget.name}`, { permanent: false, direction: 'top' })
+    }).bindTooltip(`${defLabel(def.id, catalog.name)} @ ${sourceTarget.name}`, { permanent: false, direction: 'top' })
       .addTo(_minimap);
 
     _minimapCrossLayers.push(circle, dot);
@@ -1165,7 +1199,7 @@ function buildSharedDefenseCard(def, targetId) {
       </div>
     </div>
     <div class="defense-card-body">
-      <span class="defense-name">${catalog?.name || def.system}</span>
+      <span class="defense-name">${defLabel(def.id, catalog?.name || def.system)}</span>
     </div>
     ${magHtml}
     ${reloadHtml}
@@ -1290,7 +1324,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
       <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km</span>
     </div>
     <div class="defense-card-body">
-      <span class="defense-name">${catalog?.name || def.system}</span>
+      <span class="defense-name">${defLabel(def.id, catalog?.name || def.system)}</span>
       <span class="defense-quantity"><span ${qAttr}>${def.quantity}</span> batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
     </div>
     ${magHtml}
@@ -1443,7 +1477,7 @@ function buildDefenseCard(def, targetId) {
       </div>
     </div>
     <div class="defense-card-body">
-      <span class="defense-name">${catalog?.name || def.system}</span>
+      <span class="defense-name">${defLabel(def.id, catalog?.name || def.system)}</span>
       <span class="defense-quantity"><span ${qAttr}>${def.quantity}</span> batter${def.quantity !== 1 ? 'ies' : 'y'}</span>
     </div>
     ${magHtml}
@@ -1530,16 +1564,11 @@ function addDefense(targetId, systemId, quantity, notes) {
 
   target.defenses = target.defenses || [];
 
-  // Shared patrol assets use a fixed global ID so all targets share the same
-  // magazine pool. Prevent duplicate assignment to the same target.
+  // Each patrol added here is a new, independent asset (its own id, magazine
+  // and chips), even when the same patrol type is already at this or another
+  // location. Patrol quantity is always 1 (one four-ship).
   if (catalog?.isShared) {
-    const sharedId = `shared_${systemId}`;
-    if (target.defenses.some(d => d.id === sharedId)) {
-      showToast('This patrol asset is already assigned to this target.', true);
-      return;
-    }
-    target.defenses.push({ id: sharedId, system: systemId, quantity: 1, notes: notes || '' });
-    _unifySharedReserves();   // joins the asset's chip pool if it is listed elsewhere
+    target.defenses.push({ id: `${targetId}_d${Date.now()}`, system: systemId, quantity: 1, notes: notes || '', operator: 'United States' });
     saveToStorage();
   } else {
     target.defenses.push({
@@ -1614,10 +1643,9 @@ function removeDefense(targetId, defenseId) {
   target.defenses  = (target.defenses || []).filter(d => d.id !== defenseId);
   saveToStorage();
 
-  // Shared patrol assets keep their magazine entry — other targets may still
-  // reference the same pool. Only evict the magazine for non-shared defenses.
-  const catalog = removedDef ? DEFENSE_CATALOG[removedDef.system] : null;
-  if (!catalog?.isShared) deleteMagEntry(defenseId);
+  // Keep the magazine only when another location still lists the same id
+  // (a patrol from an older laydown, shared across locations).
+  if (!isListedElsewhere(defenseId, targetId)) deleteMagEntry(defenseId);
   _manifestUnchanged = false;
   document.getElementById('simulation-results').classList.add('hidden');
   renderDefenseLayers(targetId);
@@ -2639,7 +2667,7 @@ function buildEngagementProse(eng, threatType) {
   };
   const tLabel  = PROSE_LABELS[threatType] || threatType.replace(/_/g, ' ');
   const tPlural = (eng.threatsIn === 1) ? tLabel : (tLabel + 's');
-  const name    = eng.systemName;
+  const name    = defLabel(eng.defId, eng.systemName);
   const killed  = eng.killed   ?? 0;
   const total   = eng.threatsIn ?? 0;
   const P       = (eng.pk ?? 0).toFixed(2);
@@ -2717,7 +2745,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
   if (eng.note === 'Cannot engage') {
     row.className = 'engagement-row eng-no-capability';
     row.innerHTML = `
-      <span class="eng-name">${eng.systemName}</span>
+      <span class="eng-name">${defLabel(eng.defId, eng.systemName)}</span>
       ${locationHtml}
       <span class="eng-note-text">Cannot engage this platform (Pk 0) — passes through</span>
     `;
@@ -2727,7 +2755,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
   if (eng.note === 'Magazine exhausted') {
     row.className = 'engagement-row eng-exhausted';
     row.innerHTML = `
-      <span class="eng-name">${eng.systemName}</span>
+      <span class="eng-name">${defLabel(eng.defId, eng.systemName)}</span>
       ${locationHtml}
       <span class="eng-note-text">Magazine exhausted — ${eng.threatsIn} pass through</span>
     `;
@@ -2739,7 +2767,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
     row.className = 'engagement-row eng-none eng-overridden';
     row.innerHTML = `
       <div class="eng-system">
-        <span class="eng-name">${eng.systemName}</span>
+        <span class="eng-name">${defLabel(eng.defId, eng.systemName)}</span>
         <span class="eng-qty">${eng.quantity} batt.</span>
         ${eng.notes ? `<span class="eng-notes">${eng.notes}</span>` : ''}
         ${locationHtml}
@@ -2787,7 +2815,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
 
   row.innerHTML = `
     <div class="eng-system">
-      <span class="eng-name">${eng.systemName}</span>
+      <span class="eng-name">${defLabel(eng.defId, eng.systemName)}</span>
       <span class="eng-qty">${eng.quantity} batt.</span>
       ${eng.notes ? `<span class="eng-notes">${eng.notes}</span>` : ''}
       ${locationHtml}
@@ -3238,7 +3266,7 @@ function _buildAttackSection(snap, index) {
       }
       for (const eng of plat.engagements) {
         const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—';
-        const sysCell = `${eng.systemName}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}`;
+        const sysCell = `${defLabel(eng.defId, eng.systemName)}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}`;
 
         if (eng.note === 'Cannot engage') {
           engRows += `<tr class="pr-row-dim">
@@ -3347,7 +3375,7 @@ function _buildMagChangesSection(snap) {
     if (before === after) continue;
 
     const loc = [def.locationName, def.locationCountry].filter(Boolean).join(', ');
-    changes.push({ name: catalog.name, loc, before, after, maxMag, used: before - after });
+    changes.push({ name: defLabel(def.id, catalog.name), loc, before, after, maxMag, used: before - after });
   }
 
   if (changes.length === 0) {
@@ -3397,7 +3425,7 @@ function _buildFinalMagSection() {
 
       const pct = Math.round((remaining / maxMag) * 100);
       rows.push({
-        name: catalog.name,
+        name: defLabel(def.id, catalog.name),
         location: target.name,
         country: target.country || '',
         remaining, maxMag, pct
@@ -3524,7 +3552,7 @@ function _buildChipChangesSection(attacks) {
         for (const r of rows) {
           const chips     = r.used / chipSizeFor(r.def);
           const operator  = r.def.operator ? ` (${_printEsc(r.def.operator)})` : '';
-          body += `<div class="pr-sum-line">${_printEsc(_printSystemLabel(r.catalog))}${operator}: ${_fmtChips(chips)} (-${fmtNumber(r.used)} ints.)</div>`;
+          body += `<div class="pr-sum-line">${_printEsc(defLabel(r.def.id, _printSystemLabel(r.catalog)))}${operator}: ${_fmtChips(chips)} (-${fmtNumber(r.used)} ints.)</div>`;
         }
         body += '</div>';
       }

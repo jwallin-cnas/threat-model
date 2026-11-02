@@ -79,7 +79,13 @@ killed and the magazine cost per threat (`js/engagement-models.js`).
 | `patrol` | pk for the first `cap` threats, `pLow` beyond, folded into one P | `shots` per threat | `cap`, `pLow` (F-15E: 20, 0.5) |
 
 Caps apply per threat type per run and are shared across the platforms of
-that type, in attack-manifest order.
+that type, in attack-manifest order. Each deployed entry has its own cap:
+two independent patrols (distinct entry ids) each get their own `cap`,
+magazine and chips, and the second faces only the threats the first left.
+Models whose P depends on the threats left (`patrol`, `directed_energy`,
+`gun`) are re-resolved per entry with that count. Listings that share one
+entry id (an older laydown's `shared_<system>` patrol at several locations)
+are one asset and engage once.
 
 ## Processing order
 

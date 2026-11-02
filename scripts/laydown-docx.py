@@ -17,6 +17,8 @@ Document layout (all Times New Roman):
           · location display name (targets.json "name") — 12 pt, bold, left.
           · one line per system at that location — 12 pt, left:
                 "<System> (<Operator>) -- Quantity: <n>, Chips: <n>"
+            When a patrol type has two or more patrols, each is numbered
+            ("F-15E Patrol (×4) #2") in target-list order, as in the tool.
     A target id that is not in targets.json goes under "Other".
   • Water place points (target ids ending in "_place_point": Persian Gulf,
     Gulf of Oman, Red Sea, Mediterranean Sea) are not filed under their
@@ -76,6 +78,38 @@ def load_system_names(path: pathlib.Path) -> dict:
     data = json.loads(path.read_text(encoding='utf-8'))
     items = data.get('systems', data) if isinstance(data, dict) else data
     return {s['id']: s.get('name', s['id']) for s in items if 'id' in s}
+
+
+def load_patrol_systems(path: pathlib.Path) -> set:
+    """Ids of the patrol systems (defenses.json `shared: true`)."""
+    data = json.loads(path.read_text(encoding='utf-8'))
+    items = data.get('systems', data) if isinstance(data, dict) else data
+    return {s['id'] for s in items if 'id' in s and s.get('shared')}
+
+
+def patrol_numbers(defaults: dict, target_order: list, patrol_systems: set) -> dict:
+    """Number patrols as the tool does: for each patrol type with two or more
+    patrols (distinct entry ids), #1, #2, ... in target-list order, then list
+    order. Returns {(target_id, index): n}; a type with one patrol is absent.
+    An entry id listed at several targets (an older shared patrol) is one
+    patrol and gets one number everywhere."""
+    order = [t for t in target_order if t in defaults] + [t for t in defaults if t not in target_order]
+    keys_by_system, where = {}, []
+    for t in order:
+        for i, e in enumerate(defaults.get(t) or []):
+            if not isinstance(e, dict) or e.get('system') not in patrol_systems:
+                continue
+            key = e.get('id') or (t, i)
+            keys = keys_by_system.setdefault(e['system'], [])
+            if key not in keys:
+                keys.append(key)
+            where.append(((t, i), e['system'], key))
+    out = {}
+    for pos, sys_id, key in where:
+        keys = keys_by_system[sys_id]
+        if len(keys) > 1:
+            out[pos] = keys.index(key) + 1
+    return out
 
 
 def fallback_name(raw_id: str) -> str:
@@ -294,6 +328,7 @@ def main(argv=None) -> int:
     try:
         targets      = load_targets(args.targets)
         system_names = load_system_names(args.defenses)
+        patrol_systems = load_patrol_systems(args.defenses)
     except (OSError, ValueError, KeyError) as err:
         print(f'[laydown-docx] Cannot read catalog: {err}', file=sys.stderr)
         return 1
@@ -305,6 +340,7 @@ def main(argv=None) -> int:
     now = _dt.datetime.now()
     generated_line = f'Generated at: {now.strftime("%H:%M, %B %-d, %Y")}'
 
+    patrol_no = patrol_numbers(defaults, list(targets), patrol_systems)
     unknown_targets, unknown_systems = [], []
     by_country = {}   # country → [(location, lines)], insertion order = first occurrence
     for target_id, entries in defaults.items():
@@ -318,7 +354,7 @@ def main(argv=None) -> int:
         if target_id.endswith(WATER_SUFFIX):
             country = MARITIME_HEADING
         lines = []
-        for e in entries:
+        for i, e in enumerate(entries):
             if not isinstance(e, dict) or not e.get('system'):
                 continue
             sys_id = e['system']
@@ -326,6 +362,8 @@ def main(argv=None) -> int:
             if sys_name is None:
                 unknown_systems.append(sys_id)
                 sys_name = fallback_name(sys_id)
+            if (target_id, i) in patrol_no:
+                sys_name = f'{sys_name} #{patrol_no[(target_id, i)]}'
             operator = e.get('operator') or ''
             qty = e.get('quantity', 1)
             label = f'{sys_name} ({operator})' if operator else sys_name

@@ -42,7 +42,7 @@
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Stable unique identifier for this entry. Never reuse IDs across targets."
+          "description": "Stable unique identifier for this entry. Never reuse IDs across targets, with one exception: a patrol id of the form shared_<system> (older laydowns) may be listed at several targets, and those listings are then ONE patrol with one magazine and one chip pool. Every other entry, patrols included, is an independent asset."
         },
         "system": {
           "type": "string",
