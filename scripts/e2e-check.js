@@ -230,6 +230,7 @@ async function checkIndependentPatrols(browser, base) {
   await blue.goto(base + '/blue/'); await blue.waitForFunction(() => window._blueReady === true);
   const b = await blue.evaluate(() => {
     window._blueApplyData({ version: '1.0', defaults: { gulf_of_oman_place_point: [{ id: 'shared_fa18_patrol', system: 'fa18_patrol', quantity: 1, notes: '', operator: 'United States', chips: 2 }] } });
+    renderAll();
     addEntries('doha', 'f15e_patrol', 1, '', 'United States', 1); refreshCard('doha');
     addEntries('doha', 'f15e_patrol', 1, '', 'United States', 1);
     addEntries('tel_aviv', 'f15e_patrol', 1, '', 'United States', 1);
@@ -270,6 +271,9 @@ async function checkIndependentPatrols(browser, base) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function checkLaydownExport(browser, base) {
   console.log('\n── export laydown ──');
+  // Counts follow the shipped default laydown, which the Box sync can change.
+  const DEF = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'defaults.json'), 'utf8')).defaults;
+  const nSys = Object.values(DEF).reduce((n, l) => n + l.length, 0), nLoc = Object.keys(DEF).length;
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   const errs = collectErrors(page);
   await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
@@ -313,7 +317,7 @@ async function checkLaydownExport(browser, base) {
              spent: Object.values(before.ammo).filter((v, i) => v < Object.values(after.ammo)[i] + 1).length,
              thaad: { mag: globalMagState.riyadh_d1, chips: data.defaults.riyadh[0].chips }, jeddahOff: !!findDefenseEntryById('jeddah_d1').disabled, data };
   });
-  check(rt.warnings.length === 0 && rt.importWarnings.length === 0 && rt.n === 59, `export: ${rt.n} systems exported and re-imported without warnings`);
+  check(rt.warnings.length === 0 && rt.importWarnings.length === 0 && rt.n === nSys, `export: ${rt.n} systems exported and re-imported without warnings (default laydown: ${nSys})`);
   check(rt.diffs.length === 0, 'export: every system keeps its total ammunition (loaded + reserve) through export and import ' + JSON.stringify(rt.diffs.slice(0, 4)));
   check(rt.shapeSame, 'export: placements, quantities, operators, notes and on/off switches are unchanged');
   check(rt.thaad.chips === 0.84375 && rt.thaad.mag === 40.5 && rt.jeddahOff, 'export: a fractional THAAD magazine (40.5 of 48) and a switched-off system survive ' + JSON.stringify(rt.thaad));
@@ -325,7 +329,7 @@ async function checkLaydownExport(browser, base) {
   const { spawnSync } = await import('child_process');
   const v = spawnSync('node', [path.join(ROOT, 'scripts', 'sync-laydown.js'), tmp, '--check'], { encoding: 'utf8' });
   fs.unlinkSync(tmp);
-  check(v.status === 0 && /Valid: 35 locations, 59 systems/.test(v.stdout), 'export: the file passes the laydown validator (' + (v.stdout + v.stderr).trim().split('\n')[0] + ')');
+  check(v.status === 0 && v.stdout.includes(`Valid: ${nLoc} locations, ${nSys} systems`), 'export: the file passes the laydown validator (' + (v.stdout + v.stderr).trim().split('\n')[0] + ')');
   const blue = await browser.newPage(); await blue.goto(base + '/blue/'); await blue.waitForFunction(() => window._blueReady === true);
   const b = await blue.evaluate(d => { const w = window._blueApplyData(d); const ex2 = window._blueBuildExport(d.name);
     const pick = o => Object.fromEntries(Object.entries(o.defaults).map(([t, l]) => [t, l.map(e => [e.system, e.quantity, e.operator, e.chips, !!e.disabled].join('|'))]));
@@ -342,7 +346,7 @@ async function checkLaydownExport(browser, base) {
   // 5. The header button downloads the file
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-export-laydown')]);
   const file = await dl.path(); const got = JSON.parse(fs.readFileSync(file, 'utf8'));
-  check(/^.+_state_after_\d+_attacks?_\d{4}-\d\d-\d\d_\d{4}\.json$/.test(dl.suggestedFilename()) && Object.keys(got.defaults).length === 35, 'export: the Export Laydown button downloads ' + dl.suggestedFilename());
+  check(/^.+_state_after_\d+_attacks?_\d{4}-\d\d-\d\d_\d{4}\.json$/.test(dl.suggestedFilename()) && Object.keys(got.defaults).length === nLoc, 'export: the Export Laydown button downloads ' + dl.suggestedFilename());
 
   const realErrs = errs.filter(e => !/status of 403/.test(e));
   check(realErrs.length === 0, 'export: no page errors ' + JSON.stringify(realErrs));
