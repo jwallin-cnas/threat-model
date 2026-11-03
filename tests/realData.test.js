@@ -69,11 +69,10 @@ describe('shipped data files', () => {
   });
 
   it('add the F-15I patrol right after the F/A-18 patrol, locked in place', () => {
-    for (const type of ['drone', 'drone_jet', 'fpv']) {
+    for (const type of ['cruise_missile', 'drone', 'drone_jet', 'fpv']) {
       const list = cfg.doctrine.engage[type];
       expect(list[list.indexOf('fa18_patrol') + 1]).toBe('f15i_patrol');
     }
-    expect(cfg.doctrine.engage.cruise_missile).not.toContain('f15i_patrol');
     expect(cfg.doctrine.engage.mrbm).not.toContain('f15i_patrol');
     expect(cfg.doctrine.locked).toEqual(['f15i_patrol']);
   });
