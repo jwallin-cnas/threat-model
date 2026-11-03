@@ -289,6 +289,61 @@ function applyEngagement(count, P, magazine, shotsPerThreat, partialP = null) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Random draws that can be recorded and replayed
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Uniform number in [0,1) from a string (cyrb53-style hash, then mulberry32). */
+function _hashUniform(str) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  let t = (h1 + 0x6D2B79F5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), 1 | t);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+}
+
+/**
+ * Per-entry random streams for one attack, so the attack can be run again
+ * with the same draws (after a manual override, or with different starting
+ * magazines) and only the changed inputs change the outcome.
+ *
+ * Each deployed entry facing one platform group of one threat type has its
+ * own stream, keyed "type|platformId|defId". A stream returns the recorded
+ * draws in order; past the end of the record it takes a new draw and
+ * records it. New draws come from `fresh` (the live generator, for a first
+ * run: the draws, and their order, are then exactly those of a plain run) or,
+ * without it, from a hash of `seed` and the key (a replay: an entry that did
+ * not engage first time gets the same draws on every replay).
+ *
+ * @param {object}   [opts]
+ * @param {object}   [opts.log={}]  { key: [u, …] } — recorded draws; extended in place
+ * @param {string}   [opts.seed=''] seed for hashed draws
+ * @param {function} [opts.fresh]   () => number in [0,1)
+ * @returns {{ log: object, stream: (key: string) => (() => number) }}
+ */
+function createDrawLog({ log = {}, seed = '', fresh = null } = {}) {
+  const used = {};
+  return {
+    log,
+    stream(key) {
+      return () => {
+        const list = log[key] || (log[key] = []);
+        const i = used[key] = (used[key] || 0) + 1;
+        if (i <= list.length) return list[i - 1];
+        const u = fresh ? fresh() : _hashUniform(`${seed}|${key}|${i}`);
+        list.push(u);
+        return u;
+      };
+    }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Simulation
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -334,7 +389,16 @@ function isExcluded(excludedByThreatType, threatType, platformId, defId) {
  * @param {Object} [initialMagazineState] { defId: interceptorsRemaining }; a missing key = full
  * @param {Object} [excludedByThreatType] { type: [defId] } or { type: { platformId|'*': [defId] } }
  * @param {Object} config                 { pkTable, doctrine, defenseCatalog, platformCatalog,
- *                                        rng = Math.random, models = ENGAGEMENT_MODELS }
+ *                                        rng = Math.random, models = ENGAGEMENT_MODELS,
+ *                                        draws?, overrides? }
+ *   draws      a createDrawLog() object: each entry draws from its own stream
+ *              (recorded or replayed) instead of `rng`
+ *   overrides  manual results { type: { platformId: { defId: { killed?, survived, disengaged } } } }.
+ *              A disengaged entry does not fire. Otherwise the entry fires as
+ *              usual (interceptors are spent on the threats it engages) but
+ *              its kills are forced: `killed` (capped at the threats it
+ *              faces), or for overrides saved without it, threats − `survived`.
+ *              Every later layer then engages the survivors as usual.
  * @returns {{ totalIn, totalOut, initialThreats, finalThreats, byThreatType }}
  *
  * Processing order: doctrine.typeOrder → platforms of that type in manifest
@@ -346,7 +410,9 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
   const {
     pkTable, doctrine, defenseCatalog, platformCatalog,
     rng    = Math.random,
-    models = (typeof ENGAGEMENT_MODELS !== 'undefined' ? ENGAGEMENT_MODELS : null)
+    models = (typeof ENGAGEMENT_MODELS !== 'undefined' ? ENGAGEMENT_MODELS : null),
+    draws  = null,
+    overrides = null
   } = config;
   if (!pkTable || !doctrine || !defenseCatalog || !platformCatalog) {
     throw new Error('runSimulationCore: config needs pkTable, doctrine, defenseCatalog, platformCatalog');
@@ -434,9 +500,10 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
         // Resolve every entry first so each battery gets independent draws
         // before any kill is applied.
         const resolved = entries.map(e => {
-          const { tier, mult } = rollTier(pkTable.tiers, rng);
+          const erng = draws ? draws.stream(`${threatType}|${group.platformId}|${e.def.id}`) : rng;
+          const { tier, mult } = rollTier(pkTable.tiers, erng);
           const pkShot = Math.min(1, cell.pk * mult);
-          const ctx = { pkShot, shots: cell.shots, params, threatType, remaining, pass: e.pass, rng };
+          const ctx = { pkShot, shots: cell.shots, params, threatType, remaining, pass: e.pass, rng: erng };
           const r = model.resolve(ctx);
           return { e, ctx, tier, mult, pkShot, ...r };
         });
@@ -455,8 +522,19 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
             ({ P, shotsPerThreat } = model.resolve(ctx));
           }
           const magazineBefore = e.magazineRemaining;
-          const result = applyEngagement(remaining, P, magazineBefore, shotsPerThreat,
-            (shotsLeft, engagedFull) => model.partialProbability(ctx, shotsLeft, engagedFull));
+          const ov = overrides?.[threatType]?.[group.platformId]?.[e.def.id];
+          let result;
+          if (ov?.disengaged) {
+            result = { killed: 0, survived: remaining, engaged: 0, interceptorsUsed: 0,
+                       magazineRemaining: magazineBefore, note: 'Disengaged (manual)', partial: null };
+          } else {
+            result = applyEngagement(remaining, ov ? 0 : P, magazineBefore, shotsPerThreat,
+              (shotsLeft, engagedFull) => ov ? 0 : model.partialProbability(ctx, shotsLeft, engagedFull));
+            if (ov) {
+              const killed = Math.max(0, Math.min(remaining, ov.killed ?? (remaining - (ov.survived ?? remaining))));
+              result = { ...result, killed, survived: remaining - killed, note: 'Manual override' };
+            }
+          }
           e.magazineRemaining = result.magazineRemaining;
           model.afterEngagement(ctx, result);
 
@@ -476,7 +554,8 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
             magazineRemaining:      e.magazineRemaining,
             partialShots:           result.partial ? result.partial.shots : 0,
             partialP:               result.partial ? result.partial.P     : null,
-            note:                   result.note
+            note:                   result.note,
+            ...(ov ? { isManualOverride: true } : {})
           });
           remaining = result.survived;
         }
@@ -521,6 +600,7 @@ if (typeof module !== 'undefined' && module.exports) {
     pkCell,
     rollTier,
     applyEngagement,
+    createDrawLog,
     groupManifest,
     runSimulationCore,
     allEngagements

@@ -39,6 +39,7 @@ export const {
   pkCell,
   rollTier,
   applyEngagement,
+  createDrawLog,
   groupManifest,
   runSimulationCore,
   allEngagements

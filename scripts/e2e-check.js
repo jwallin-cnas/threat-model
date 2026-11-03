@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -99,13 +99,13 @@ async function checkTool(browser, base) {
     applyLayerOverride('drone', 'shahed_136', 'dubai_d1', 45, false);
     const a1 = { notice: !document.getElementById('override-notice').classList.contains('hidden'), badge: !!document.querySelector('.eng-overridden'), mag: { ...globalMagState } };
     applyLayerOverride('drone', 'shahed_136', 'jebel_ali_port_d1', 0, true);
-    const a2 = { mag: { ...globalMagState } };
+    const a2 = { mag: { ...globalMagState }, jaFull: _fullOfId('jebel_ali_port_d1') };
     clearAllOverrides();
     const a3 = { notice: !document.getElementById('override-notice').classList.contains('hidden'), mag: { ...globalMagState }, headline: document.querySelector('.final-headline').textContent };
     return { a1, a2, a3 };
   });
   check(r2.a1.notice && r2.a1.badge && r2.a1.mag.dubai_d1 === 0, 'tool: kill override renders and keeps the Dubai Patriot spent');
-  check(r2.a2.mag.jebel_ali_port_d1 === undefined, 'tool: disengage override restores that battery to full');
+  check(r2.a2.mag.jebel_ali_port_d1 === undefined || r2.a2.mag.jebel_ali_port_d1 === r2.a2.jaFull, 'tool: disengage override restores that battery to full');
   check(!r2.a3.notice && r2.a3.mag.jebel_ali_port_d1 === 0 && /All 60/.test(r2.a3.headline), 'tool: clearing overrides restores the original result');
 
   const r3 = await page.evaluate(async () => {
@@ -405,9 +405,10 @@ async function checkReloadAndSwitching(browser, base) {
   const o = await page.evaluate(i => {
     const before = { live: globalMagState[i], laterPre: simHistory[2].preSimMagState[i], laterAfter: simHistory[2].magStateAfter[i] };
     applyLayerOverride('drone', 'shahed_136', i, 0, true);   // disengage A from the Doha attack
-    const after = { live: globalMagState[i] ?? 'full', laterPre: simHistory[2].preSimMagState[i] ?? 'full', laterAfter: simHistory[2].magStateAfter[i] ?? 'full', dohaAfter: simHistory[1].magStateAfter[i] ?? 'full' };
+    const f = v => (v == null || v >= 108) ? 'full' : v;   // A holds 108
+    const after = { live: f(globalMagState[i]), laterPre: f(simHistory[2].preSimMagState[i]), laterAfter: f(simHistory[2].magStateAfter[i]), dohaAfter: f(simHistory[1].magStateAfter[i]) };
     clearAllOverrides();
-    const undone = { live: globalMagState[i] ?? 'full', laterAfter: simHistory[2].magStateAfter[i] ?? 'full' };
+    const undone = { live: f(globalMagState[i]), laterAfter: f(simHistory[2].magStateAfter[i]) };
     return { before, after, undone };
   }, A);
   const used = 108 - o.before.laterPre;   // what A fired at Doha
@@ -530,6 +531,103 @@ async function checkReportSummaries(browser, base) {
   const patTot  = tl.find(m => m[1] === 'Ally/Partner' && m[2] === 'Patriot');
   check(patTot && +patTot[3] === patUsed, `summaries: Ally/Partner Patriot total is the sum of the partner Patriot lines (${patUsed})`);
   check(errs.length === 0, 'summaries: no page errors ' + JSON.stringify(errs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Overrides re-run the attack and every later history entry
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkOverrideReplay(browser, base) {
+  console.log('\n── override replay ──');
+  const page = await browser.newPage();
+  const errs = collectErrors(page);
+  // Tel Nof alone: an F-15I patrol (100 shots, full Pk on 25 per type) and one
+  // David's Sling (36 shots) with one reserve chip. Nothing else in range.
+  const LAYDOWN = { version: '1.0', defaults: { tel_nof_ab: [
+    { id: 'tn_cap', system: 'f15i_patrol',  quantity: 1, notes: '', operator: 'Israel', chips: 1 },
+    { id: 'tn_ds',  system: 'davids_sling', quantity: 1, notes: '', operator: 'Israel', chips: 2 } ] } };
+  const fresh = async () => {
+    await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+    await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+    await page.evaluate(l => { window._setSeed(0); window._importLaydownDirect(l); _resetSimulationHistory(); }, LAYDOWN);
+  };
+  const queue = attacks => page.evaluate(a => { window._importAttackQueueDirect({ version: '1.0', attacks: a }); window._simulateQueueDirect(); }, attacks);
+  const TN = n => ({ targetId: 'tel_nof_ab', platforms: [{ platformId: 'shahed_136', quantity: n }] });
+  const helpers = `
+    window.__eng  = (r, id) => r.byThreatType.flatMap(t => t.platforms.flatMap(p => p.engagements)).find(e => e.defId === id) || null;
+    window.__show = i => { navigateToSnapshot(i); };`;
+
+  // 1. Layers that did not fire the first time engage the extra leakers
+  await fresh(); await queue([TN(10)]); await page.evaluate(helpers);
+  const r1 = await page.evaluate(() => {
+    const orig = __eng(simHistory[1].results, 'tn_ds');
+    selectedTargetId = 'tel_nof_ab'; _loadTargetState('tel_nof_ab');   // view the attack's results
+    applyLayerOverride('drone', 'shahed_136', 'tn_cap', 5, false, 5);   // CAP kills 5 of 10
+    const d = _computeDisplayResults();
+    return { orig, cap: __eng(d, 'tn_cap'), ds: __eng(d, 'tn_ds'), out: d.totalOut, live: globalMagState.tn_ds, snapAfter: simHistory[1].magStateAfter.tn_ds };
+  });
+  check(r1.orig === null && r1.ds && r1.ds.threatsIn === 5 && r1.ds.killed > 0, 'replay: a layer that never fired now engages the extra leakers ' + JSON.stringify(r1.ds && { in: r1.ds.threatsIn, killed: r1.ds.killed }));
+  check(r1.cap.killed === 5 && r1.cap.interceptorsUsed === 10 && r1.cap.isManualOverride, 'replay: the overridden layer keeps its kills and spends shots on every threat it engaged');
+  check(r1.live === r1.ds.magazineRemaining && r1.snapAfter === r1.ds.magazineRemaining && r1.out === 5 - r1.ds.killed, 'replay: its interceptors come off the live magazine and the history entry');
+
+  // 2. Later attacks are re-simulated from the new magazines; clearing restores them exactly
+  await fresh(); await queue([TN(30), TN(60)]); await page.evaluate(helpers);
+  const r2 = await page.evaluate(() => {
+    const origA2 = JSON.stringify(simHistory[2].results), origAfter1 = JSON.stringify(simHistory[1].magStateAfter);
+    const ds2Before = __eng(simHistory[2].results, 'tn_ds');
+    __show(1);
+    applyLayerOverride('drone', 'shahed_136', 'tn_cap', 20, false, 10);   // CAP kills 10 of 30 instead of 25
+    const s1 = simHistory[1], s2 = simHistory[2];
+    const ds1 = __eng(_snapshotShownResults(s1), 'tn_ds'), ds2 = __eng(s2.results, 'tn_ds');
+    const out = {
+      ds1In: ds1.threatsIn, s1Ds: s1.magStateAfter.tn_ds, s2Pre: s2.preSimMagState.tn_ds, ds2Start: ds2.magazineAtStart,
+      ds2UsedBefore: ds2Before.interceptorsUsed, ds2Used: ds2.interceptorsUsed, s2After: s2.magStateAfter.tn_ds, ds2Rem: ds2.magazineRemaining,
+      statsOk: s2.stats.totalOut === s2.results.totalOut, live: globalMagState.tn_ds,
+      printOk: /David's Sling/.test(window._buildPrintDocument())
+    };
+    clearAllOverrides();
+    out.restored = JSON.stringify(simHistory[2].results) === origA2 && JSON.stringify(simHistory[1].magStateAfter) === origAfter1;
+    return out;
+  });
+  check(r2.ds1In === 20 && r2.s1Ds < 36, 'replay: the edited attack sends 20 drones to David\'s Sling ' + JSON.stringify(r2));
+  check(r2.s2Pre === r2.s1Ds && r2.ds2Start === r2.s1Ds, 'replay: the next attack starts from the new magazine');
+  check(r2.ds2Used !== r2.ds2UsedBefore && r2.ds2Used <= r2.s1Ds && r2.s2After === r2.ds2Rem && r2.statsOk, 'replay: the next attack is re-simulated (interceptor use and leakers follow the shortage)');
+  check(r2.live === r2.s1Ds, 'replay: the live magazine matches the history entry being viewed');
+  check(r2.restored, 'replay: clearing the override restores later attacks exactly (same draws)');
+
+  // 3. A reload in between is redone, and the live reserve follows when the session is at the end
+  await fresh(); await queue([TN(30)]); await page.evaluate(() => performGlobalReload());
+  await page.evaluate(() => {   // queue the second attack without resetting the history
+    attackQueue.push({ id: 'q_e2e', targetId: 'tel_nof_ab', targetName: 'Tel Nof Air Base', targetCountry: 'Israel', manifest: [{ platformId: 'shahed_136', count: 60 }] });
+    window._simulateQueueDirect();
+  });
+  await page.evaluate(helpers);
+  const r3 = await page.evaluate(() => {
+    const before = { res: simHistory[2].reloadsState.tn_ds, label: simHistory[2].label, a3: JSON.stringify(simHistory[3].results), live: findDefenseEntryById('tn_ds').reloads };
+    // View attack 1 while the session stays at the end (as the target menu does)
+    const s1 = simHistory[1];
+    lastSimResults = JSON.parse(JSON.stringify(s1.results)); lastSimDefenses = JSON.parse(JSON.stringify(s1.allDefenses));
+    preSimMagState = JSON.parse(JSON.stringify(s1.preSimMagState)); manualOverrides = {}; lastSimSnapshotId = s1.id; lastSimTarget = getTarget('tel_nof_ab');
+    applyLayerOverride('drone', 'shahed_136', 'tn_cap', 20, false, 10);
+    return { before, res: simHistory[2].reloadsState.tn_ds, label: simHistory[2].label, a3Same: JSON.stringify(simHistory[3].results) === before.a3,
+             a3Pre: simHistory[3].preSimMagState.tn_ds, live: findDefenseEntryById('tn_ds').reloads, cursor: simHistoryCursor };
+  });
+  check(r3.before.res > 0 && r3.res === 0 && /\+36 missiles/.test(r3.label), 'replay: the reload is redone with the bigger refill (reserve chip spent) ' + JSON.stringify({ was: r3.before.res, now: r3.res, label: r3.label }));
+  check(r3.a3Pre === 36 && r3.a3Same, 'replay: the attack after the reload starts full again, so its result is unchanged');
+  check(r3.cursor === 3 && r3.live === 0, 'replay: the live reserve chips follow the redone reload');
+
+  // 4. A replay with no change reproduces the recorded result, THAAD shot rolls included
+  await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true);
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  const r4 = await page.evaluate(() => {
+    window._setSeed(7);
+    window._importAttackQueueDirect({ version: '1.0', attacks: [{ targetId: 'abu_dhabi', platforms: [{ platformId: 'khorramshahr', quantity: 12 }] }] });
+    window._simulateQueueDirect();
+    const s = simHistory[simHistory.length - 1];
+    return { keys: Object.keys(s.draws || {}).length, same: JSON.stringify(_replayAttack(s, s.preSimMagState)) === JSON.stringify(s.results) };
+  });
+  check(r4.keys > 0 && r4.same, 'replay: an attack with THAAD shot rolls records its draws and replays identically ' + JSON.stringify(r4));
+  check(errs.length === 0, 'replay: no page errors ' + JSON.stringify(errs));
   await page.close();
 }
 
@@ -886,6 +984,7 @@ try {
   if (!ONLY || ONLY === 'tool')     await checkTool(browser, base);
   if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'water') await checkWaterCoverage(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'replay') await checkOverrideReplay(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'patrols') await checkIndependentPatrols(browser, base);

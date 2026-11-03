@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  runSimulationCore, normalizeDoctrine, normalizePkTable, groupManifest, allEngagements,
+  runSimulationCore, normalizeDoctrine, normalizePkTable, groupManifest, allEngagements, createDrawLog,
   buildMockConfig, MOCK_DOCTRINE, MOCK_PK_TABLE, mkDef, extractMag, seq
 } from './setup.js';
 
@@ -332,6 +332,68 @@ describe('runSimulationCore — tiers', () => {
     const config = buildMockConfig({ rng: () => { calls++; return 0.5; } });
     run([{ platformId: 'drone_a', count: 10 }, { platformId: 'srbm_a', count: 3 }], [mkDef('s1', 'sam')], {}, {}, config);
     expect(calls).toBe(0);
+  });
+});
+
+// ── Recorded draws and manual overrides ───────────────────────────────────────
+
+describe('runSimulationCore — recorded draws', () => {
+  const mrbm = [{ platformId: 'mrbm_a', count: 2 }];
+  const bmds = [mkDef('b1', 'bmd'), mkDef('b2', 'bmd')];
+
+  it('records per-entry draws without changing a plain run', () => {
+    const plain = run(mrbm, bmds, { b1: 1.5 }, {}, buildMockConfig({ rng: seq([0.05, 0.5]) }));
+    const draws = createDrawLog({ fresh: seq([0.05, 0.5]) });
+    const rec   = run(mrbm, bmds, { b1: 1.5 }, {}, buildMockConfig({ draws }));
+    expect(rec).toEqual(plain);
+    expect(draws.log).toEqual({ 'mrbm|mrbm_a|b1': [0.05], 'mrbm|mrbm_a|b2': [0.5] });
+  });
+
+  it('replays each entry\'s own draws when the entries engage differently', () => {
+    const draws = createDrawLog({ fresh: seq([0.05, 0.5]) });
+    run(mrbm, bmds, { b1: 1.5 }, {}, buildMockConfig({ draws }));
+    // b1 now out of the fight: b2 must still get its own (standard) roll, not b1's
+    const replay = createDrawLog({ log: JSON.parse(JSON.stringify(draws.log)), seed: 's' });
+    const r = run(mrbm, bmds, {}, { mrbm: ['b1'] }, buildMockConfig({ draws: replay, rng: () => { throw new Error('rng used'); } }));
+    expect(allEngagements(r)[0]).toMatchObject({ defId: 'b2', shotsPerEngagementTier: 'standard' });
+  });
+
+  it('gives entries with no recorded draw the same hashed draw on every replay', () => {
+    const a = createDrawLog({ seed: 'snap_1' }).stream('mrbm|mrbm_a|b9');
+    const b = createDrawLog({ seed: 'snap_1' }).stream('mrbm|mrbm_a|b9');
+    const c = createDrawLog({ seed: 'snap_2' }).stream('mrbm|mrbm_a|b9');
+    const u = a();
+    expect(u).toBe(b());
+    expect(u).toBeGreaterThanOrEqual(0); expect(u).toBeLessThan(1);
+    expect(c()).not.toBe(u);
+  });
+});
+
+describe('runSimulationCore — manual overrides', () => {
+  const drones = [{ platformId: 'drone_a', count: 10 }];
+  const defs   = [mkDef('shared_cap', 'cap'), mkDef('s1', 'sam')];
+  const ov = o => buildMockConfig({ overrides: { drone: { drone_a: o } } });
+
+  it('forces the kills, spends interceptors on every threat engaged, and lets later layers engage the rest', () => {
+    const base = run(drones, defs);
+    expect(allEngagements(base).map(e => e.defId)).toEqual(['shared_cap']);   // the CAP killed all 10
+    const r = run(drones, defs, {}, {}, ov({ shared_cap: { killed: 4, survived: 6 } }));
+    const [cap, sam] = allEngagements(r);
+    expect(cap).toMatchObject({ killed: 4, survived: 6, interceptorsUsed: 10, isManualOverride: true, note: 'Manual override' });
+    expect(sam).toMatchObject({ defId: 's1', threatsIn: 6, killed: 6, interceptorsUsed: 12 });
+    expect(r.totalOut).toBe(0);
+  });
+
+  it('keeps the kill count when more threats reach the layer; survived-only overrides keep the survivors', () => {
+    expect(allEngagements(run([{ platformId: 'drone_a', count: 15 }], defs, {}, {}, ov({ shared_cap: { killed: 4, survived: 6 } })))[0].killed).toBe(4);
+    expect(allEngagements(run([{ platformId: 'drone_a', count: 15 }], defs, {}, {}, ov({ shared_cap: { survived: 6 } })))[0].killed).toBe(9);
+  });
+
+  it('disengages an entry: no shots, a Disengaged row, the next layer takes all', () => {
+    const r = run(drones, defs, {}, {}, ov({ shared_cap: { survived: 10, disengaged: true } }));
+    const [cap, sam] = allEngagements(r);
+    expect(cap).toMatchObject({ killed: 0, survived: 10, interceptorsUsed: 0, magazineRemaining: 50, note: 'Disengaged (manual)', isManualOverride: true });
+    expect(sam).toMatchObject({ threatsIn: 10, killed: 10 });
   });
 });
 

@@ -2109,7 +2109,8 @@ async function simulate() {
     // re-run the simulation from the same starting point.
     const preSimSnap = { ...globalMagState };
 
-    const results = runSimulation(attackManifest, allDefenses, globalMagState);
+    const draws   = createDrawLog({ fresh: () => Math.random() });
+    const results = runSimulation(attackManifest, allDefenses, globalMagState, {}, { draws });
 
     // Merge updated magazine levels back into globalMagState.
     // Cross-target def.id entries are automatically shared with their source targets.
@@ -2143,7 +2144,8 @@ async function simulate() {
         results,
         allDefenses,
         manualOverrides: {},
-        attackManifest
+        attackManifest,
+        draws:          draws.log
       }));
       simHistoryCursor = simHistory.length - 1;
       lastSimSnapshotId = simHistory[simHistoryCursor].id;
@@ -2276,12 +2278,17 @@ function computeAdjustedResults(originalResults, overrides) {
   return { ...originalResults, totalOut: adjTotalOut, finalThreats, byThreatType: adjustedByThreatType };
 }
 
-/** Store an override for one layer, adjust magazines, and re-render results. */
-function applyLayerOverride(threatType, platformId, defId, survived, disengaged = false) {
+/**
+ * Store an override for one layer, adjust magazines, and re-render results.
+ * `killed` is kept when given, so the layer keeps that kill count if an
+ * earlier change sends it more or fewer threats; `survived` is the count
+ * at the time (overrides saved before `killed` existed use it instead).
+ */
+function applyLayerOverride(threatType, platformId, defId, survived, disengaged = false, killed = null) {
   _changeOverrides(() => {
     const t = manualOverrides[threatType] || (manualOverrides[threatType] = {});
     const p = t[platformId] || (t[platformId] = {});
-    p[defId] = { survived, disengaged };
+    p[defId] = killed != null && !disengaged ? { survived, killed, disengaged } : { survived, disengaged };
   });
 }
 
@@ -2328,59 +2335,176 @@ function _shownAttackSnapshotIndex() {
 /**
  * Change the shown attack's manual overrides and account for the result.
  *
- * Magazines move by the DIFFERENCE the change makes to that attack's
- * interceptor use, never to absolute levels, so reloads, resets and later
- * attacks are kept. The attack's own snapshot records its new end state and
- * overrides; every later snapshot shifts by the same difference so the
- * history and the PDF report stay consistent.
+ * The attack is run again with its recorded draws and the new overrides
+ * (_computeDisplayResults), so every layer after an overridden one engages
+ * the new number of survivors. The attack's history entry records its new
+ * end state and overrides, and _propagateHistory() carries the change
+ * through every later entry: later attacks are run again from their new
+ * starting magazines, reloads are redone. The live magazines and reserves
+ * then move to match the entry the session is at.
  */
 function _changeOverrides(mutate) {
   if (!lastSimResults) { mutate(); return; }
   const snapIdx = _shownAttackSnapshotIndex();
   const snap    = snapIdx >= 0 ? simHistory[snapIdx] : null;
 
-  // Interceptors left after the attack, before the change (from its snapshot)
-  const before = snap ? snap.magStateAfter : null;
-  const prevDisplay = before ? null : _computeDisplayResults();
+  if (!snap) {
+    // No history entry (should not happen): move live magazines by the change.
+    const prev = extractMagazineState(_computeDisplayResults());
+    mutate();
+    const display = _computeDisplayResults();
+    const next = extractMagazineState(display);
+    for (const id of new Set([...Object.keys(prev), ...Object.keys(next)])) {
+      const full = _fullMagOf(id);
+      if (full > 0) _shiftMag(globalMagState, id, (next[id] ?? full) - (prev[id] ?? full), full);
+    }
+    saveMagStateToStorage();
+    _saveTargetState(selectedTargetId);
+    rerenderWithOverrides(display);
+    return;
+  }
+
   mutate();
   const display = _computeDisplayResults();
 
-  const after    = extractMagazineState(display);
-  const original = extractMagazineState(lastSimResults);
-  const prevMap  = prevDisplay ? extractMagazineState(prevDisplay) : null;
-  const ids = new Set([...Object.keys(after), ...Object.keys(original), ...Object.keys(prevMap || {})]);
-  if (snap) {
-    for (const id of new Set([...Object.keys(snap.magStateAfter), ...Object.keys(snap.preSimMagState)])) {
-      if (snap.magStateAfter[id] !== snap.preSimMagState[id]) ids.add(id);
-    }
+  // Old states of every entry from the shown attack on, before anything moves
+  const oldMag = simHistory.map(h => h.magStateAfter);
+  const oldRes = simHistory.map(h => h.reloadsState || {});
+
+  snap.magStateAfter   = { ...snap.preSimMagState, ...extractMagazineState(display) };
+  snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
+  snap.stats           = { totalIn: display.totalIn, totalOut: display.totalOut };
+  const { replayed, adjusted } = _propagateHistory(snapIdx, oldMag, oldRes);
+
+  // The live state belongs to the history entry the session is at; changes
+  // made since that entry (a manual magazine edit) are kept.
+  if (simHistoryCursor >= snapIdx) {
+    const k = Math.min(simHistoryCursor, simHistory.length - 1);
+    _carry(globalMagState, oldMag[k], simHistory[k].magStateAfter, _fullOfId);
+    const live = _captureReloadsState();
+    _carry(live, oldRes[k], simHistory[k].reloadsState || {}, () => 0);
+    _restoreReloadsState(live);
+    saveToStorage();
   }
 
-  for (const id of ids) {
-    const full = _fullMagOf(id);
-    if (full <= 0) continue;
-    const startOf = m => (id in m ? m[id] : full);
-    const newRem  = id in after ? after[id] : startOf(preSimMagState);
-    const oldRem  = before ? startOf(before) : (id in prevMap ? prevMap[id] : startOf(preSimMagState));
-    const delta   = newRem - oldRem;
-    if (delta === 0) continue;
-    _shiftMag(globalMagState, id, delta, full);
-    if (snap) {
-      _shiftMag(snap.magStateAfter, id, delta, full);
-      for (let k = snapIdx + 1; k < simHistory.length; k++) {
-        _shiftMag(simHistory[k].preSimMagState, id, delta, full);
-        _shiftMag(simHistory[k].magStateAfter,  id, delta, full);
-      }
-    }
-  }
-
-  if (snap) {
-    snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
-    if (snap.stats) snap.stats = { totalIn: display.totalIn, totalOut: display.totalOut };
-    saveHistoryState();
-  }
+  saveHistoryState();
   saveMagStateToStorage();
   _saveTargetState(selectedTargetId);
   rerenderWithOverrides(display);
+
+  if (replayed + adjusted > 0) {
+    const parts = [];
+    if (replayed) parts.push(`${replayed} later attack${replayed !== 1 ? 's' : ''} re-simulated`);
+    if (adjusted) parts.push(`${adjusted} only adjusted (recorded before re-simulation was available, or under a different Pk table or doctrine)`);
+    showToast(parts.join('; ') + '.', adjusted > 0);
+  }
+}
+
+/** Full magazine of a defense id: the laydown entry, else the last attack that deployed it (0 = none). */
+function _fullOfId(id) {
+  let def = findDefenseEntryById(id);
+  for (let k = simHistory.length - 1; !def && k > 0; k--) def = (simHistory[k].allDefenses || []).find(d => d.id === id);
+  const catalog = def ? DEFENSE_CATALOG[def.system] : null;
+  if (!catalog) return 0;
+  return catalog.isShared ? (catalog.magazinePerBattery || 0) : (catalog.magazinePerBattery || 0) * (def.quantity || 1);
+}
+
+/**
+ * Move `target` (a magazine or reserve map, changed in place) from the old
+ * state of the entry before it to that entry's new state. Only values that
+ * still equal the old state move: a value set outside the history since
+ * (a manual edit, a reset) is kept. fullOf(id) is the value of a missing key.
+ */
+function _carry(target, oldPrev, newPrev, fullOf) {
+  for (const id of new Set([...Object.keys(oldPrev), ...Object.keys(newPrev)])) {
+    const full = fullOf(id);
+    const was  = id in oldPrev ? oldPrev[id] : full;
+    const now  = id in newPrev ? newPrev[id] : full;
+    if (was === now) continue;
+    const cur = id in target ? target[id] : full;
+    if (Math.abs(cur - was) > 1e-9) continue;
+    target[id] = now;
+  }
+  return target;
+}
+
+/** True when a history attack can be run again faithfully: its draws were recorded under the active Pk table and doctrine. */
+function _canReplay(snap) {
+  return !!snap?.draws && !_configDiffers(snap.engagementConfig);
+}
+
+/** Run a history attack again from `startMag` with its recorded draws and the given overrides. */
+function _replayAttack(snap, startMag, overrides = null) {
+  const extra = { draws: createDrawLog({ log: JSON.parse(JSON.stringify(snap.draws || {})), seed: snap.id }) };
+  if (overrides && Object.keys(overrides).length) extra.overrides = overrides;
+  return runSimulation(snap.attackManifest, snap.allDefenses, { ...startMag }, {}, extra);
+}
+
+/**
+ * Carry a changed end state at simHistory[from] through every later entry.
+ * oldMag / oldRes hold each entry's magazines and reserves before the change.
+ *
+ *   attack  Starts from the new end state of the entry before it (values set
+ *           outside the history in between are kept). It is run again with
+ *           its recorded draws and its manual overrides, so its results,
+ *           interceptor use and leakers follow the new magazines. Attacks
+ *           that cannot be replayed (_canReplay) only move their magazines
+ *           by the change, as before.
+ *   reload  Redone from its new starting magazines and reserve chips.
+ *
+ * Per-target result caches pointing at a changed entry are updated.
+ * @returns {{ replayed, adjusted }} attacks run again / only moved
+ */
+function _propagateHistory(from, oldMag, oldRes) {
+  let replayed = 0, adjusted = 0;
+  for (let k = from + 1; k < simHistory.length; k++) {
+    const s = simHistory[k];
+    const pre    = _carry({ ...s.preSimMagState }, oldMag[k - 1], simHistory[k - 1].magStateAfter, _fullOfId);
+    const resPre = _carry({ ...oldRes[k] }, oldRes[k - 1], simHistory[k - 1].reloadsState || {}, () => 0);
+    const preChanged = JSON.stringify(pre) !== JSON.stringify(s.preSimMagState);
+    const resChanged = JSON.stringify(resPre) !== JSON.stringify(oldRes[k]);
+    if (!preChanged && !resChanged) break;   // nothing differs from here on
+
+    if (s.type === 'reload') {
+      // Reserves before the reload are those after the entry before it
+      const plan = _reloadPlan(pre, simHistory[k - 1].reloadsState || {});
+      s.preSimMagState = pre;
+      s.magStateAfter  = plan.mag;
+      s.reloadsState   = plan.res;
+      s.label          = _reloadLabel(plan.systems, plan.added);
+      continue;
+    }
+
+    if (s.results && _canReplay(s)) {
+      const raw     = _replayAttack(s, pre);
+      const ov      = s.manualOverrides || {};
+      const display = Object.keys(ov).length ? _replayAttack(s, pre, ov) : raw;
+      s.results       = raw;
+      s.stats         = { totalIn: display.totalIn, totalOut: display.totalOut };
+      s.magStateAfter = { ...pre, ...extractMagazineState(display) };
+      replayed++;
+    } else {
+      // Not replayable: move the end state by the change to the start, clamped
+      const after = { ...s.magStateAfter };
+      for (const id of new Set([...Object.keys(pre), ...Object.keys(s.preSimMagState)])) {
+        const full = _fullOfId(id);
+        if (full <= 0) continue;
+        const d = (id in pre ? pre[id] : full) - (id in s.preSimMagState ? s.preSimMagState[id] : full);
+        if (d !== 0) _shiftMag(after, id, d, full);
+      }
+      s.magStateAfter = after;
+      if (s.results) adjusted++;
+    }
+    s.preSimMagState = pre;
+    s.reloadsState   = resPre;   // an attack spends no reserve chips
+
+    for (const st of Object.values(perTargetState)) {
+      if (st.snapshotId !== s.id) continue;
+      st.lastSimResults = JSON.parse(JSON.stringify(s.results));
+      st.preSimMagState = JSON.parse(JSON.stringify(s.preSimMagState));
+    }
+  }
+  return { replayed, adjusted };
 }
 
 /**
@@ -2415,6 +2539,13 @@ function _computeDisplayResults() {
   const hasOv = Object.keys(manualOverrides).length > 0;
   let displayResults = lastSimResults;
 
+  // Attacks with recorded draws are run again with the overrides, so every
+  // layer after an overridden one engages the new number of survivors.
+  const idx  = hasOv ? _shownAttackSnapshotIndex() : -1;
+  const snap = idx >= 0 ? simHistory[idx] : null;
+  if (snap?.draws) return _replayAttack(snap, snap.preSimMagState, manualOverrides);
+
+  // Older attacks: disengage re-runs, kill overrides re-walk the stored engagements.
   if (hasOv) {
     // Split overrides into two buckets:
     //   disengagedByThreatType — per-threat-type map of defIds to skip so that
@@ -2536,7 +2667,7 @@ function activateOverrideEdit(triggerBtn) {
       return;
     }
     form.remove();
-    applyLayerOverride(threatType, platformId, defId, threatsIn - val, false);
+    applyLayerOverride(threatType, platformId, defId, threatsIn - val, false, val);
   });
 
   form.querySelector('.btn-ov-disengage').addEventListener('click', () => {
@@ -3004,7 +3135,7 @@ async function _confirmTruncate() {
 
 function _createSnapshot({ isInitial, type, label, targetId, targetName,
                             magStateBefore, magStateAfter, reloadsState,
-                            results, allDefenses, manualOverrides, attackManifest }) {
+                            results, allDefenses, manualOverrides, attackManifest, draws }) {
   const snap = {
     id:             `snap_${Date.now()}_${simHistory.length}`,
     type:           type || (isInitial ? 'initial' : 'attack'),
@@ -3021,7 +3152,10 @@ function _createSnapshot({ isInitial, type, label, targetId, targetName,
     allDefenses:    JSON.parse(JSON.stringify(allDefenses     || [])),
     manualOverrides:JSON.parse(JSON.stringify(manualOverrides || {})),
     stats:          results    ? { totalIn: results.totalIn, totalOut: results.totalOut } : null,
-    engagementConfig: _engagementConfigRef()
+    engagementConfig: _engagementConfigRef(),
+    // Each entry's random draws ({ "type|platformId|defId": [u, …] }), so the
+    // attack can be run again after an override with the same luck.
+    ...(draws ? { draws: JSON.parse(JSON.stringify(draws)) } : {})
   };
   return snap;
 }
@@ -3238,8 +3372,17 @@ function _buildPrintDocument() {
 }
 
 /** Build one attack section (header + engagements + magazine changes). */
+/** A history attack's results as shown: with its manual overrides applied. */
+function _snapshotShownResults(snap) {
+  const ov = snap.manualOverrides || {};
+  if (!snap.results || Object.keys(ov).length === 0) return snap.results;
+  if (snap.draws) return _replayAttack(snap, snap.preSimMagState, ov);
+  return computeAdjustedResults(snap.results, ov);
+}
+
 function _buildAttackSection(snap, index) {
   if (!snap.results) return '';
+  const results = _snapshotShownResults(snap);
 
   const time       = new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const target     = getTarget(snap.targetId);
@@ -3261,7 +3404,7 @@ function _buildAttackSection(snap, index) {
 
   // ── Per-threat-type engagement tables, one block of rows per platform ────
   let engagementHtml = '';
-  for (const group of snap.results.byThreatType) {
+  for (const group of results.byThreatType) {
     const typeLabel = THREAT_TYPE_LABELS[group.threatType] || group.threatType;
     const killed    = group.initialCount - group.finalCount;
 
@@ -3329,7 +3472,7 @@ function _buildAttackSection(snap, index) {
     fpv:            'FPV'
   };
 
-  const typeParts = snap.results.byThreatType
+  const typeParts = results.byThreatType
     .filter(g => g.initialCount > 0)
     .map(g => {
       const lbl     = SHORT_TYPE_LABELS[g.threatType] || g.threatType;
@@ -4561,7 +4704,8 @@ function _runOneQueuedAttack(entry) {
   const allDefenses = [...perTargetDefenses, ...crossDefs];
   const preSimSnap  = { ...globalMagState };
 
-  const results = runSimulation(entry.manifest, allDefenses, globalMagState);
+  const draws   = createDrawLog({ fresh: () => Math.random() });
+  const results = runSimulation(entry.manifest, allDefenses, globalMagState, {}, { draws });
 
   // Persist magazine depletion globally
   const newMagState = extractMagazineState(results);
@@ -4581,7 +4725,8 @@ function _runOneQueuedAttack(entry) {
       results,
       allDefenses,
       manualOverrides: {},
-      attackManifest:  entry.manifest
+      attackManifest:  entry.manifest,
+      draws:           draws.log
     }));
     simHistoryCursor = simHistory.length - 1;
   }
@@ -4605,6 +4750,59 @@ function _runOneQueuedAttack(entry) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * What a global reload does to the given magazines and reserve chips, without
+ * changing them. Every entry with reserve chips is refilled toward full: one
+ * chip refills one system (chipSize interceptors), so an entry of several
+ * systems may need several chips, and a short supply refills it only partly
+ * (whole interceptors). A shared asset listed at several targets reloads once.
+ *
+ * @param {object} magState  { defId: interceptors }; a missing key = full
+ * @param {object} reserves  { defId: reserve chips }
+ * @returns {{ mag, res, systems, added }} new magazines and reserves (copies),
+ *          systems refilled and interceptors added
+ */
+function _reloadPlan(magState, reserves) {
+  const mag = { ...magState }, res = { ...reserves };
+  let systems = 0, added = 0;
+  const handled = new Set();
+  for (const target of appTargetCatalog) {
+    for (const def of target.defenses || []) {
+      if (handled.has(def.id)) continue;
+      handled.add(def.id);
+      const reserve = res[def.id];
+      if (reserve == null || reserve <= 0) continue;
+
+      const catalog    = DEFENSE_CATALOG[def.system];
+      const perBattery = catalog?.magazinePerBattery || 0;
+      if (perBattery === 0) continue;   // directed-energy / no magazine
+
+      const fullMag  = catalog?.isShared ? perBattery : perBattery * def.quantity;
+      const chipSize = chipSizeFor(def);
+      const current  = mag[def.id] ?? fullMag;
+      const needed   = fullMag - current;
+      if (needed <= 0 || chipSize <= 0) continue;   // already at full capacity
+
+      const costChips = needed / chipSize;
+      if (reserve >= costChips) {
+        mag[def.id] = fullMag;                                        // full refill
+        res[def.id] = Math.round((reserve - costChips) * 1e6) / 1e6;
+      } else {
+        const toAdd = Math.floor(reserve * chipSize + 0.01);         // partial: whole interceptors (reserves kept to 6 decimals)
+        if (toAdd > 0) mag[def.id] = current + toAdd;
+        res[def.id] = 0;
+      }
+      added += mag[def.id] - current;
+      systems++;
+    }
+  }
+  return { mag, res, systems, added };
+}
+
+function _reloadLabel(systems, added) {
+  return `Reload — ${systems} system${systems !== 1 ? 's' : ''}, +${added} missile${added !== 1 ? 's' : ''}`;
+}
+
+/**
  * Reload all defense systems across all targets.
  * Consumes reloads fractionally: cost = missiles_needed / full_loadout.
  * Creates a 'reload' history snapshot and guards against discarding forward states.
@@ -4612,46 +4810,15 @@ function _runOneQueuedAttack(entry) {
 async function performGlobalReload() {
   if (!await _confirmTruncate()) return;
 
-  const magBefore     = { ...globalMagState };
-  let   refilledCount = 0;
-  let   missilesAdded = 0;
-
-  const handled = new Set();   // a shared asset listed at several targets reloads once
-  for (const target of appTargetCatalog) {
-    for (const def of target.defenses || []) {
-      if (handled.has(def.id)) continue;
-      handled.add(def.id);
-      if (def.reloads == null || def.reloads <= 0) continue;
-
-      const catalog    = DEFENSE_CATALOG[def.system];
-      const perBattery = catalog?.magazinePerBattery || 0;
-      if (perBattery === 0) continue;   // directed-energy / no magazine
-
-      // One chip refills one system: chipSize interceptors. An entry of
-      // several systems may need several chips, and a short supply refills
-      // it only partly.
-      const isShared = catalog?.isShared || false;
-      const fullMag  = isShared ? perBattery : perBattery * def.quantity;
-      const chipSize = chipSizeFor(def);
-      const current  = globalMagState[def.id] ?? fullMag;
-      const needed   = fullMag - current;
-      if (needed <= 0 || chipSize <= 0) continue;   // already at full capacity
-
-      const costChips = needed / chipSize;
-
-      if (def.reloads >= costChips) {
-        // Full refill
-        globalMagState[def.id] = fullMag;
-        def.reloads = Math.round((def.reloads - costChips) * 1e6) / 1e6;
-      } else {
-        // Partial refill — add as many whole missiles as the reserve chips allow
-        const toAdd = Math.floor(def.reloads * chipSize + 0.01);   // reserves are kept to 6 decimals
-        if (toAdd > 0) globalMagState[def.id] = current + toAdd;
-        def.reloads = 0;
+  const magBefore = { ...globalMagState };
+  const plan      = _reloadPlan(globalMagState, _captureReloadsState());
+  const refilledCount = plan.systems, missilesAdded = plan.added;
+  if (refilledCount > 0) {
+    globalMagState = plan.mag;
+    for (const target of appTargetCatalog) {
+      for (const def of target.defenses || []) {
+        if (def.id in plan.res) def.reloads = plan.res[def.id];   // shared listings share the id
       }
-      if (isShared) _syncSharedReserve(def);
-      missilesAdded += globalMagState[def.id] - current;
-      refilledCount++;
     }
   }
 
@@ -4664,7 +4831,7 @@ async function performGlobalReload() {
   simHistory.push(_createSnapshot({
     isInitial:      false,
     type:           'reload',
-    label:          `Reload — ${refilledCount} system${refilledCount !== 1 ? 's' : ''}, +${missilesAdded} missile${missilesAdded !== 1 ? 's' : ''}`,
+    label:          _reloadLabel(refilledCount, missilesAdded),
     magStateBefore: magBefore,
     magStateAfter:  { ...globalMagState },
     reloadsState:   _captureReloadsState(),

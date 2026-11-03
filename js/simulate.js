@@ -27,11 +27,12 @@ function engineConfig() {
  * @param {Array}  defenses               defense entries
  * @param {Object} [initialMagState={}]   { defId: remainingCount }
  * @param {Object} [excluded={}]          { threatType: [defId] } or { threatType: { platformId: [defId] } }
+ * @param {Object} [extra={}]             extra engine config: { draws, overrides } (see runSimulationCore)
  * @returns {{ totalIn, totalOut, initialThreats, finalThreats, byThreatType }}
  */
-function runSimulation(attackManifest, defenses, initialMagState = {}, excluded = {}) {
+function runSimulation(attackManifest, defenses, initialMagState = {}, excluded = {}, extra = {}) {
   if (!activePkTable || !activeDoctrine) {
     throw new Error('No Pk table or doctrine is loaded.');
   }
-  return runSimulationCore(attackManifest, defenses, initialMagState, excluded, engineConfig());
+  return runSimulationCore(attackManifest, defenses, initialMagState, excluded, { ...engineConfig(), ...extra });
 }

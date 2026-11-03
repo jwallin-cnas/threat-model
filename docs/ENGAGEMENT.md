@@ -101,6 +101,29 @@ for type in doctrine.typeOrder
 Results are grouped `byThreatType[].platforms[].engagements[]`. Manual
 overrides in the tool are keyed by type, platform and battery.
 
+## Manual overrides and replays
+
+Every attack the tool runs records its random draws (`createDrawLog`): one
+stream per battery facing one platform group of one type, keyed
+`type|platformId|defId`. A first run draws from the live generator in the
+usual order, so the record changes no result. The draws are stored in the
+history entry (`snapshot.draws`).
+
+A manual override (`config.overrides`) runs the attack again with those
+draws. The overridden battery fires as usual, so it spends interceptors on
+every threat it engages, but its kills are forced to the number entered; a
+disengaged battery does not fire. Every later layer then engages the new
+survivors, including layers that did not fire the first time. A battery
+with no recorded draw gets a hashed draw from the entry id, the same on
+every replay.
+
+The change then runs through the later history: each later attack is run
+again from its new starting magazines with its own draws and overrides,
+and each reload is redone from the new magazines and reserve chips. Values
+set outside the history between entries (a manual magazine edit, a reset)
+are kept. Attacks recorded before draws were kept, or under a different Pk
+table or doctrine, only move their magazines by the change.
+
 ## Regenerating and checking the defaults
 
 ```bash
