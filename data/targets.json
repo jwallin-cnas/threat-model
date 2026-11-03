@@ -212,6 +212,13 @@
       "infrastructure": ["city", "data center", "base"]
     },
     {
+      "id": "seeb_ab",
+      "name": "Seeb Air Base / Muscat International Airport",
+      "country": "Oman",
+      "location": [23.601, 58.282],
+      "infrastructure": ["base"]
+    },
+    {
       "id": "masirah_ab",
       "name": "Masirah Air Base",
       "country": "Oman",
