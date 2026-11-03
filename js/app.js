@@ -695,8 +695,47 @@ function _applyPkTable(raw, name, { persist = false } = {}) {
     try { localStorage.setItem(PK_STORAGE_KEY, JSON.stringify({ name: activePkName, data: raw })); }
     catch { /* non-critical */ }
   }
+  _refreshCapabilities();
   renderConfigBadge('pk-badge', activePkName);
   return warnings;
+}
+
+/**
+ * Rewrite every catalog entry's canEngage list: the threat types it has
+ * Pk > 0 against (at least one platform of the type) in the active Pk
+ * table. That is what a system CAN engage; effectiveAgainst (from the
+ * doctrine) is what it is chosen to engage.
+ */
+function _refreshCapabilities() {
+  for (const sys of Object.values(DEFENSE_CATALOG)) {
+    const types = new Set();
+    for (const plat of Object.values(PLATFORM_CATALOG)) {
+      if (pkCell(activePkTable, sys.id, plat.id).pk > 0) types.add(plat.type);
+    }
+    sys.canEngage = THREAT_TYPES.filter(t => types.has(t));
+  }
+}
+
+/** Threat types a system can engage or the doctrine has it engage, in THREAT_TYPES order. */
+function _engageableTypes(catalog) {
+  const all = new Set([...(catalog?.canEngage || []), ...(catalog?.effectiveAgainst || [])]);
+  return THREAT_TYPES.filter(t => all.has(t));
+}
+
+/**
+ * Threat chips for a defense card: the types the doctrine has the system
+ * engage, then dimmed the types it can engage (Pk > 0) that the doctrine
+ * leaves out. restrictTo (a cross-target range limit) filters both.
+ */
+function _threatChipsHtml(catalog, restrictTo = null) {
+  const keep  = t => !restrictTo || restrictTo.includes(t);
+  const doc   = (catalog?.effectiveAgainst || []).filter(keep);
+  const extra = (catalog?.canEngage || []).filter(t => keep(t) && !(catalog?.effectiveAgainst || []).includes(t));
+  const chip  = (t, off) => `<span class="threat-chip threat-${t}${off ? ' threat-chip--off-doctrine' : ''}"`
+    + `${off ? ' title="Can engage (Pk > 0), but the doctrine does not use it against this threat"' : ''}>`
+    + `${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`;
+  return collapseThreatsForDisplay(doc).map(t => chip(t, false)).join('')
+       + collapseThreatsForDisplay(extra).map(t => chip(t, true)).join('');
 }
 
 /**
@@ -715,6 +754,7 @@ function _applyDoctrine(raw, name, { persist = false } = {}) {
     catch { /* non-critical */ }
   }
   for (const sys of Object.values(DEFENSE_CATALOG)) sys.effectiveAgainst = systemThreatTypes(doctrine, sys.id);
+  if (activePkTable) _refreshCapabilities();
   renderConfigBadge('doctrine-badge', activeDoctrineName);
   return warnings;
 }
@@ -866,7 +906,9 @@ function getCrossTargetDefenses(targetId, positions = _livePositions()) {
     // Systems with threat_range_overrides (e.g. Patriot: BM 30 km, CM/drone 100 km)
     // may be in range for some types but not others.
     const overrides       = catalog.threatRangeOverrides || {};
-    const inRangeForTypes = (catalog.effectiveAgainst || []).filter(tt => {
+    // Over every type it can engage, so it can be engaged outside the doctrine too
+    const types           = _engageableTypes(catalog);
+    const inRangeForTypes = types.filter(tt => {
       const effectiveRange = overrides[tt] ?? catalog.range_km;
       return dist <= effectiveRange;
     });
@@ -874,7 +916,7 @@ function getCrossTargetDefenses(targetId, positions = _livePositions()) {
     if (inRangeForTypes.length === 0) continue;
 
     // null means "all catalogued threat types are in range" — no restriction needed.
-    const hasRestriction = inRangeForTypes.length < (catalog.effectiveAgainst || []).length;
+    const hasRestriction = inRangeForTypes.length < types.length;
     result.push({
       ...def,
       _isCrossTarget:         true,
@@ -1015,7 +1057,7 @@ function _setCapMove(defId, at) {
     if (Object.keys(moves).length) snap.capMoves = moves;
     else delete snap.capMoves;
     for (const k of forced) if (_canReplay(simHistory[k])) _placeCap(simHistory[k], defId, after[k]);
-  }, { forced, defensesChanged: forced.has(i) });
+  }, { forced, rerun: forced.has(i) });
   if (selectedTargetId) renderDefenseLayers(selectedTargetId);
 }
 
@@ -1117,6 +1159,133 @@ function _wireCapCard(card) {
     saveSessionState();
     if (selectedTargetId) { renderDefenseLayers(selectedTargetId); updateMinimap(getTarget(selectedTargetId)); }
   });
+}
+
+// ── Engaging outside the doctrine ────────────────────────────────────────────
+// On a simulated attack, a system that can engage a threat type (Pk > 0) but
+// that the doctrine does not use against it can be engaged anyway, for that
+// attack only: attack.doctrineAdds = { threatType: [systemId] }. The attack
+// runs with the active doctrine plus those systems, each in the slot the
+// default doctrine gives it (_doctrineSlot).
+
+/**
+ * Index at which `systemId` joins `list` (a doctrine engage list for
+ * threatType): after the nearest system before it in the default doctrine's
+ * list that `list` has (first if none); if the default doctrine does not
+ * list it, before the first system of a higher tier (outer layers first).
+ */
+function _doctrineSlot(list, threatType, systemId) {
+  const def = defaultDoctrineRaw?.engage?.[threatType] || [];
+  const at  = def.indexOf(systemId);
+  if (at >= 0) {
+    for (let j = at - 1; j >= 0; j--) {
+      const k = list.indexOf(def[j]);
+      if (k >= 0) return k + 1;
+    }
+    return 0;
+  }
+  const tier = DEFENSE_CATALOG[systemId]?.tier ?? 99;
+  const k = list.findIndex(id => (DEFENSE_CATALOG[id]?.tier ?? 99) > tier);
+  return k >= 0 ? k : list.length;
+}
+
+/** The doctrine an attack runs with: the active one plus its doctrineAdds, or null when it has none. */
+function _attackDoctrine(snap) {
+  const adds = Object.entries(snap?.doctrineAdds || {}).filter(([, ids]) => ids?.length);
+  if (!adds.length || !activeDoctrine) return null;
+  const doctrine = { ...activeDoctrine, engage: { ...activeDoctrine.engage } };
+  for (const [type, ids] of adds) {
+    const list = [...(doctrine.engage[type] || [])];
+    for (const id of ids) if (!list.includes(id)) list.splice(_doctrineSlot(list, type, id), 0, id);
+    doctrine.engage[type] = list;
+  }
+  return doctrine;
+}
+
+/** True when a system engages a threat type in the shown attack only because it was added outside the doctrine. */
+function _isOffDoctrine(threatType, systemId) {
+  const i = _shownAttackSnapshotIndex();
+  return i >= 0 && (simHistory[i].doctrineAdds?.[threatType] || []).includes(systemId);
+}
+
+/**
+ * Systems the shown attack (history index i) could engage threatType with
+ * outside the doctrine: deployed for it (switched on, in range for that
+ * type), Pk > 0 against at least one of its platforms of that type, and
+ * not already used by the doctrine or added. [{ systemId, name, entries }]
+ */
+function _offDoctrineCandidates(i, threatType) {
+  const snap = simHistory[i];
+  const used = new Set([...(activeDoctrine?.engage?.[threatType] || []), ...(snap.doctrineAdds?.[threatType] || [])]);
+  const pids = [...new Set((snap.attackManifest || []).map(e => e.platformId))].filter(pid => PLATFORM_CATALOG[pid]?.type === threatType);
+  const bySystem = new Map();
+  for (const d of _attackDefenses(snap.targetId, _positionsAt(i))) {
+    if (used.has(d.system)) continue;
+    if (d.restrictToThreatTypes && !d.restrictToThreatTypes.includes(threatType)) continue;
+    if (!pids.some(pid => pkCell(activePkTable, d.system, pid).pk > 0)) continue;
+    if (!bySystem.has(d.system)) bySystem.set(d.system, []);
+    bySystem.get(d.system).push(d);
+  }
+  return [...bySystem].map(([systemId, entries]) => ({ systemId, name: DEFENSE_CATALOG[systemId]?.name || systemId, entries }));
+}
+
+/**
+ * Engage a system against threatType on the shown attack outside the
+ * doctrine (on = true), or stop doing so (on = false). The attack and the
+ * later ones are run again with their recorded draws (_changeOverrides).
+ */
+function _setOffDoctrine(threatType, systemId, on) {
+  const i    = _shownAttackSnapshotIndex();
+  const snap = i >= 0 ? simHistory[i] : null;
+  if (!snap || !_canReplay(snap)) {
+    showToast('This attack cannot be re-simulated (recorded before re-simulation was available, or under another Pk table or doctrine), so its doctrine cannot be changed.', true);
+    return;
+  }
+  const entries = on ? (_offDoctrineCandidates(i, threatType).find(c => c.systemId === systemId)?.entries || []) : [];
+  if (on && !entries.length) return;
+  _changeOverrides(() => {
+    const adds = { ...(snap.doctrineAdds || {}) };
+    const list = (adds[threatType] || []).filter(id => id !== systemId);
+    if (on) list.push(systemId);
+    if (list.length) adds[threatType] = list; else delete adds[threatType];
+    if (Object.keys(adds).length) snap.doctrineAdds = adds; else delete snap.doctrineAdds;
+    if (on) {
+      // Its entries join the attack's defenses, with their range limits from now
+      const defs = (snap.allDefenses || []).filter(d => !entries.some(e => e.id === d.id));
+      snap.allDefenses = [...defs, ...entries];
+    } else {
+      // Its manual results for this type go with it
+      const ids = new Set((snap.allDefenses || []).filter(d => d.system === systemId).map(d => d.id));
+      for (const byDef of Object.values(manualOverrides[threatType] || {})) for (const id of ids) delete byDef[id];
+      for (const [pid, byDef] of Object.entries(manualOverrides[threatType] || {})) if (!Object.keys(byDef).length) delete manualOverrides[threatType][pid];
+      if (manualOverrides[threatType] && !Object.keys(manualOverrides[threatType]).length) delete manualOverrides[threatType];
+    }
+  }, { rerun: true });
+}
+
+/** The "outside the doctrine" line of a threat-type section on the results, or null. */
+function _buildOffDoctrineBar(threatType) {
+  const i = _shownAttackSnapshotIndex();
+  const snap = i >= 0 ? simHistory[i] : null;
+  if (!snap?.results || snap.type !== 'attack' || !_canReplay(snap)) return null;
+  const added = snap.doctrineAdds?.[threatType] || [];
+  const cands = _offDoctrineCandidates(i, threatType);
+  if (!added.length && !cands.length) return null;
+  const label = THREAT_TYPE_LABELS[threatType] || threatType;
+  const bar = document.createElement('div');
+  bar.className = 'off-doctrine-bar';
+  bar.innerHTML = `
+    ${added.map(id => `<span class="off-doctrine-tag" title="Engaged against ${label} on this attack although the doctrine does not use it">⚑ ${DEFENSE_CATALOG[id]?.name || id} — outside doctrine
+       <button class="btn-icon btn-off-doctrine-remove" data-system="${id}" title="Stop engaging it outside the doctrine">✕</button></span>`).join('')}
+    ${cands.length ? `
+      <select class="off-doctrine-select" aria-label="System to engage outside the doctrine">
+        ${cands.map(c => `<option value="${c.systemId}">${c.name}</option>`).join('')}
+      </select>
+      <button class="btn btn-secondary btn-sm btn-off-doctrine-add" title="Re-simulate this attack with it engaging ${label}, in the slot the default doctrine gives it">Engage outside doctrine</button>` : ''}`;
+  bar.querySelector('.btn-off-doctrine-add')?.addEventListener('click', () =>
+    _setOffDoctrine(threatType, bar.querySelector('.off-doctrine-select').value, true));
+  bar.querySelectorAll('.btn-off-doctrine-remove').forEach(b => b.addEventListener('click', () => _setOffDoctrine(threatType, b.dataset.system, false)));
+  return bar;
 }
 
 /**
@@ -1521,9 +1690,7 @@ function buildSharedDefenseCard(def, targetId) {
     }
   }
 
-  const effectList = collapseThreatsForDisplay(catalog?.effectiveAgainst || [])
-    .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
-    .join('');
+  const effectList = _threatChipsHtml(catalog);
 
   const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
   const reloadHtml = _rd != null
@@ -1625,10 +1792,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
   // When a system's per-threat-type range cap means it can only reach this target
   // for some threat types, show only the active chips and add a warning note.
   const restrictedTypes = def._restrictToThreatTypes;   // null = no restriction
-  const displayTypes    = restrictedTypes || (catalog?.effectiveAgainst || []);
-  const effectList      = collapseThreatsForDisplay(displayTypes)
-    .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
-    .join('');
+  const effectList      = _threatChipsHtml(catalog, restrictedTypes);
 
   let rangeNoteHtml = '';
   if (restrictedTypes) {
@@ -1805,9 +1969,7 @@ function buildDefenseCard(def, targetId) {
   card.className = `defense-card${isDisabled ? ' defense-card--disabled' : ''}`;
   card.style.setProperty('--tier-color', color);
 
-  const effectList = collapseThreatsForDisplay(catalog?.effectiveAgainst || [])
-    .map(t => `<span class="threat-chip threat-${t}">${THREAT_TYPE_ICONS[t] || ''} ${THREAT_TYPE_LABELS[t] || t}</span>`)
-    .join('');
+  const effectList = _threatChipsHtml(catalog);
 
   const _rd = def.reloads != null ? fmtReloads(def.reloads) : null;
   const reloadHtml = _rd != null
@@ -2844,7 +3006,7 @@ function _shownAttackSnapshotIndex() {
  * starting magazines, reloads are redone. The live magazines and reserves
  * then move to match the entry the session is at.
  */
-function _changeOverrides(mutate, { forced = null, defensesChanged = false } = {}) {
+function _changeOverrides(mutate, { forced = null, rerun = false } = {}) {
   if (!lastSimResults) { mutate(); return; }
   const snapIdx = _shownAttackSnapshotIndex();
   const snap    = snapIdx >= 0 ? simHistory[snapIdx] : null;
@@ -2867,8 +3029,9 @@ function _changeOverrides(mutate, { forced = null, defensesChanged = false } = {
 
   if (!snap.preReloadsState) snap.preReloadsState = { ...(snap.reloadsState || {}) };
   mutate();
-  if (defensesChanged) {
-    // The attack's defenses changed (a CAP move): its own result is run again too
+  if (rerun) {
+    // The attack's inputs changed (a CAP move, a system engaged outside the
+    // doctrine): its own result is run again too
     snap.results    = _replayAttack(snap, snap.preSimMagState);
     lastSimResults  = JSON.parse(JSON.stringify(snap.results));
     lastSimDefenses = JSON.parse(JSON.stringify(snap.allDefenses));
@@ -2956,6 +3119,8 @@ function _replayAttack(snap, startMag, overrides = null, reserveChips = null) {
   const extra = { draws: createDrawLog({ log: JSON.parse(JSON.stringify(snap.draws || {})), seed: snap.id }) };
   if (overrides && Object.keys(overrides).length) extra.overrides = overrides;
   if (snap.attrition) extra.attrition = snap.attrition;
+  const doctrine = _attackDoctrine(snap);
+  if (doctrine) extra.doctrine = doctrine;
   extra.reserves = _reserveInterceptors(snap.allDefenses, reserveChips ?? _reservesBefore(snap));
   return runSimulation(snap.attackManifest, snap.allDefenses, { ...startMag }, {}, extra);
 }
@@ -3456,6 +3621,8 @@ function buildThreatTypeSection(group) {
     <span class="threat-section-count">${_launchNote(group)}${_addedNote(group.addedCount)}</span>
   `;
   section.appendChild(hdr);
+  const offBar = _buildOffDoctrineBar(threatType);
+  if (offBar) section.appendChild(offBar);
 
   // ── One block per platform, in manifest order ────────────────────────────
   for (const plat of platforms) {
@@ -3739,6 +3906,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
       <span class="eng-qty">${eng.quantity} batt.</span>
       ${eng.notes ? `<span class="eng-notes">${eng.notes}</span>` : ''}
       ${locationHtml}
+      ${_isOffDoctrine(threatType, eng.systemId) ? '<span class="off-doctrine-tag off-doctrine-tag--row" title="Engaged on this attack although the doctrine does not use it against this threat">⚑ outside doctrine</span>' : ''}
       ${overrideBadge}
     </div>
     <div class="eng-stats">
@@ -4256,7 +4424,8 @@ function _buildAttackSection(snap, index) {
       for (const eng of plat.engagements) {
         const loc = ([eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—')
           + (eng.movedFrom ? ` (moved from ${eng.movedFrom})` : '');
-        const sysCell = `${defLabel(eng.defId, eng.systemName)}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}`;
+        const offDoc  = (snap.doctrineAdds?.[group.threatType] || []).includes(eng.systemId);
+        const sysCell = `${defLabel(eng.defId, eng.systemName)}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}${offDoc ? ' <span class="pr-notes">(outside doctrine)</span>' : ''}`;
 
         if (eng.note === 'Cannot engage') {
           engRows += `<tr class="pr-row-dim">
@@ -4337,6 +4506,7 @@ function _buildAttackSection(snap, index) {
       </div>
 
       ${_capMovesNote(snap)}
+      ${_offDoctrineNote(snap)}
       <div class="pr-section-label">Inbound Platforms</div>
       <table class="pr-table">
         <thead><tr><th>Platform</th><th>Type</th><th>Salvo</th>${hasAttrition ? '<th>Attrition</th><th>Arrive</th>' : ''}</tr></thead>
@@ -4348,6 +4518,13 @@ function _buildAttackSection(snap, index) {
       ${_buildMagChangesSection(snap)}
     </div>
   `;
+}
+
+/** "Engaged outside the doctrine on this attack: Aegis SM-6 (Drone)" for the report, or ''. */
+function _offDoctrineNote(snap) {
+  const parts = Object.entries(snap.doctrineAdds || {}).flatMap(([type, ids]) =>
+    ids.map(id => `${DEFENSE_CATALOG[id]?.name || id} against ${THREAT_TYPE_LABELS[type] || type}`));
+  return parts.length ? `<div class="pr-cap-moves">Engaged outside the doctrine on this attack: ${parts.join('; ')}</div>` : '';
 }
 
 /** "CAP moves from this attack on: F-15I Patrol → Amman" for the report, or ''. */

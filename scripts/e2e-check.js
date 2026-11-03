@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay|used|caps|attrition]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay|used|caps|doctrine-off|attrition]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -947,6 +947,76 @@ async function checkCapMoves(browser, base) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Engaging outside the doctrine on a simulated attack
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkOffDoctrine(browser, base) {
+  console.log('\n── outside doctrine ──');
+  const page = await browser.newPage();
+  const errs = collectErrors(page);
+  // A US ship in the Persian Gulf with SM-2 and SM-6; the players' doctrine
+  // does not use SM-6 against drones (both have Pk 1 against the Shahed-136).
+  const LAYDOWN = { version: '1.0', defaults: { persian_gulf_place_point: [
+    { id: 'pg_sm2', system: 'aegis_sm2', quantity: 1, notes: '', operator: 'United States', chips: 1 },
+    { id: 'pg_sm6', system: 'aegis_sm6', quantity: 1, notes: '', operator: 'United States', chips: 1 } ] } };
+  await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  await page.evaluate(l => {
+    appAttrition = null; window._setSeed(0);
+    const doc = JSON.parse(JSON.stringify(defaultDoctrineRaw)); doc.name = 'No SM-6 on drones';
+    doc.engage.drone = doc.engage.drone.filter(id => id !== 'aegis_sm6');
+    window._importDoctrineDirect(doc);
+    window._importLaydownDirect(l); _resetSimulationHistory();
+    window._importAttackQueueDirect({ version: '1.0', attacks: [
+      { targetId: 'persian_gulf_place_point', platforms: [{ platformId: 'shahed_136', quantity: 100 }] },
+      { targetId: 'persian_gulf_place_point', platforms: [{ platformId: 'shahed_136', quantity: 50 }] } ] });
+    window._simulateQueueDirect();
+    window.__engs = s => (_snapshotShownResults(s) || { byThreatType: [] }).byThreatType.flatMap(t => t.platforms.flatMap(p => p.engagements));
+    navigateToSnapshot(2); navigateToSnapshot(1);
+  }, LAYDOWN);
+  await page.selectOption('#target-select', 'persian_gulf_place_point');
+
+  // 1. Capability vs doctrine on the cards: SM-6 can engage drones (Pk > 0), shown dimmed
+  const chips = await page.evaluate(() => {
+    const card = [...document.querySelectorAll('#defense-layers .defense-card')].find(c => /SM-?6/.test(c.textContent));
+    return [...card.querySelectorAll('.threat-chip')].map(c => c.className.replace('threat-chip ', '') + ':' + c.textContent.trim());
+  });
+  check(chips.some(c => /threat-drone threat-chip--off-doctrine/.test(c)) && chips.some(c => /threat-cruise_missile:/.test(c)),
+        'doctrine: the SM-6 card shows its drone chip dimmed (can engage, doctrine does not) ' + JSON.stringify(chips));
+
+  // 2. On attack 1, engage SM-6 against the drones outside the doctrine
+  const before = await page.evaluate(() => ({ e: __engs(simHistory[1]).map(e => e.defId), out: simHistory[1].stats.totalOut, res1: JSON.stringify(simHistory[1].results), res2: JSON.stringify(simHistory[2].results),
+    opts: [...document.querySelectorAll('.off-doctrine-select option')].map(o => o.value) }));
+  await page.selectOption('.off-doctrine-select', 'aegis_sm6');
+  await page.click('.btn-off-doctrine-add');
+  const r2 = await page.evaluate(() => ({ e: __engs(simHistory[1]), out: simHistory[1].stats.totalOut, hist: simHistory.length, adds: JSON.stringify(simHistory[1].doctrineAdds),
+    order: _attackDoctrine(simHistory[1]).engage.drone, tag: document.querySelector('.off-doctrine-bar .off-doctrine-tag')?.textContent || '',
+    rowTag: [...document.querySelectorAll('.engagement-row')].some(r => /SM-?6/.test(r.textContent) && /outside doctrine/.test(r.textContent)),
+    a2sm6: __engs(simHistory[2]).find(e => e.defId === 'pg_sm6') || null, pre2: simHistory[2].preSimMagState.pg_sm6, after1: simHistory[1].magStateAfter.pg_sm6, live: globalMagState.pg_sm6, cursor: simHistoryCursor }));
+  const sm6 = r2.e.find(e => e.defId === 'pg_sm6');
+  check(!before.e.includes('pg_sm6') && before.opts.includes('aegis_sm6') && !before.opts.includes('aegis_sm2'),
+        'doctrine: before, SM-6 does not engage the drones; it is offered outside the doctrine (SM-2, in the doctrine, is not) ' + JSON.stringify(before.opts));
+  check(sm6 && sm6.killed > 0 && r2.out < before.out && r2.hist === 3 && r2.adds === '{"drone":["aegis_sm6"]}',
+        'doctrine: engaged outside the doctrine, SM-6 fires on the drones in the same attack (no new attack) ' + JSON.stringify({ k: sm6 && sm6.killed, out: [before.out, r2.out] }));
+  const iSm2 = r2.order.indexOf('aegis_sm2');
+  check(iSm2 >= 0 && r2.order[iSm2 + 1] === 'aegis_sm6' && r2.e.findIndex(e => e.defId === 'pg_sm6') === r2.e.findIndex(e => e.defId === 'pg_sm2') + 1,
+        'doctrine: it engages in the default doctrine\'s slot, right after SM-2');
+  check(/outside doctrine/.test(r2.tag) && r2.rowTag, 'doctrine: the section and the row are tagged "outside doctrine"');
+  check(r2.after1 < 1e9 && r2.pre2 === r2.after1 && r2.a2sm6 === null && r2.cursor === 1 && r2.live === r2.after1,
+        'doctrine: the next attack starts from the SM-6 magazine attack 1 left, and keeps the doctrine (no SM-6 on its drones) ' + JSON.stringify({ after1: r2.after1, pre2: r2.pre2 }));
+  const pr = await page.evaluate(() => window._buildPrintDocument());
+  check(/Engaged outside the doctrine on this attack: Aegis SM-?6[^<]*against Drone/.test(pr) && /\(outside doctrine\)/.test(pr), 'doctrine: the report names it');
+
+  // 3. ✕ stops it: both attacks are back to their first results
+  await page.click('.btn-off-doctrine-remove');
+  const r3 = await page.evaluate(() => ({ res1: JSON.stringify(simHistory[1].results), res2: JSON.stringify(simHistory[2].results), adds: simHistory[1].doctrineAdds ?? null }));
+  const strip = s => s.replace(/"reserveAtStart":[\d.]+,?/g, '');
+  check(r3.adds === null && strip(r3.res1) === strip(before.res1) && strip(r3.res2) === strip(before.res2), 'doctrine: removing it restores both attacks exactly (same draws)');
+  const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
+  check(realErrs.length === 0, 'doctrine: no page errors ' + JSON.stringify(realErrs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Organic attrition before the first defenses
 // ─────────────────────────────────────────────────────────────────────────────
 async function checkAttrition(browser, base) {
@@ -1362,6 +1432,7 @@ try {
   if (!ONLY || ONLY === 'tool' || ONLY === 'replay') await checkOverrideReplay(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'used') await checkInterceptorOverrides(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'caps') await checkCapMoves(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'doctrine-off') await checkOffDoctrine(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'attrition') await checkAttrition(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);

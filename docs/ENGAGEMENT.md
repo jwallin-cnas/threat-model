@@ -188,6 +188,28 @@ home). Its magazine is one pool wherever it is. Its engagement records
 carry `movedFrom` (the laydown location), shown on the results row and in
 the report, which also lists the moves made on each attack.
 
+## Capability and doctrine
+
+What a system **can** engage comes from the active Pk table: a threat type
+with Pk > 0 against at least one of its platforms (`catalog.canEngage`).
+What it is **chosen** to engage is the doctrine (`catalog.effectiveAgainst`,
+from `doctrine.engage`). Defense cards show the doctrine's types as usual
+and the other types it can engage dimmed. The cross-target range filter
+works over both, so a system in range for a type it can engage is
+available for it.
+
+On a simulated attack, each threat-type section of the results offers
+"Engage outside doctrine": the systems deployed for that attack (switched
+on, in range for the type) with Pk > 0 against its platforms that the
+doctrine does not use against it. The choice applies to that attack only
+(`snapshot.doctrineAdds = { threatType: [systemId] }`): the attack runs
+with the active doctrine plus those systems, each placed where the
+default doctrine puts it (after the nearest system before it that the
+active doctrine uses; by tier if the default doctrine does not list it).
+The attack and the later ones are run again with their recorded draws.
+The section and the system's rows are tagged "outside doctrine", ✕ undoes
+it, and the report lists it.
+
 ## Regenerating and checking the defaults
 
 ```bash

@@ -460,7 +460,11 @@ select option, select optgroup {
   font-weight: 600;
   margin: 2px 2px 2px 0;
 }
+/* A type the system can engage (Pk > 0) that the doctrine does not use it against */
+.threat-chip--off-doctrine { opacity: 0.4; border-style: dashed !important; }
+
 .threat-drone,
+.threat-fpv,
 .threat-drone_jet         { background: #1a2a3a; color: #79c0ff; border: 1px solid #1f4060; }
 .threat-cruise_missile    { background: #2a1a2a; color: #d2a8ff; border: 1px solid #4a2060; }
 .threat-ballistic_missile { background: #2a1a1a; color: #ffa657; border: 1px solid #602020; }
@@ -2489,3 +2493,35 @@ select option, select optgroup {
 .caps-elsewhere-title { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
 .caps-elsewhere-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; padding: 2px 0; }
 .caps-elsewhere-row .btn-cap-here { margin-left: auto; }
+
+/* Results: systems engaged outside the doctrine on this attack */
+.off-doctrine-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+}
+.off-doctrine-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--warn);
+  background: var(--warn-dim);
+  border: 1px solid #5a4500;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.off-doctrine-tag--row { font-size: 10px; }
+.off-doctrine-select {
+  max-width: 220px;
+  padding: 2px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 12px;
+}
