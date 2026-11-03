@@ -766,13 +766,13 @@ async function checkInterceptorOverrides(browser, base) {
   // 1. Attack 1: David's Sling kills 30 with 50 interceptors — 36 loaded, 14 from its reserve chip
   const ds0 = await page.evaluate(() => __ds());
   await open('tn_ds');
-  const formBoxes = await page.evaluate(() => [...document.querySelectorAll('.override-edit-form input')].map(i => i.className + '=' + i.value));
+  const formBoxes = await page.evaluate(() => [...document.querySelectorAll('.override-edit-form input')].map(i => i.className + '=' + i.value + '/' + i.placeholder));
   const hint = await page.textContent('.override-edit-form .override-edit-hint');
   await fillForm({ 'override-killed-input': 30, 'override-used-input': 50 });
   const r1 = await page.evaluate(() => ({ ds: __ds(), res: __res(), ov: JSON.stringify(manualOverrides),
     a2ds: __eng(simHistory[2].results, 'tn_ds'), row: document.querySelector(`.btn-override-eng[data-def="tn_ds"]`).closest('.engagement-row').textContent.replace(/\s+/g, ' ') }));
-  check(ds0.magazineAtStart === 36 && formBoxes.length === 3 && /36 loaded \+ 36 in reserve/.test(hint),
-        'used: the form has Incoming, Killed and Interceptors used, and shows the loaded and reserve interceptors ' + JSON.stringify({ formBoxes, hint }));
+  check(ds0.magazineAtStart === 36 && formBoxes.length === 3 && formBoxes[2] === 'override-used-input=/36' && /36 loaded \+ 36 in reserve/.test(hint),
+        'used: the form has Incoming, Killed and Interceptors used (open empty, 36 shown greyed), and shows the loaded and reserve interceptors ' + JSON.stringify({ formBoxes, hint }));
   check(r1.ds.killed === 30 && r1.ds.interceptorsUsed === 50 && r1.ds.reserveUsed === 14 && r1.ds.magazineRemaining === 0 && r1.ov.includes('"used":50'),
         'used: 30 kills with 50 interceptors — 14 drawn from the reserve chip ' + JSON.stringify({ k: r1.ds.killed, u: r1.ds.interceptorsUsed, r: r1.ds.reserveUsed }));
   check(Math.abs(r1.res.s1 - (1 - 14 / 36)) < 1e-5 && Math.abs(r1.a2ds.reserveAtStart - 22) < 1e-3 && r1.res.live === r1.res.s1 && r1.res.cursor === 1,
@@ -830,6 +830,13 @@ async function checkInterceptorOverrides(browser, base) {
   });
   check(r5.includes("Israel: David's Sling: -58 (14/72)") && r5.some(l => /-58 ints\./.test(l)),
         'used: the report counts the 22 drawn from reserve as expended (36 + 22) ' + JSON.stringify(r5));
+  // 6. Changing only the interceptors keeps the kills shown (the patrol against the Shahed-238s)
+  const cap0 = await page.evaluate(() => __eng(_computeDisplayResults(), 'tn_cap', 'shahed_238'));
+  await open('tn_cap', 'shahed_238');
+  await fillForm({ 'override-used-input': 10 });
+  const r6 = await page.evaluate(() => ({ e: __eng(_computeDisplayResults(), 'tn_cap', 'shahed_238'), ov: JSON.stringify(manualOverrides.drone_jet) }));
+  check(cap0.killed === 25 && cap0.interceptorsUsed === 40 && r6.e.killed === 25 && r6.e.interceptorsUsed === 10 && r6.ov.includes('"killed":25') && r6.ov.includes('"used":10'),
+        'used: setting only the interceptors (40 → 10) keeps the 25 kills shown ' + JSON.stringify({ k: r6.e.killed, u: r6.e.interceptorsUsed }));
   const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
   check(realErrs.length === 0, 'used: no page errors ' + JSON.stringify(realErrs));
   await page.close();

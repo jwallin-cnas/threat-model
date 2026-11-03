@@ -2891,12 +2891,20 @@ function _renderConfigNotice() {
  * Open an inline override form directly below the given engagement row.
  *
  * Boxes: Incoming (attacks that can be run again), Killed, and Interceptors
- * used (attacks that can be run again, systems with a magazine). Each box
- * opens with the row's current value. A box left as it was keeps its
- * current setting; a changed box sets that value; an emptied box returns
- * it to the simulated value. Interceptors used above the loaded magazine
- * come from reserve chips, up to what the entry holds. Disengage stops the
- * system firing.
+ * used (attacks that can be run again, systems with a magazine).
+ *
+ *   Incoming  opens with the threats reaching the layer; stored only when
+ *             changed (emptied: what the layers before leave).
+ *   Killed    opens with the kills, or empty when they follow from the Pk
+ *             (an interceptors-only override, a disengaged layer).
+ *   Used      opens empty (current value as placeholder) unless it was set.
+ *
+ * When Killed or Interceptors used changes, both are applied as shown: a
+ * filled box is set, an empty box is automatic. So changing only the
+ * interceptors keeps the kills shown, and changing only the kills lets the
+ * interceptors follow (kills × per threat, capped at the magazine).
+ * Interceptors used above the loaded magazine come from reserve chips, up
+ * to what the entry holds. Disengage stops the system firing.
  */
 function activateOverrideEdit(triggerBtn) {
   // Close any previously open override form first
@@ -2915,6 +2923,14 @@ function activateOverrideEdit(triggerBtn) {
   const reserve    = canUse ? _reserveAtEngagement(d) : 0;
   const unit       = d.model === 'gun' ? 'Rounds' : 'Interceptors';
 
+  // What the layer's override sets now: the boxes open on that
+  const ov        = manualOverrides?.[threatType]?.[platformId]?.[defId] || null;
+  const off       = !!ov?.disengaged;
+  const killsSet  = !!ov && !off && (ov.killed != null || ov.survived != null);
+  const usedSet   = !!ov && !off && ov.used != null;
+  const killStart = off || (usedSet && !killsSet) ? '' : String(killedNow);
+  const usedStart = usedSet ? fmtNumber(usedNow) : '';
+
   const form = document.createElement('div');
   form.className = 'override-edit-form';
   form.innerHTML = `
@@ -2922,12 +2938,12 @@ function activateOverrideEdit(triggerBtn) {
     <span class="override-edit-label">Incoming:</span>
     <input type="number" class="override-incoming-input" value="${threatsIn}" min="0" title="Threats that reach this layer; earlier layers keep their results. Empty: what the layers before leave">` : ''}
     <span class="override-edit-label">Killed:</span>
-    <input type="number" class="override-killed-input" value="${killedNow}" min="0" title="Empty: follow from the system's Pk">
+    <input type="number" class="override-killed-input" value="${killStart}" placeholder="${killedNow}" min="0" title="Empty: kills follow from the system's Pk">
     ${canReplay ? '' : `<span class="override-edit-label">of ${threatsIn}</span>`}
     ${canUse ? `
     <span class="override-edit-label">${unit} used:</span>
-    <input type="number" class="override-used-input" value="${fmtNumber(usedNow)}" min="0" title="Empty: kills × ${unit.toLowerCase()} per threat, capped at the magazine">
-    <span class="override-edit-hint">${fmtNumber(magStart)} loaded${reserve > 0 ? ` + ${fmtNumber(reserve)} in reserve` : ''}</span>` : ''}
+    <input type="number" class="override-used-input" value="${usedStart}" placeholder="${fmtNumber(usedNow)}" min="0" title="Empty: kills × ${unit.toLowerCase()} per threat, capped at the magazine">
+    <span class="override-edit-hint">${fmtNumber(magStart)} loaded${reserve > 0 ? ` + ${fmtNumber(reserve)} in reserve` : ''} · empty box = automatic</span>` : ''}
     <button class="btn btn-primary btn-sm btn-ov-apply">Apply</button>
     <button class="btn btn-warning btn-sm btn-ov-disengage" title="System does not fire; no interceptors expended">Disengage</button>
     <button class="btn btn-secondary btn-sm btn-ov-cancel">Cancel</button>
@@ -2973,8 +2989,8 @@ function activateOverrideEdit(triggerBtn) {
     return {
       incoming, killed, used, faced,
       incChanged:  incInput  ? incInput.value.trim()  !== String(threatsIn)        : false,
-      killChanged: input.value.trim() !== String(killedNow),
-      usedChanged: usedInput ? usedInput.value.trim() !== fmtNumber(usedNow)        : false
+      killChanged: input.value.trim() !== killStart,
+      usedChanged: usedInput ? usedInput.value.trim() !== usedStart                 : false
     };
   };
 
@@ -2992,13 +3008,11 @@ function activateOverrideEdit(triggerBtn) {
         if (v.incoming == null) delete next.incoming;
         else next.incoming = v.incoming;
       }
-      if (v.killChanged) {
-        delete next.killed; delete next.survived;
+      // The result boxes are applied together, as shown
+      if (v.killChanged || v.usedChanged) {
+        delete next.killed; delete next.survived; delete next.used;
         if (v.killed != null) { next.killed = v.killed; next.survived = v.faced - v.killed; }
-      }
-      if (v.usedChanged) {
-        if (v.used == null) delete next.used;
-        else next.used = v.used;
+        if (v.used   != null) next.used = v.used;
       }
       return next;
     }));
