@@ -127,12 +127,29 @@ usual order, so the record changes no result. The draws are stored in the
 history entry (`snapshot.draws`).
 
 A manual override (`config.overrides`) runs the attack again with those
-draws. The overridden battery fires as usual, so it spends interceptors on
-every threat it engages, but its kills are forced to the number entered; a
-disengaged battery does not fire. Every later layer then engages the new
-survivors, including layers that did not fire the first time. A battery
-with no recorded draw gets a hashed draw from the entry id, the same on
-every replay.
+draws. It can set the kills (`killed`), the interceptors used (`used`), or
+both; a disengaged battery does not fire.
+
+| Set | Kills | Interceptors used |
+|---|---|---|
+| Kills only | as set (at most the threats it faces) | kills × interceptors per threat (one burst per kill for a gun), capped at the loaded magazine |
+| Interceptors only | follow from the battery's Pk, firing only that many | as set |
+| Both | as set | as set |
+
+Kills and interceptors are independent, so a battery can be credited more
+kills than interceptors. Interceptors used above the loaded magazine come
+from the battery's reserve chips (`config.reserves`, in interceptors), as
+far as they go: the record carries `reserveUsed`, and `usedShort` for any
+the magazine and reserve could not cover. The attack's history entry keeps
+its reserves before (`preReloadsState`) and after (`reloadsState`), and the
+report counts reserve interceptors as expended. Systems with no magazine
+(lasers, microwave, jammers) take kills only. An override also applies to a
+battery the Pk table says cannot engage the platform (Pk 0); its record
+carries `cannotEngage`.
+
+Every later layer then engages the new survivors, including layers that
+did not fire the first time. A battery with no recorded draw gets a hashed
+draw from the entry id, the same on every replay.
 
 An override can also set how many threats reach a battery (`incoming`).
 Earlier layers keep their results; the difference is added or removed at
@@ -144,8 +161,9 @@ manifest (`entry.layers = { defId: count }`); they are applied as incoming
 overrides when the attack runs and stored on its result like any other.
 
 The change then runs through the later history: each later attack is run
-again from its new starting magazines with its own draws and overrides,
-and each reload is redone from the new magazines and reserve chips. Values
+again from its new starting magazines and reserve chips with its own draws
+and overrides, and each reload is redone from the new magazines and
+reserve chips. Values
 set outside the history between entries (a manual magazine edit, a reset)
 are kept. Attacks recorded before draws were kept, or under a different Pk
 table or doctrine, only move their magazines by the change.

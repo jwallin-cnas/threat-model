@@ -307,9 +307,11 @@ function _migrateReloadUnits() {
     return Math.round(Math.max(0, def.loadouts - systems - spent) * 1e6) / 1e6;
   };
   for (const snap of simHistory) {
-    if (!snap.reloadsState) continue;
-    for (const [id, def] of converted) {
-      if (id in snap.reloadsState) snap.reloadsState[id] = toChips(def, snap.reloadsState[id]);
+    for (const state of [snap.reloadsState, snap.preReloadsState]) {
+      if (!state) continue;
+      for (const [id, def] of converted) {
+        if (id in state) state[id] = toChips(def, state[id]);
+      }
     }
   }
   for (const t of appTargetCatalog) {
@@ -2487,7 +2489,17 @@ function _editOverride(threatType, platformId, defId, fn) {
   if (Object.keys(t).length === 0) delete manualOverrides[threatType];
 }
 
-/** True when the shown attack can be run again with its recorded draws (incoming edits need it). */
+/** The parts of the shown attack's override on one layer that set its result: 'kills', 'interceptors used'. */
+function _overrideParts(threatType, platformId, defId) {
+  const ov = manualOverrides?.[threatType]?.[platformId]?.[defId];
+  if (!ov || ov.disengaged) return [];
+  return [
+    ...(ov.killed != null || ov.survived != null ? ['kills'] : []),
+    ...(ov.used != null ? ['interceptors used'] : [])
+  ];
+}
+
+/** True when the shown attack can be run again with its recorded draws (incoming and interceptor edits need it). */
 function _shownAttackReplayable() {
   const i = _shownAttackSnapshotIndex();
   return i >= 0 && !!simHistory[i].draws;
@@ -2553,6 +2565,7 @@ function _changeOverrides(mutate) {
     return;
   }
 
+  if (!snap.preReloadsState) snap.preReloadsState = { ...(snap.reloadsState || {}) };
   mutate();
   const display = _computeDisplayResults();
 
@@ -2561,6 +2574,7 @@ function _changeOverrides(mutate) {
   const oldRes = simHistory.map(h => h.reloadsState || {});
 
   snap.magStateAfter   = { ...snap.preSimMagState, ...extractMagazineState(display) };
+  snap.reloadsState    = _reservesAfter(snap.allDefenses, snap.preReloadsState, display);
   snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
   snap.stats           = _statsOf(display);
   const { replayed, adjusted } = _propagateHistory(snapIdx, oldMag, oldRes);
@@ -2627,12 +2641,48 @@ function _canReplay(snap) {
   return !!snap?.draws && !_configDiffers(snap.engagementConfig);
 }
 
-/** Run a history attack again from `startMag` with its recorded draws and the given overrides. */
-function _replayAttack(snap, startMag, overrides = null) {
+/**
+ * Run a history attack again from `startMag` with its recorded draws and the
+ * given overrides. `reserveChips` are the reserves it starts with (default:
+ * those it recorded); an interceptors-used override above a magazine draws on them.
+ */
+function _replayAttack(snap, startMag, overrides = null, reserveChips = null) {
   const extra = { draws: createDrawLog({ log: JSON.parse(JSON.stringify(snap.draws || {})), seed: snap.id }) };
   if (overrides && Object.keys(overrides).length) extra.overrides = overrides;
   if (snap.attrition) extra.attrition = snap.attrition;
+  extra.reserves = _reserveInterceptors(snap.allDefenses, reserveChips ?? _reservesBefore(snap));
   return runSimulation(snap.attackManifest, snap.allDefenses, { ...startMag }, {}, extra);
+}
+
+/** Reserve chips before a history attack (attacks recorded before they could draw on reserves: their reloadsState). */
+function _reservesBefore(snap) {
+  return snap.preReloadsState || snap.reloadsState || {};
+}
+
+/** { defId: interceptors } held in reserve chips by the given defense entries. */
+function _reserveInterceptors(defs, chips) {
+  const out = {};
+  for (const d of defs || []) {
+    const n = chips?.[d.id];
+    const size = chipSizeFor(d);
+    if (n > 0 && size > 0) out[d.id] = Math.round(n * size * 1e4) / 1e4;
+  }
+  return out;
+}
+
+/** Reserve chips after an attack: `chips` less what its engagements drew from reserve (reserveUsed). */
+function _reservesAfter(defs, chips, results) {
+  const out   = { ...chips };
+  const drawn = {};
+  for (const e of allEngagements(results)) {
+    if (e.reserveUsed > 0) drawn[e.defId] = (drawn[e.defId] || 0) + e.reserveUsed;
+  }
+  for (const [id, n] of Object.entries(drawn)) {
+    const def  = (defs || []).find(d => d.id === id);
+    const size = def ? chipSizeFor(def) : 0;
+    if (size > 0) out[id] = Math.max(0, Math.round(((out[id] || 0) - n / size) * 1e6) / 1e6);
+  }
+  return out;
 }
 
 /**
@@ -2655,9 +2705,12 @@ function _propagateHistory(from, oldMag, oldRes) {
   for (let k = from + 1; k < simHistory.length; k++) {
     const s = simHistory[k];
     const pre    = _carry({ ...s.preSimMagState }, oldMag[k - 1], simHistory[k - 1].magStateAfter, _fullOfId);
-    const resPre = _carry({ ...oldRes[k] }, oldRes[k - 1], simHistory[k - 1].reloadsState || {}, () => 0);
+    // Reserves the entry starts from: a reload's are re-read below; an
+    // attack's are those before it (it may draw on them)
+    const resOld = s.type === 'reload' ? oldRes[k] : _reservesBefore(s);
+    const resPre = _carry({ ...resOld }, oldRes[k - 1], simHistory[k - 1].reloadsState || {}, () => 0);
     const preChanged = JSON.stringify(pre) !== JSON.stringify(s.preSimMagState);
-    const resChanged = JSON.stringify(resPre) !== JSON.stringify(oldRes[k]);
+    const resChanged = JSON.stringify(resPre) !== JSON.stringify(resOld);
     if (!preChanged && !resChanged) break;   // nothing differs from here on
 
     if (s.type === 'reload') {
@@ -2671,12 +2724,13 @@ function _propagateHistory(from, oldMag, oldRes) {
     }
 
     if (s.results && _canReplay(s)) {
-      const raw     = _replayAttack(s, pre);
+      const raw     = _replayAttack(s, pre, null, resPre);
       const ov      = s.manualOverrides || {};
-      const display = Object.keys(ov).length ? _replayAttack(s, pre, ov) : raw;
+      const display = Object.keys(ov).length ? _replayAttack(s, pre, ov, resPre) : raw;
       s.results       = raw;
       s.stats         = _statsOf(display);
       s.magStateAfter = { ...pre, ...extractMagazineState(display) };
+      s.reloadsState  = _reservesAfter(s.allDefenses, resPre, display);
       replayed++;
     } else {
       // Not replayable: move the end state by the change to the start, clamped
@@ -2688,10 +2742,17 @@ function _propagateHistory(from, oldMag, oldRes) {
         if (d !== 0) _shiftMag(after, id, d, full);
       }
       s.magStateAfter = after;
+      // Reserves after it move by the change to those before it
+      const resAfter = { ...oldRes[k] };
+      for (const id of new Set([...Object.keys(resPre), ...Object.keys(resOld)])) {
+        const d = (resPre[id] || 0) - (resOld[id] || 0);
+        if (d !== 0) resAfter[id] = Math.max(0, Math.round(((resAfter[id] || 0) + d) * 1e6) / 1e6);
+      }
+      s.reloadsState = resAfter;
       if (s.results) adjusted++;
     }
-    s.preSimMagState = pre;
-    s.reloadsState   = resPre;   // an attack spends no reserve chips
+    s.preSimMagState  = pre;
+    s.preReloadsState = resPre;
 
     for (const st of Object.values(perTargetState)) {
       if (st.snapshotId !== s.id) continue;
@@ -2828,85 +2889,152 @@ function _renderConfigNotice() {
 
 /**
  * Open an inline override form directly below the given engagement row.
- * The user can specify how many were killed, or disengage the system entirely.
+ *
+ * Boxes: Incoming (attacks that can be run again), Killed, and Interceptors
+ * used (attacks that can be run again, systems with a magazine). Each box
+ * opens with the row's current value. A box left as it was keeps its
+ * current setting; a changed box sets that value; an emptied box returns
+ * it to the simulated value. Interceptors used above the loaded magazine
+ * come from reserve chips, up to what the entry holds. Disengage stops the
+ * system firing.
  */
 function activateOverrideEdit(triggerBtn) {
   // Close any previously open override form first
   document.querySelector('.override-edit-form')?.remove();
 
-  const threatType = triggerBtn.dataset.threat;
-  const platformId = triggerBtn.dataset.platform;
-  const defId      = triggerBtn.dataset.def;
-  const threatsIn  = parseInt(triggerBtn.dataset.threatsIn, 10);
-  const killedNow  = parseInt(triggerBtn.dataset.killed,    10);
-  const canIncoming = _shownAttackReplayable();
+  const d          = triggerBtn.dataset;
+  const threatType = d.threat;
+  const platformId = d.platform;
+  const defId      = d.def;
+  const threatsIn  = parseInt(d.threatsIn, 10);
+  const killedNow  = parseInt(d.killed,    10);
+  const usedNow    = Number(d.used || 0);
+  const magStart   = Number(d.magStart || 0);
+  const canReplay  = _shownAttackReplayable();
+  const canUse     = canReplay && d.usesMag === '1';
+  const reserve    = canUse ? _reserveAtEngagement(d) : 0;
+  const unit       = d.model === 'gun' ? 'Rounds' : 'Interceptors';
 
   const form = document.createElement('div');
   form.className = 'override-edit-form';
   form.innerHTML = `
-    ${canIncoming ? `
+    ${canReplay ? `
     <span class="override-edit-label">Incoming:</span>
-    <input type="number" class="override-incoming-input" value="${threatsIn}" min="0" title="Threats that reach this layer; earlier layers keep their results">` : ''}
+    <input type="number" class="override-incoming-input" value="${threatsIn}" min="0" title="Threats that reach this layer; earlier layers keep their results. Empty: what the layers before leave">` : ''}
     <span class="override-edit-label">Killed:</span>
-    <input type="number" class="override-killed-input" value="${killedNow}" min="0" max="${threatsIn}">
-    ${canIncoming ? '' : `<span class="override-edit-label">of ${threatsIn}</span>`}
+    <input type="number" class="override-killed-input" value="${killedNow}" min="0" title="Empty: follow from the system's Pk">
+    ${canReplay ? '' : `<span class="override-edit-label">of ${threatsIn}</span>`}
+    ${canUse ? `
+    <span class="override-edit-label">${unit} used:</span>
+    <input type="number" class="override-used-input" value="${fmtNumber(usedNow)}" min="0" title="Empty: kills × ${unit.toLowerCase()} per threat, capped at the magazine">
+    <span class="override-edit-hint">${fmtNumber(magStart)} loaded${reserve > 0 ? ` + ${fmtNumber(reserve)} in reserve` : ''}</span>` : ''}
     <button class="btn btn-primary btn-sm btn-ov-apply">Apply</button>
     <button class="btn btn-warning btn-sm btn-ov-disengage" title="System does not fire; no interceptors expended">Disengage</button>
     <button class="btn btn-secondary btn-sm btn-ov-cancel">Cancel</button>
   `;
 
   triggerBtn.closest('.engagement-row').after(form);
-  const input    = form.querySelector('.override-killed-input');
-  const incInput = form.querySelector('.override-incoming-input');
+  const input     = form.querySelector('.override-killed-input');
+  const incInput  = form.querySelector('.override-incoming-input');
+  const usedInput = form.querySelector('.override-used-input');
   (incInput || input).focus();
   (incInput || input).select();
 
-  // Read the form: { incoming, killed, incChanged, killChanged } or null (invalid, toast shown)
+  // A box's value: null when emptied, NaN when not a number
+  const valueOf = el => el.value.trim() === '' ? null : Number(el.value);
+
+  // Read the form, or null (invalid, toast shown)
   const read = () => {
-    const incoming = incInput ? (incInput.value.trim() === '' ? NaN : Number(incInput.value)) : threatsIn;
-    if (!Number.isInteger(incoming) || incoming < 0) {
+    const incoming = incInput ? valueOf(incInput) : threatsIn;
+    if (incoming != null && !(Number.isInteger(incoming) && incoming >= 0)) {
       showToast('Incoming must be a whole number of 0 or more.', true);
       return null;
     }
-    const killed = parseInt(input.value, 10);
-    if (isNaN(killed) || killed < 0 || killed > incoming) {
-      showToast(`Enter a whole number of kills between 0 and ${incoming}.`, true);
+    const faced  = incoming ?? (d.incomingFrom != null && d.incomingFrom !== '' ? Number(d.incomingFrom) : threatsIn);
+    const killed = valueOf(input);
+    if (killed != null && !(Number.isInteger(killed) && killed >= 0 && killed <= faced)) {
+      showToast(`Enter a whole number of kills between 0 and ${faced}, or leave it empty.`, true);
       return null;
     }
-    return { incoming, killed, incChanged: incoming !== threatsIn, killChanged: killed !== killedNow };
+    if (!canReplay && killed == null) {
+      showToast(`Enter a whole number of kills between 0 and ${faced}.`, true);
+      return null;
+    }
+    const used = usedInput ? valueOf(usedInput) : null;
+    if (used != null && !(Number.isFinite(used) && used >= 0)) {
+      showToast(`${unit} used must be a number of 0 or more, or empty.`, true);
+      return null;
+    }
+    if (used != null && used > magStart + reserve + 1e-9) {
+      showToast(`Only ${fmtNumber(magStart + reserve)} ${unit.toLowerCase()} are available here: ${fmtNumber(magStart)} loaded`
+        + `${reserve > 0 ? ` and ${fmtNumber(reserve)} in reserve chips` : ', no reserve chips'}.`, true);
+      return null;
+    }
+    return {
+      incoming, killed, used, faced,
+      incChanged:  incInput  ? incInput.value.trim()  !== String(threatsIn)        : false,
+      killChanged: input.value.trim() !== String(killedNow),
+      usedChanged: usedInput ? usedInput.value.trim() !== fmtNumber(usedNow)        : false
+    };
   };
 
   form.querySelector('.btn-ov-apply').addEventListener('click', () => {
     const v = read();
     if (!v) return;
     form.remove();
-    if (!v.incChanged && !v.killChanged) return;
-    _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => ({
-      ...(prev || {}),
-      ...(v.incChanged  ? { incoming: v.incoming } : {}),
-      ...(v.killChanged ? { killed: v.killed, survived: v.incoming - v.killed, disengaged: false } : {})
-    })));
+    if (!v.incChanged && !v.killChanged && !v.usedChanged) return;
+    _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => {
+      // A disengaged layer starts again from its incoming count only
+      const next = prev?.disengaged
+        ? (prev.incoming != null ? { incoming: prev.incoming } : {})
+        : { ...(prev || {}) };
+      if (v.incChanged) {
+        if (v.incoming == null) delete next.incoming;
+        else next.incoming = v.incoming;
+      }
+      if (v.killChanged) {
+        delete next.killed; delete next.survived;
+        if (v.killed != null) { next.killed = v.killed; next.survived = v.faced - v.killed; }
+      }
+      if (v.usedChanged) {
+        if (v.used == null) delete next.used;
+        else next.used = v.used;
+      }
+      return next;
+    }));
   });
 
   form.querySelector('.btn-ov-disengage').addEventListener('click', () => {
     const v = read();
     if (!v) return;
     form.remove();
-    _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => ({
-      ...(prev?.incoming != null ? { incoming: prev.incoming } : {}),
-      ...(v.incChanged ? { incoming: v.incoming } : {}),
-      survived: v.incoming, disengaged: true
-    })));
+    _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => {
+      const incoming = v.incChanged ? v.incoming : prev?.incoming;
+      return { ...(incoming != null ? { incoming } : {}), survived: v.faced, disengaged: true };
+    }));
   });
 
   form.querySelector('.btn-ov-cancel').addEventListener('click', () => form.remove());
 
-  for (const el of [input, incInput].filter(Boolean)) {
+  for (const el of [input, incInput, usedInput].filter(Boolean)) {
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter')  { e.preventDefault(); form.querySelector('.btn-ov-apply').click(); }
       if (e.key === 'Escape') { e.preventDefault(); form.querySelector('.btn-ov-cancel').click(); }
     });
   }
+}
+
+/**
+ * Interceptors an entry holds in reserve chips when it engages: from the
+ * engagement record, else (results recorded without it) from the shown
+ * attack's starting reserves.
+ */
+function _reserveAtEngagement(data) {
+  if (data.reserveStart != null && data.reserveStart !== '') return Number(data.reserveStart);
+  const i = _shownAttackSnapshotIndex();
+  if (i < 0) return 0;
+  const snap = simHistory[i];
+  return _reserveInterceptors(snap.allDefenses, _reservesBefore(snap))[data.def] || 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3072,7 +3200,23 @@ function buildEngagementProse(eng, threatType) {
   // ── Manual override ───────────────────────────────────────────────────────
   if (eng.isManualOverride) {
     const killWord = isDE ? 'neutralised' : 'destroyed';
-    return `${incomingNote}This engagement result was manually adjusted. ${name} was recorded as having ${killWord} <strong>${killed}</strong> of <strong>${total}</strong> ${tPlural}.`;
+    const parts    = _overrideParts(threatType, eng.platformId, eng.defId);
+    const pk0      = eng.cannotEngage ? ` The Pk table gives ${name} no chance against ${eng.platformName}s (Pk 0); the result was set by hand.` : '';
+    const killHow  = parts.includes('kills') || !parts.includes('interceptors used')
+      ? `was recorded as having ${killWord}`
+      : `fired only the interceptors set and, at its engagement Pk of <strong>${(eng.pk ?? 0).toFixed(2)}</strong>, ${killWord}`;
+    let intSentence = '';
+    if (!isDE) {
+      const unit = eng.model === 'gun' ? 'round' : 'interceptor';
+      const used = eng.interceptorsUsed ?? 0;
+      const how  = parts.includes('interceptors used') ? 'set by hand'
+                 : `${fmtNumber(eng.shotsPerEngagement ?? 0)} per ${tLabel} ${killWord}, capped at the magazine`;
+      intSentence = ` <strong>${fmtNumber(used)}</strong> ${unit}${used !== 1 ? 's' : ''} were expended (${how}; `
+        + `magazine ${fmtNumber(eng.magazineAtStart ?? 0)} → ${fmtNumber(eng.magazineRemaining ?? 0)}).`;
+      if (eng.reserveUsed > 0) intSentence += ` <strong>${fmtNumber(eng.reserveUsed)}</strong> of them came from reserve chips once the magazine was empty.`;
+      if (eng.usedShort > 0)   intSentence += ` ${fmtNumber(eng.usedShort)} more were set than the magazine and reserve chips held.`;
+    }
+    return `${incomingNote}This engagement result was manually adjusted.${pk0} ${name} ${killHow} <strong>${killed}</strong> of <strong>${total}</strong> ${tPlural}.${intSentence}`;
   }
 
   // ── Pk sentence ───────────────────────────────────────────────────────────
@@ -3165,12 +3309,24 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
          <button class="btn-icon btn-clear-override" ${keyAttrs} data-part="incoming" title="Clear the incoming count">✕</button>
        </span>`
     : '';
+  // ⚙ opens the override form on every row of a stored simulation
+  const usesMag = (ENGAGEMENT_MODELS[eng.model] || ENGAGEMENT_MODELS.kinetic).usesMagazine !== false;
+  const editBtn = (threatType && lastSimResults)
+    ? `<button class="btn-icon btn-override-eng" ${keyAttrs}
+         data-threats-in="${eng.threatsIn}" data-killed="${eng.killed ?? 0}"
+         data-used="${eng.interceptorsUsed ?? 0}" data-mag-start="${eng.magazineAtStart ?? 0}"
+         data-reserve-start="${eng.reserveAtStart ?? ''}" data-incoming-from="${eng.incomingFrom ?? ''}"
+         data-uses-mag="${usesMag ? 1 : 0}" data-model="${eng.model || ''}"
+         title="Override this layer's result">⚙</button>`
+    : '';
   const wireClears = () => {
     row.querySelectorAll('.btn-clear-override').forEach(btn => btn.addEventListener('click', e => {
       e.stopPropagation();
       const d = e.currentTarget.dataset;
       clearLayerOverride(d.threat, d.platform, d.def, d.part || null);
     }));
+    row.querySelector('.btn-override-eng')
+      ?.addEventListener('click', e => activateOverrideEdit(e.currentTarget));
     return row;
   };
 
@@ -3181,6 +3337,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
       ${locationHtml}
       ${incomingBadge}
       <span class="eng-note-text">Cannot engage this platform (Pk 0) — passes through</span>
+      ${editBtn}
     `;
     return wireClears();
   }
@@ -3192,6 +3349,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
       ${locationHtml}
       ${incomingBadge}
       <span class="eng-note-text">Magazine exhausted — ${eng.threatsIn} pass through</span>
+      ${editBtn}
     `;
     return wireClears();
   }
@@ -3214,6 +3372,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
         <span class="eng-in">${eng.threatsIn} in</span>
       </div>
       <button class="btn-icon btn-clear-override" ${keyAttrs} data-part="kills" title="Clear override">✕</button>
+      ${editBtn}
     `;
     return wireClears();
   }
@@ -3232,19 +3391,19 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
   const pkText = `<span class="eng-pk" title="per-shot pk ${(eng.pkShot ?? 0).toFixed(2)} · ${shotsLabel}${eng.pkTier ? ' · ' + eng.pkTier + ' tier' : ''}${partialNote}">Pk = ${(eng.pk ?? 0).toFixed(2)}</span>`;
 
   const intUsed = eng.interceptorsUsed ?? 0;
+  const unitAbbr = eng.model === 'gun' ? 'rds' : 'int.';
 
+  // What the override sets: "kills", "interceptors used", or both
+  const ovSet = _overrideParts(threatType, platformId, eng.defId);
   const overrideBadge = incomingBadge + (isOverride
-    ? `<span class="override-badge">⚡ Override
+    ? `<span class="override-badge" title="Set manually: ${ovSet.join(' and ') || 'result'}">⚡ Override${eng.cannotEngage ? ' (Pk 0 in the table)' : ''}
          <button class="btn-icon btn-clear-override" ${keyAttrs} data-part="kills" title="Clear override">✕</button>
        </span>`
     : '');
-
-  // Edit button only appears on un-overridden rows when a simulation is stored
-  const editBtn = (!isOverride && threatType && lastSimResults)
-    ? `<button class="btn-icon btn-override-eng" ${keyAttrs}
-         data-threats-in="${eng.threatsIn}" data-killed="${eng.killed}"
-         title="Override this layer's result">⚙</button>`
-    : '';
+  const reserveNote = eng.reserveUsed > 0
+    ? `<span class="eng-reserve" title="Drawn from reserve chips because the loaded magazine ran out">${fmtNumber(eng.reserveUsed)} from reserve</span>` : '';
+  const shortNote = eng.usedShort > 0
+    ? `<span class="eng-short" title="The override asked for more than the magazine and reserve chips held">⚠ ${fmtNumber(eng.usedShort)} short</span>` : '';
 
   row.innerHTML = `
     <div class="eng-system">
@@ -3259,13 +3418,11 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
       <span class="eng-sep">/</span>
       <span class="eng-in">${eng.threatsIn} in</span>
       ${pkText}
-      ${intUsed > 0 ? `<span class="eng-interceptors">${fmtNumber(intUsed)} ${eng.model === 'gun' ? 'rds' : 'int.'}</span>` : ''}
+      ${intUsed > 0 ? `<span class="eng-interceptors">${fmtNumber(intUsed)} ${unitAbbr}</span>` : ''}
+      ${reserveNote}${shortNote}
     </div>
     ${editBtn}
   `;
-
-  row.querySelector('.btn-override-eng')
-    ?.addEventListener('click', e => activateOverrideEdit(e.currentTarget));
 
   wireClears();
 
@@ -3455,6 +3612,9 @@ function _createSnapshot({ id, isInitial, type, label, targetId, targetName,
     // Organic attrition the attack ran with ({ type: percent }), reused by replays
     ...(attrition ? { attrition: { ...attrition } } : {})
   };
+  // An attack's reloadsState is the reserves after it; an interceptors-used
+  // override can draw on them, so the reserves before it are kept as well.
+  if (snap.type === 'attack') snap.preReloadsState = JSON.parse(JSON.stringify(snap.reloadsState));
   return snap;
 }
 
@@ -3479,11 +3639,12 @@ function _statsOf(r) {
 function _runNewAttack(manifest, defenses, startMag, attrition = {}) {
   const id      = _newSnapshotId();
   const draws   = createDrawLog({ fresh: () => Math.random() });
-  const results = runSimulation(manifest, defenses, startMag, {}, { draws, attrition });
+  const reserves = _reserveInterceptors(defenses, _captureReloadsState());
+  const results = runSimulation(manifest, defenses, startMag, {}, { draws, attrition, reserves });
   const overrides = _presetOverrides(manifest);
   const display = Object.keys(overrides).length
     ? runSimulation(manifest, defenses, { ...startMag }, {},
-        { draws: createDrawLog({ log: JSON.parse(JSON.stringify(draws.log)), seed: id }), overrides, attrition })
+        { draws: createDrawLog({ log: JSON.parse(JSON.stringify(draws.log)), seed: id }), overrides, attrition, reserves })
     : results;
   return { id, draws: draws.log, results, display, overrides, attrition };
 }
@@ -4012,6 +4173,8 @@ function _buildChipChangesSection(attacks) {
   for (const snap of attacks) {
     const prevMag  = snap.preSimMagState || {};
     const afterMag = snap.magStateAfter  || {};
+    const prevRes  = _reservesBefore(snap);
+    const afterRes = snap.reloadsState || {};
     const seen     = new Set();
     for (const def of (snap.allDefenses || [])) {
       if (seen.has(def.id)) continue;   // a shared asset can be listed twice in one attack
@@ -4021,7 +4184,9 @@ function _buildChipChangesSection(attacks) {
       if (!catalog || maxMag === 0) continue;
       const before = (def.id in prevMag)  ? prevMag[def.id]  : maxMag;
       const after  = (def.id in afterMag) ? afterMag[def.id] : maxMag;
-      const used   = before - after;
+      // Interceptors an override drew from reserve chips once the magazine was empty
+      const fromReserve = Math.max(0, ((prevRes[def.id] || 0) - (afterRes[def.id] || 0)) * chipSizeFor(def));
+      const used   = before - after + Math.round(fromReserve * 1e4) / 1e4;
       if (!(used > 0)) continue;
       const rec = byDef.get(def.id);
       if (rec) { rec.used += used; continue; }

@@ -394,6 +394,66 @@ function isExcluded(excludedByThreatType, threatType, platformId, defId) {
   return forAll || forPlat;
 }
 
+/** True when a manual override sets this entry's result (a disengage, kills, or interceptors used). */
+function isForcedOverride(ov, usesMagazine) {
+  return !!ov && (!!ov.disengaged || ov.killed != null || ov.survived != null || (ov.used != null && usesMagazine));
+}
+
+/**
+ * The result of one engagement whose kills and/or interceptors used were set
+ * by hand (not a disengage).
+ *
+ *   kills set, used not set  kills as set (capped at `remaining`); spends
+ *                            kills × perKill, capped at the magazine
+ *   used set, kills not set  fires `used` interceptors; kills follow from P
+ *                            as in applyEngagement() with that budget
+ *   both set                 both as set
+ *
+ * A `used` above the magazine takes the rest from the reserve, as far as it
+ * goes; `short` is what could not be found. Systems without a magazine
+ * spend nothing. perKill is the interceptors one kill costs (the shots per
+ * threat; a gun's burst).
+ *
+ * @returns {{ killed, survived, engaged, interceptorsUsed, magazineRemaining,
+ *             fromReserve, short, note, partial }}
+ */
+function forcedResult(ov, { remaining, magazine, reserve = 0, P, shotsPerThreat, perKill, usesMagazine, partialP = null }) {
+  const clampKills = n => Math.max(0, Math.min(remaining, Math.round(n)));
+  const hasKills   = ov.killed != null || ov.survived != null;
+  const setKills   = () => clampKills(ov.killed ?? (remaining - (ov.survived ?? remaining)));
+  if (!usesMagazine) {
+    const killed = setKills();
+    return { killed, survived: remaining - killed, engaged: remaining, interceptorsUsed: 0,
+             magazineRemaining: magazine, fromReserve: 0, short: 0, note: 'Manual override', partial: null };
+  }
+  const loaded = Math.max(0, magazine);
+  const want   = ov.used != null ? Math.max(0, ov.used)
+               : Math.min(loaded, setKills() * perKill);
+  const fromMag     = Math.min(want, loaded);
+  const fromReserve = Math.min(want - fromMag, Math.max(0, reserve));
+  const used        = fromMag + fromReserve;
+
+  let killed, engaged, partial = null;
+  if (hasKills) {
+    killed  = setKills();
+    engaged = perKill > 0 ? Math.min(remaining, Math.floor(used / perKill + 1e-9)) : killed;
+  } else {
+    const r = applyEngagement(remaining, P, used, shotsPerThreat, partialP);
+    killed  = r.killed;
+    engaged = r.engaged;
+    partial = r.partial;
+  }
+  return {
+    killed, survived: remaining - killed, engaged,
+    interceptorsUsed:  used,
+    magazineRemaining: magazine - fromMag,
+    fromReserve,
+    short:             Math.max(0, want - used),
+    note:              'Manual override',
+    partial
+  };
+}
+
 /**
  * Run a full layered-defence simulation.
  *
@@ -409,16 +469,23 @@ function isExcluded(excludedByThreatType, threatType, platformId, defId) {
  *              the first layer (attritionArrivals); a missing type loses none
  *   draws      a createDrawLog() object: each entry draws from its own stream
  *              (recorded or replayed) instead of `rng`
- *   overrides  manual results { type: { platformId: { defId: { incoming?, killed?, survived?, disengaged? } } } }.
+ *   overrides  manual results { type: { platformId: { defId: { incoming?, killed?, survived?, used?, disengaged? } } } }.
  *              `incoming` sets how many threats reach the entry, whatever
  *              the layers before it left: the difference is added (or
  *              removed) at that layer, and earlier layers keep their results.
- *              A disengaged entry does not fire. With `killed` or `survived`
- *              the entry fires as usual (interceptors are spent on the
- *              threats it engages) but its kills are forced: `killed`
- *              (capped at the threats it faces), or for overrides saved
- *              without it, threats − `survived`. Every later layer then
- *              engages the survivors as usual.
+ *              A disengaged entry does not fire. `killed` forces the kills
+ *              (capped at the threats it faces; for overrides saved without
+ *              it, threats − `survived`). `used` sets the interceptors spent
+ *              (systems with a magazine only). With kills and no `used`, the
+ *              entry spends kills × interceptors per threat, capped at its
+ *              magazine. With `used` and no kills, the entry fires only that
+ *              many and its kills follow from its Pk as usual. A `used` above
+ *              the magazine takes the rest from `reserves` (see forcedResult).
+ *              Every later layer then engages the survivors as usual.
+ *              Overrides also apply to an entry that cannot engage (pk 0).
+ *   reserves   { defId: interceptors } held in reserve chips; only a `used`
+ *              override draws on them. Records then carry reserveAtStart,
+ *              and reserveUsed when some were drawn.
  * @returns {{ totalIn, totalOut, totalAdded, totalAttrited, initialThreats, finalThreats, byThreatType }}
  *          totalIn and initialCount are the platforms launched. totalAttrited
  *          (attritionLost on each type and platform, with attritionPct) were
@@ -438,7 +505,8 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
     models = (typeof ENGAGEMENT_MODELS !== 'undefined' ? ENGAGEMENT_MODELS : null),
     draws  = null,
     overrides = null,
-    attrition = null
+    attrition = null,
+    reserves  = null
   } = config;
   if (!pkTable || !doctrine || !defenseCatalog || !platformCatalog) {
     throw new Error('runSimulationCore: config needs pkTable, doctrine, defenseCatalog, platformCatalog');
@@ -453,8 +521,17 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
     const catalog = defenseCatalog[def.system];
     if (!catalog) continue;
     const fullMag = (catalog.magazinePerBattery || 0) * def.quantity;
-    deployed[def.id] = { def, magazineRemaining: initialMagazineState[def.id] ?? fullMag };
+    deployed[def.id] = { def, magazineRemaining: initialMagazineState[def.id] ?? fullMag,
+                         reserveRemaining: reserves?.[def.id] ?? 0 };
   }
+
+  // Reserve bookkeeping on a record: the reserve the entry had when given
+  // one, what a `used` override drew from it, and any shortfall.
+  const reserveFields = (before, result) => ({
+    ...(reserves ? { reserveAtStart: before } : {}),
+    ...(result.fromReserve > 0 ? { reserveUsed: result.fromReserve } : {}),
+    ...(result.short > 0 ? { usedShort: result.short } : {})
+  });
 
   const byThreatType = [];
   let totalIn = 0, totalOut = 0, totalAdded = 0, totalAttrited = 0;
@@ -527,11 +604,36 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
           cellShots:       cell.shots
         });
 
-        // A cell with pk 0 means the system cannot engage this platform.
+        // A cell with pk 0 means the system cannot engage this platform,
+        // unless a manual override sets its kills or interceptors used.
         if (!model || cell.pk <= 0) {
           for (const e of entries) {
             const from = takeIncoming(e.def.id);
             if (remaining <= 0 && from == null) continue;
+            const ov = platOv[e.def.id];
+            const usesMag = model ? model.usesMagazine !== false : true;
+            if (isForcedOverride(ov, usesMag) && !ov.disengaged) {
+              const perKill = cell.shots > 0 ? cell.shots : 1;
+              const magazineBefore = e.magazineRemaining;
+              const reserveBefore  = e.reserveRemaining;
+              const result = forcedResult(ov, { remaining, magazine: magazineBefore, reserve: reserveBefore,
+                P: 0, shotsPerThreat: perKill, perKill, usesMagazine: usesMag });
+              e.magazineRemaining = result.magazineRemaining;
+              e.reserveRemaining -= result.fromReserve;
+              engagements.push({
+                ...baseRecord(e),
+                ...(from != null ? { incomingFrom: from } : {}),
+                threatsIn: remaining, killed: result.killed, survived: result.survived,
+                pkShot: 0, pkTier: null, tierMultiplier: 1, pk: 0,
+                shotsPerEngagement: usesMag ? perKill : 0, shotsPerEngagementTier: null,
+                magazineAtStart: magazineBefore, interceptorsUsed: result.interceptorsUsed,
+                magazineRemaining: e.magazineRemaining,
+                ...reserveFields(reserveBefore, result),
+                note: 'Manual override', isManualOverride: true, cannotEngage: true
+              });
+              remaining = result.survived;
+              continue;
+            }
             engagements.push({
               ...baseRecord(e),
               ...(from != null ? { incomingFrom: from } : {}),
@@ -540,6 +642,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
               shotsPerEngagement: 0, shotsPerEngagementTier: null,
               magazineAtStart: e.magazineRemaining, interceptorsUsed: 0,
               magazineRemaining: e.magazineRemaining,
+              ...reserveFields(e.reserveRemaining, {}),
               note: 'Cannot engage'
             });
           }
@@ -575,19 +678,23 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
             ({ P, shotsPerThreat } = model.resolve(ctx));
           }
           const magazineBefore = e.magazineRemaining;
+          const reserveBefore  = e.reserveRemaining;
           const ov = platOv[e.def.id];
-          const forced = ov && (ov.disengaged || ov.killed != null || ov.survived != null);
+          const usesMag = model.usesMagazine !== false;
+          const forced  = isForcedOverride(ov, usesMag);
+          const partialP = (shotsLeft, engagedFull) => model.partialProbability(ctx, shotsLeft, engagedFull);
           let result;
           if (ov?.disengaged) {
             result = { killed: 0, survived: remaining, engaged: 0, interceptorsUsed: 0,
                        magazineRemaining: magazineBefore, note: 'Disengaged (manual)', partial: null };
+          } else if (forced) {
+            // One kill costs one threat's shots; a gun's costs one burst.
+            const perKill = catalog.engagement?.model === 'gun' ? (ctx.shots || 0) : shotsPerThreat;
+            result = forcedResult(ov, { remaining, magazine: magazineBefore, reserve: reserveBefore,
+              P, shotsPerThreat, perKill, usesMagazine: usesMag, partialP });
+            e.reserveRemaining -= result.fromReserve;
           } else {
-            result = applyEngagement(remaining, forced ? 0 : P, magazineBefore, shotsPerThreat,
-              (shotsLeft, engagedFull) => forced ? 0 : model.partialProbability(ctx, shotsLeft, engagedFull));
-            if (forced) {
-              const killed = Math.max(0, Math.min(remaining, ov.killed ?? (remaining - (ov.survived ?? remaining))));
-              result = { ...result, killed, survived: remaining - killed, note: 'Manual override' };
-            }
+            result = applyEngagement(remaining, P, magazineBefore, shotsPerThreat, partialP);
           }
           e.magazineRemaining = result.magazineRemaining;
           model.afterEngagement(ctx, result);
@@ -605,8 +712,9 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
             shotsPerEngagement:     shotsPerThreat,
             shotsPerEngagementTier: shotsTier,
             magazineAtStart:        magazineBefore,
-            interceptorsUsed:       magazineBefore - e.magazineRemaining,
+            interceptorsUsed:       magazineBefore - e.magazineRemaining + (result.fromReserve || 0),
             magazineRemaining:      e.magazineRemaining,
+            ...reserveFields(reserveBefore, result),
             partialShots:           result.partial ? result.partial.shots : 0,
             partialP:               result.partial ? result.partial.P     : null,
             note:                   result.note,
@@ -660,6 +768,8 @@ if (typeof module !== 'undefined' && module.exports) {
     pkCell,
     rollTier,
     applyEngagement,
+    forcedResult,
+    isForcedOverride,
     attritionArrivals,
     createDrawLog,
     groupManifest,

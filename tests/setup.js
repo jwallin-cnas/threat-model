@@ -39,6 +39,8 @@ export const {
   pkCell,
   rollTier,
   applyEngagement,
+  forcedResult,
+  isForcedOverride,
   attritionArrivals,
   createDrawLog,
   groupManifest,

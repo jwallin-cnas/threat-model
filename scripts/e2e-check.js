@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay|attrition]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay|used|attrition]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -98,14 +98,17 @@ async function checkTool(browser, base) {
 
   const r2 = await page.evaluate(() => {
     applyLayerOverride('drone', 'shahed_136', 'dubai_d1', 45, false);
-    const a1 = { notice: !document.getElementById('override-notice').classList.contains('hidden'), badge: !!document.querySelector('.eng-overridden'), mag: { ...globalMagState } };
+    const pat = _computeDisplayResults().byThreatType.flatMap(t => t.platforms.flatMap(p => p.engagements)).find(e => e.defId === 'dubai_d1');
+    const a1 = { notice: !document.getElementById('override-notice').classList.contains('hidden'), badge: !!document.querySelector('.eng-overridden'), mag: { ...globalMagState },
+                 used: pat.interceptorsUsed, want: Math.min(pat.magazineAtStart, 5 * pat.shotsPerEngagement), rem: pat.magazineRemaining };
     applyLayerOverride('drone', 'shahed_136', 'jebel_ali_port_d1', 0, true);
     const a2 = { mag: { ...globalMagState }, jaFull: _fullOfId('jebel_ali_port_d1') };
     clearAllOverrides();
     const a3 = { notice: !document.getElementById('override-notice').classList.contains('hidden'), mag: { ...globalMagState }, headline: document.querySelector('.final-headline').textContent };
     return { a1, a2, a3 };
   });
-  check(r2.a1.notice && r2.a1.badge && r2.a1.mag.dubai_d1 === 0, 'tool: kill override renders and keeps the Dubai Patriot spent');
+  check(r2.a1.notice && r2.a1.badge && r2.a1.used === r2.a1.want && r2.a1.mag.dubai_d1 === r2.a1.rem,
+        'tool: kill override renders; the Dubai Patriot spends 5 kills × its shots per threat ' + JSON.stringify(r2.a1.used));
   check(r2.a2.mag.jebel_ali_port_d1 === undefined || r2.a2.mag.jebel_ali_port_d1 === r2.a2.jaFull, 'tool: disengage override restores that battery to full');
   check(!r2.a3.notice && r2.a3.mag.jebel_ali_port_d1 === 0 && /All 60/.test(r2.a3.headline), 'tool: clearing overrides restores the original result');
 
@@ -570,7 +573,7 @@ async function checkOverrideReplay(browser, base) {
     return { orig, cap: __eng(d, 'tn_cap'), ds: __eng(d, 'tn_ds'), out: d.totalOut, live: globalMagState.tn_ds, snapAfter: simHistory[1].magStateAfter.tn_ds };
   });
   check(r1.orig === null && r1.ds && r1.ds.threatsIn === 5 && r1.ds.killed > 0, 'replay: a layer that never fired now engages the extra leakers ' + JSON.stringify(r1.ds && { in: r1.ds.threatsIn, killed: r1.ds.killed }));
-  check(r1.cap.killed === 5 && r1.cap.interceptorsUsed === 10 && r1.cap.isManualOverride, 'replay: the overridden layer keeps its kills and spends shots on every threat it engaged');
+  check(r1.cap.killed === 5 && r1.cap.interceptorsUsed === 5 && r1.cap.isManualOverride, 'replay: the overridden layer keeps its kills and spends one shot per kill');
   check(r1.live === r1.ds.magazineRemaining && r1.snapAfter === r1.ds.magazineRemaining && r1.out === 5 - r1.ds.killed, 'replay: its interceptors come off the live magazine and the history entry');
 
   // 2. Later attacks are re-simulated from the new magazines; clearing restores them exactly
@@ -606,17 +609,19 @@ async function checkOverrideReplay(browser, base) {
   });
   await page.evaluate(helpers);
   const r3 = await page.evaluate(() => {
-    const before = { res: simHistory[2].reloadsState.tn_ds, label: simHistory[2].label, a3: JSON.stringify(simHistory[3].results), live: findDefenseEntryById('tn_ds').reloads };
+    // David's Sling in attack 3, less the reserve it held (the redone reload spends it)
+    const dsOf = s => { const { reserveAtStart, ...e } = __eng(s.results, 'tn_ds'); return JSON.stringify(e); };
+    const before = { res: simHistory[2].reloadsState.tn_ds, label: simHistory[2].label, a3: dsOf(simHistory[3]), live: findDefenseEntryById('tn_ds').reloads };
     // View attack 1 while the session stays at the end (as the target menu does)
     const s1 = simHistory[1];
     lastSimResults = JSON.parse(JSON.stringify(s1.results)); lastSimDefenses = JSON.parse(JSON.stringify(s1.allDefenses));
     preSimMagState = JSON.parse(JSON.stringify(s1.preSimMagState)); manualOverrides = {}; lastSimSnapshotId = s1.id; lastSimTarget = getTarget('tel_nof_ab');
     applyLayerOverride('drone', 'shahed_136', 'tn_cap', 20, false, 10);
-    return { before, res: simHistory[2].reloadsState.tn_ds, label: simHistory[2].label, a3Same: JSON.stringify(simHistory[3].results) === before.a3,
+    return { before, res: simHistory[2].reloadsState.tn_ds, label: simHistory[2].label, a3Same: dsOf(simHistory[3]) === before.a3,
              a3Pre: simHistory[3].preSimMagState.tn_ds, live: findDefenseEntryById('tn_ds').reloads, cursor: simHistoryCursor };
   });
   check(r3.before.res > 0 && r3.res === 0 && /\+36 missiles/.test(r3.label), 'replay: the reload is redone with the bigger refill (reserve chip spent) ' + JSON.stringify({ was: r3.before.res, now: r3.res, label: r3.label }));
-  check(r3.a3Pre === 36 && r3.a3Same, 'replay: the attack after the reload starts full again, so its result is unchanged');
+  check(r3.a3Pre === 36 && r3.a3Same, 'replay: the attack after the reload starts David\'s Sling full again, so its result there is unchanged');
   check(r3.cursor === 3 && r3.live === 0, 'replay: the live reserve chips follow the redone reload');
 
   // 5. Incoming count changed after simulating: added at that layer, earlier layers unchanged
@@ -721,6 +726,112 @@ async function checkOverrideReplay(browser, base) {
   check(r4.keys > 0 && r4.same, 'replay: an attack with THAAD shot rolls records its draws and replays identically ' + JSON.stringify(r4));
   const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
   check(realErrs.length === 0, 'replay: no page errors ' + JSON.stringify(realErrs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interceptors-used overrides: the ⚙ form, reserve chips, later attacks
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkInterceptorOverrides(browser, base) {
+  console.log('\n── interceptors used ──');
+  const page = await browser.newPage();
+  const errs = collectErrors(page);
+  // Tel Nof alone: an F-15I patrol (100 shots, full Pk on 25 per type), one
+  // David's Sling (36 loaded, 3 shots per drone, one reserve chip of 36) and
+  // a containerized laser (no magazine; Pk 0 against the Shahed-238).
+  const LAYDOWN = { version: '1.0', defaults: { tel_nof_ab: [
+    { id: 'tn_cap', system: 'f15i_patrol',         quantity: 1, notes: '', operator: 'Israel', chips: 1 },
+    { id: 'tn_ds',  system: 'davids_sling',        quantity: 1, notes: '', operator: 'Israel', chips: 2 },
+    { id: 'tn_cl',  system: 'containerized_laser', quantity: 1, notes: '', operator: 'Israel' } ] } };
+  await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  await page.evaluate(l => {
+    appAttrition = null; window._setSeed(0); window._importLaydownDirect(l); _resetSimulationHistory();
+    window._importAttackQueueDirect({ version: '1.0', attacks: [
+      { targetId: 'tel_nof_ab', platforms: [{ platformId: 'shahed_136', quantity: 60 }] },
+      { targetId: 'tel_nof_ab', platforms: [{ platformId: 'shahed_136', quantity: 30 }, { platformId: 'shahed_238', quantity: 40 }] } ] });
+    window._simulateQueueDirect();
+    window.__eng  = (r, id, pid = 'shahed_136') => r.byThreatType.flatMap(t => t.platforms).filter(p => p.platformId === pid).flatMap(p => p.engagements).find(e => e.defId === id) || null;
+    window.__ds   = () => __eng(_computeDisplayResults(), 'tn_ds');
+    window.__res  = () => ({ s1: simHistory[1].reloadsState.tn_ds, s2: simHistory[2].reloadsState.tn_ds, live: findDefenseEntryById('tn_ds').reloads, cursor: simHistoryCursor });
+    navigateToSnapshot(1);
+  }, LAYDOWN);
+  const gear = (def, pid = 'shahed_136') => `.btn-override-eng[data-def="${def}"][data-platform="${pid}"]`;
+  const open = async (def, pid) => { await page.click(gear(def, pid)); await page.waitForSelector('.override-edit-form'); };
+  const fillForm = async vals => {
+    for (const [cls, v] of Object.entries(vals)) await page.fill(`.override-edit-form .${cls}`, String(v));
+    await page.click('.override-edit-form .btn-ov-apply');
+  };
+
+  // 1. Attack 1: David's Sling kills 30 with 50 interceptors — 36 loaded, 14 from its reserve chip
+  const ds0 = await page.evaluate(() => __ds());
+  await open('tn_ds');
+  const formBoxes = await page.evaluate(() => [...document.querySelectorAll('.override-edit-form input')].map(i => i.className + '=' + i.value));
+  const hint = await page.textContent('.override-edit-form .override-edit-hint');
+  await fillForm({ 'override-killed-input': 30, 'override-used-input': 50 });
+  const r1 = await page.evaluate(() => ({ ds: __ds(), res: __res(), ov: JSON.stringify(manualOverrides),
+    a2ds: __eng(simHistory[2].results, 'tn_ds'), row: document.querySelector(`.btn-override-eng[data-def="tn_ds"]`).closest('.engagement-row').textContent.replace(/\s+/g, ' ') }));
+  check(ds0.magazineAtStart === 36 && formBoxes.length === 3 && /36 loaded \+ 36 in reserve/.test(hint),
+        'used: the form has Incoming, Killed and Interceptors used, and shows the loaded and reserve interceptors ' + JSON.stringify({ formBoxes, hint }));
+  check(r1.ds.killed === 30 && r1.ds.interceptorsUsed === 50 && r1.ds.reserveUsed === 14 && r1.ds.magazineRemaining === 0 && r1.ov.includes('"used":50'),
+        'used: 30 kills with 50 interceptors — 14 drawn from the reserve chip ' + JSON.stringify({ k: r1.ds.killed, u: r1.ds.interceptorsUsed, r: r1.ds.reserveUsed }));
+  check(Math.abs(r1.res.s1 - (1 - 14 / 36)) < 1e-5 && Math.abs(r1.a2ds.reserveAtStart - 22) < 1e-3 && r1.res.live === r1.res.s1 && r1.res.cursor === 1,
+        'used: the reserve chip drops by 14/36; the next attack starts with 22 in reserve; the live chips follow ' + JSON.stringify(r1.res));
+  check(/14 from reserve/.test(r1.row) && /50 int\./.test(r1.row), 'used: the row shows 50 interceptors, 14 from reserve');
+
+  // 2. Attack 2: David's Sling starts empty (magazine exhausted); more than the reserve is refused, the reserve is accepted
+  await page.evaluate(() => navigateToSnapshot(2));
+  const exhausted = await page.evaluate(() => ({ note: __ds().note, gear: !!document.querySelector(`.btn-override-eng[data-def="tn_ds"]`) }));
+  await open('tn_ds');
+  await fillForm({ 'override-used-input': 30 });
+  const refused = await page.evaluate(() => ({ toast: document.getElementById('toast')?.textContent || '', form: !!document.querySelector('.override-edit-form'), ov: Object.keys(manualOverrides).length }));
+  await fillForm({ 'override-killed-input': '', 'override-used-input': 22 });
+  const r2 = await page.evaluate(() => ({ ds: __ds(), res: __res(), ov: JSON.stringify(manualOverrides) }));
+  check(exhausted.note === 'Magazine exhausted' && exhausted.gear, 'used: a magazine-exhausted row has the ⚙ form ' + JSON.stringify(exhausted));
+  check(refused.form && refused.ov === 0 && /Only 22 interceptors are available here: 0 loaded and 22 in reserve chips/.test(refused.toast),
+        'used: more than the magazine and reserve hold is refused, with what is available ' + refused.toast);
+  check(r2.ds.interceptorsUsed === 22 && r2.ds.reserveUsed === 22 && r2.ds.killed > 0 && r2.ds.killed <= 8 && r2.ov === '{"drone":{"shahed_136":{"tn_ds":{"used":22}}}}',
+        'used: with only interceptors set, the 22 are fired and the kills follow from the Pk ' + JSON.stringify({ k: r2.ds.killed, ov: r2.ov }));
+  check(r2.res.s2 === 0 && r2.res.live === 0, 'used: attack 2 empties the reserve chip ' + JSON.stringify(r2.res));
+
+  // 3. Reopen attack 1's override: emptying Interceptors used returns it to kills × shots, capped at the magazine;
+  //    the later attack is re-simulated with the reserve it now has
+  await page.evaluate(() => navigateToSnapshot(1));
+  await open('tn_ds');
+  const prefill = await page.evaluate(() => [...document.querySelectorAll('.override-edit-form input')].map(i => i.value));
+  await fillForm({ 'override-used-input': '' });
+  const r3 = await page.evaluate(() => ({ ds: __ds(), res: __res(), ov: JSON.stringify(manualOverrides), a2ds: __eng(_snapshotShownResults(simHistory[2]), 'tn_ds') }));
+  check(JSON.stringify(prefill) === '["35","30","50"]', 'used: the form reopens on an overridden row with its values ' + JSON.stringify(prefill));
+  check(r3.ds.killed === 30 && r3.ds.interceptorsUsed === 36 && !r3.ds.reserveUsed && !r3.ov.includes('used'),
+        'used: an emptied box returns to the default — 30 kills × 3 shots, capped at the 36 loaded ' + JSON.stringify({ u: r3.ds.interceptorsUsed, ov: r3.ov }));
+  check(r3.res.s1 === 1 && r3.a2ds.reserveAtStart === 36 && r3.a2ds.interceptorsUsed === 22 && Math.abs(r3.res.s2 - (1 - 22 / 36)) < 1e-5,
+        'used: attack 1 keeps its reserve chip; attack 2 is re-simulated and draws its 22 from it ' + JSON.stringify(r3.res));
+
+  // 4. A system the Pk table says cannot engage (laser vs Shahed-238) can be given kills; no interceptors box
+  await page.evaluate(() => navigateToSnapshot(2));
+  const cl0 = await page.evaluate(() => __eng(_computeDisplayResults(), 'tn_cl', 'shahed_238'));
+  await open('tn_cl', 'shahed_238');
+  const clBoxes = await page.evaluate(() => [...document.querySelectorAll('.override-edit-form input')].map(i => i.className));
+  await fillForm({ 'override-killed-input': 2 });
+  const r4 = await page.evaluate(() => {
+    const e = __eng(_computeDisplayResults(), 'tn_cl', 'shahed_238');
+    const row = document.querySelector(`.btn-override-eng[data-def="tn_cl"][data-platform="shahed_238"]`).closest('.engagement-row');
+    return { e, badge: row.querySelector('.override-badge')?.textContent.replace(/\s+/g, ' ').trim(), prose: row.querySelector('.eng-prose')?.textContent || '' };
+  });
+  check(cl0 && cl0.note === 'Cannot engage' && clBoxes.length === 2 && !clBoxes.some(c => /used/.test(c)),
+        'used: a Pk-0 row opens the form, without an interceptors box for a laser ' + JSON.stringify({ note: cl0 && cl0.note, clBoxes }));
+  check(r4.e.killed === 2 && r4.e.interceptorsUsed === 0 && r4.e.cannotEngage && /Pk 0 in the table/.test(r4.badge) && /no chance/.test(r4.prose),
+        'used: the laser is credited 2 kills it could not make by the table ' + JSON.stringify({ k: r4.e.killed, badge: r4.badge }));
+
+  // 5. The Blue report counts the reserve interceptors as expended
+  const r5 = await page.evaluate(() => {
+    const d = document.createElement('div'); d.innerHTML = window._buildPrintDocument();
+    return [...d.querySelectorAll('.pr-sum-line')].map(e => e.textContent).filter(t => /David's Sling/.test(t));
+  });
+  check(r5.includes("Israel: David's Sling: -58 (14/72)") && r5.some(l => /-58 ints\./.test(l)),
+        'used: the report counts the 22 drawn from reserve as expended (36 + 22) ' + JSON.stringify(r5));
+  const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
+  check(realErrs.length === 0, 'used: no page errors ' + JSON.stringify(realErrs));
   await page.close();
 }
 
@@ -1138,6 +1249,7 @@ try {
   if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'water') await checkWaterCoverage(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'replay') await checkOverrideReplay(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'used') await checkInterceptorOverrides(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'attrition') await checkAttrition(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);

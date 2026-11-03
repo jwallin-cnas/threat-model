@@ -374,12 +374,12 @@ describe('runSimulationCore — manual overrides', () => {
   const defs   = [mkDef('shared_cap', 'cap'), mkDef('s1', 'sam')];
   const ov = o => buildMockConfig({ overrides: { drone: { drone_a: o } } });
 
-  it('forces the kills, spends interceptors on every threat engaged, and lets later layers engage the rest', () => {
+  it('forces the kills, spends kills × shots per threat, and lets later layers engage the rest', () => {
     const base = run(drones, defs);
     expect(allEngagements(base).map(e => e.defId)).toEqual(['shared_cap']);   // the CAP killed all 10
     const r = run(drones, defs, {}, {}, ov({ shared_cap: { killed: 4, survived: 6 } }));
     const [cap, sam] = allEngagements(r);
-    expect(cap).toMatchObject({ killed: 4, survived: 6, interceptorsUsed: 10, isManualOverride: true, note: 'Manual override' });
+    expect(cap).toMatchObject({ killed: 4, survived: 6, interceptorsUsed: 4, magazineRemaining: 46, isManualOverride: true, note: 'Manual override' });
     expect(sam).toMatchObject({ defId: 's1', threatsIn: 6, killed: 6, interceptorsUsed: 12 });
     expect(r.totalOut).toBe(0);
   });
@@ -394,6 +394,78 @@ describe('runSimulationCore — manual overrides', () => {
     const [cap, sam] = allEngagements(r);
     expect(cap).toMatchObject({ killed: 0, survived: 10, interceptorsUsed: 0, magazineRemaining: 50, note: 'Disengaged (manual)', isManualOverride: true });
     expect(sam).toMatchObject({ threatsIn: 10, killed: 10 });
+  });
+});
+
+describe('runSimulationCore — interceptors used overrides', () => {
+  const drones = [{ platformId: 'drone_a', count: 10 }];
+  const defs   = [mkDef('shared_cap', 'cap'), mkDef('s1', 'sam')];
+  const off    = { shared_cap: { survived: 10, disengaged: true } };   // the SAM faces all 10
+  const ov = (o, extra = {}) => buildMockConfig({ overrides: { drone: { drone_a: { ...off, ...o } } }, ...extra });
+  const sam = r => allEngagements(r).find(e => e.defId === 's1');
+
+  it('caps the default use at the magazine when the kills cost more', () => {
+    const r = run(drones, defs, { s1: 10 }, {}, ov({ s1: { killed: 8 } }));   // 8 kills × 2 shots = 16 > 10 loaded
+    expect(sam(r)).toMatchObject({ killed: 8, interceptorsUsed: 10, magazineRemaining: 0, isManualOverride: true });
+    expect(sam(r).reserveUsed).toBeUndefined();
+  });
+
+  it('spends a set number above the magazine from the reserve', () => {
+    const r = run(drones, defs, { s1: 10 }, {}, ov({ s1: { killed: 8, used: 16 } }, { reserves: { s1: 20 } }));
+    expect(sam(r)).toMatchObject({ killed: 8, interceptorsUsed: 16, magazineRemaining: 0, reserveAtStart: 20, reserveUsed: 6 });
+    expect(sam(r).usedShort).toBeUndefined();
+  });
+
+  it('spends only what the magazine and reserve hold, and records the shortfall', () => {
+    const r = run(drones, defs, { s1: 10 }, {}, ov({ s1: { killed: 8, used: 16 } }, { reserves: { s1: 2 } }));
+    expect(sam(r)).toMatchObject({ interceptorsUsed: 12, magazineRemaining: 0, reserveUsed: 2, usedShort: 4 });
+    const noReserve = run(drones, defs, { s1: 10 }, {}, ov({ s1: { killed: 8, used: 16 } }));
+    expect(sam(noReserve)).toMatchObject({ interceptorsUsed: 10, usedShort: 6 });
+  });
+
+  it('fires only the set number when the kills are not set, kills following the Pk', () => {
+    const r = run(drones, defs, {}, {}, ov({ s1: { used: 6 } }));   // 6 interceptors at 2 per threat: 3 engaged at Pk 1
+    expect(sam(r)).toMatchObject({ threatsIn: 10, killed: 3, survived: 7, interceptorsUsed: 6, magazineRemaining: 94, isManualOverride: true });
+    expect(r.totalOut).toBe(7);
+    // A budget larger than the threats need is still spent as set
+    expect(sam(run(drones, defs, {}, {}, ov({ s1: { used: 40 } })))).toMatchObject({ killed: 10, interceptorsUsed: 40 });
+  });
+
+  it('takes kills and interceptors as set when both are, even more kills than interceptors', () => {
+    expect(sam(run(drones, defs, {}, {}, ov({ s1: { killed: 10, used: 2 } })))).toMatchObject({ killed: 10, interceptorsUsed: 2, magazineRemaining: 98 });
+    expect(sam(run(drones, defs, {}, {}, ov({ s1: { killed: 0, used: 0 } })))).toMatchObject({ killed: 0, survived: 10, interceptorsUsed: 0 });
+  });
+
+  it('charges a gun one burst per kill', () => {
+    const r = run(drones, [mkDef('g1', 'gun')], {}, {}, buildMockConfig({ overrides: { drone: { drone_a: { g1: { killed: 2 } } } } }));
+    expect(allEngagements(r)[0]).toMatchObject({ killed: 2, interceptorsUsed: 300, magazineRemaining: 150 });
+  });
+
+  it('ignores interceptors used on a system without a magazine', () => {
+    const laser = [mkDef('l1', 'laser')];
+    const set = o => buildMockConfig({ overrides: { drone: { drone_a: { l1: o } } } });
+    expect(allEngagements(run(drones, laser, {}, {}, set({ killed: 9, used: 5 })))[0]).toMatchObject({ killed: 9, interceptorsUsed: 0, isManualOverride: true });
+    const usedOnly = allEngagements(run(drones, laser, {}, {}, set({ used: 5 })))[0];
+    expect(usedOnly.isManualOverride).toBeUndefined();
+    expect(usedOnly.killed).toBe(3);
+  });
+
+  it('lets a system that cannot engage a platform (pk 0) be given kills', () => {
+    const mrbm = [{ platformId: 'mrbm_a', count: 5 }];
+    const both = [mkDef('b1', 'bmd'), mkDef('s1', 'sam')];
+    const set = o => buildMockConfig({ overrides: { mrbm: { mrbm_a: { b1: { survived: 5, disengaged: true }, ...o } } } });
+    expect(allEngagements(run(mrbm, both, {}, {}, set({})))[1]).toMatchObject({ defId: 's1', note: 'Cannot engage', killed: 0 });
+    const r = run(mrbm, both, {}, {}, set({ s1: { killed: 3 } }));
+    expect(allEngagements(r)[1]).toMatchObject({ defId: 's1', killed: 3, survived: 2, interceptorsUsed: 3, magazineRemaining: 97,
+      note: 'Manual override', isManualOverride: true, cannotEngage: true });
+    expect(r.totalOut).toBe(2);
+    expect(allEngagements(run(mrbm, both, {}, {}, set({ s1: { killed: 3, used: 8 } })))[1]).toMatchObject({ killed: 3, interceptorsUsed: 8 });
+  });
+
+  it('adds no reserve fields to a plain run', () => {
+    const e = allEngagements(run(drones, defs))[0];
+    expect(e.reserveAtStart).toBeUndefined();
+    expect(e.reserveUsed).toBeUndefined();
   });
 });
 
@@ -423,7 +495,7 @@ describe('runSimulationCore — incoming overrides', () => {
     const r = run([{ platformId: 'drone_a', count: 10 }, { platformId: 'drone_b', count: 3 }], defs, {}, {},
       ov({ shared_cap: { incoming: 15, killed: 5 } }));
     const [cap, sam] = allEngagements(r);
-    expect(cap).toMatchObject({ threatsIn: 15, incomingFrom: 10, killed: 5, interceptorsUsed: 15, isManualOverride: true });
+    expect(cap).toMatchObject({ threatsIn: 15, incomingFrom: 10, killed: 5, interceptorsUsed: 5, isManualOverride: true });
     expect(sam).toMatchObject({ threatsIn: 10, killed: 10 });
     expect(r.byThreatType[0].platforms[1]).toMatchObject({ platformId: 'drone_b', addedCount: 0, finalCount: 0 });
   });

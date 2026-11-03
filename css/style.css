@@ -1367,7 +1367,24 @@ select option, select optgroup {
   white-space: nowrap;
 }
 
+.override-edit-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.eng-reserve,
+.eng-short {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.eng-reserve { color: var(--text-dim); }
+.eng-short   { color: var(--warn); }
+
 .override-edit-form .override-killed-input,
+.override-edit-form .override-used-input,
 .override-edit-form .override-incoming-input {
   width: 56px;
   padding: 2px 6px;
