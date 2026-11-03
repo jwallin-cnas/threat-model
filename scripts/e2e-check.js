@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay|attrition]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -68,6 +68,7 @@ async function checkTool(browser, base) {
   await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
 
   const r1 = await page.evaluate(async (attack) => {
+    appAttrition = null;   // these numbers match the engine tests, which have no attrition (checked in its own section)
     window._setSeed(0);
     window._importAttackQueueDirect(attack);
     window._simulateQueueDirect();
@@ -362,6 +363,7 @@ async function checkReloadAndSwitching(browser, base) {
   const fresh = async () => {
     await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
     await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+    await page.evaluate(() => { appAttrition = null; });   // exact counts below assume no attrition
   };
   const queue = attacks => page.evaluate(a => { window._setSeed(0); window._importAttackQueueDirect({ version: '1.0', attacks: a }); window._simulateQueueDirect(); }, attacks);
   // 'full' when the magazine is at capacity (absent key or an explicit full count)
@@ -549,7 +551,7 @@ async function checkOverrideReplay(browser, base) {
   const fresh = async () => {
     await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
     await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
-    await page.evaluate(l => { window._setSeed(0); window._importLaydownDirect(l); _resetSimulationHistory(); }, LAYDOWN);
+    await page.evaluate(l => { appAttrition = null; window._setSeed(0); window._importLaydownDirect(l); _resetSimulationHistory(); }, LAYDOWN);
   };
   const queue = attacks => page.evaluate(a => { window._importAttackQueueDirect({ version: '1.0', attacks: a }); window._simulateQueueDirect(); }, attacks);
   const TN = n => ({ targetId: 'tel_nof_ab', platforms: [{ platformId: 'shahed_136', quantity: n }] });
@@ -692,6 +694,66 @@ async function checkOverrideReplay(browser, base) {
   check(r4.keys > 0 && r4.same, 'replay: an attack with THAAD shot rolls records its draws and replays identically ' + JSON.stringify(r4));
   const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
   check(realErrs.length === 0, 'replay: no page errors ' + JSON.stringify(realErrs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Organic attrition before the first defenses
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkAttrition(browser, base) {
+  console.log('\n── attrition ──');
+  const page = await browser.newPage();
+  const errs = collectErrors(page);
+  await page.goto(base + '/index.html');
+  await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  const r = await page.evaluate(() => {
+    const ids = ['dubai', 'manama', 'baghdad', 'riyadh', 'jeddah', 'muscat', 'seeb_ab', 'tel_aviv', 'amman',
+                 'persian_gulf_place_point', 'strait_of_hormuz_place_point', 'gulf_of_oman_place_point', 'red_sea_place_point', 'mediterranean_sea_place_point'];
+    const rates = Object.fromEntries(ids.map(id => { const a = _attritionFor(id); return [id, [a.drone, a.cruise_missile, a.fpv, a.mrbm, a.srbm]]; }));
+    const unset = appTargetCatalog.filter(t => !(_attritionFor(t.id).drone > 0)).map(t => t.id);
+    window._setSeed(0);
+    window._importAttackQueueDirect({ version: '1.0', attacks: [
+      { targetId: 'tel_aviv', platforms: [{ platformId: 'shahed_136', quantity: 250 }, { platformId: 'khorramshahr', quantity: 10 }, { platformId: 'paveh_quds', quantity: 20 }] },
+      { targetId: 'dubai',    platforms: [{ platformId: 'shahed_136', quantity: 250 }] } ] });
+    window._simulateQueueDirect();
+    const s1 = simHistory[1], s2 = simHistory[2];
+    const plat = (res, pid) => res.byThreatType.flatMap(t => t.platforms).find(p => p.platformId === pid);
+    const sh = plat(s1.results, 'shahed_136'), mr = plat(s1.results, 'khorramshahr'), cm = plat(s1.results, 'paveh_quds');
+    const firstIn = p => p.engagements[0]?.threatsIn ?? null;
+    // the results panel for Tel Aviv
+    const sel = document.getElementById('target-select'); sel.value = 'tel_aviv'; sel.dispatchEvent(new Event('change'));
+    const table = [...document.querySelectorAll('.attrition-table tbody tr')].map(tr => [...tr.children].map(td => td.textContent.trim()).join('|'));
+    const foot  = [...document.querySelectorAll('.attrition-table tfoot td')].map(td => td.textContent.trim()).join('|');
+    const summaryFirst = document.querySelector('#results-summary .summary-attrition') !== null
+      && document.querySelector('#results-summary').compareDocumentPosition(document.querySelector('#results-layers')) & Node.DOCUMENT_POSITION_FOLLOWING;
+    const d = document.createElement('div'); d.innerHTML = window._buildPrintDocument();
+    const redLine = [...d.querySelectorAll('.pr-sum-line')].map(e => e.textContent).find(t => /^Shahed-136:/.test(t));
+    return {
+      rates, unset,
+      sh: [sh.initialCount, sh.attritionLost, sh.attritionPct, firstIn(sh)], mr: [mr.initialCount, mr.attritionLost, firstIn(mr)], cm: [cm.initialCount, cm.attritionLost, firstIn(cm)],
+      dubai: [plat(s2.results, 'shahed_136').attritionLost, firstIn(plat(s2.results, 'shahed_136'))],
+      stored: JSON.stringify(s1.attrition), stats: s1.stats, replay: JSON.stringify(_replayAttack(s1, s1.preSimMagState)) === JSON.stringify(s1.results),
+      table, foot, summaryFirst: !!summaryFirst, redLine, printHasArrive: /Arrive/.test(d.innerHTML)
+    };
+  });
+  const R = r.rates;
+  check(R.dubai[0] === 5 && R.manama[0] === 5 && R.baghdad[0] === 5 && R.riyadh[0] === 10 && R.jeddah[0] === 10 && R.muscat[0] === 10 && R.seeb_ab[0] === 10
+        && R.tel_aviv[0] === 15 && R.amman[0] === 15, 'attrition: drones lose 5% at Gulf states and Iraq, 10% in Saudi Arabia and Oman, 15% in Israel and Jordan ' + JSON.stringify(R));
+  check(R.persian_gulf_place_point[0] === 5 && R.strait_of_hormuz_place_point[0] === 5 && R.gulf_of_oman_place_point[0] === 5
+        && R.red_sea_place_point[0] === 10 && R.mediterranean_sea_place_point[0] === 15, 'attrition: water points 5% (Gulf waters), 10% (Red Sea), 15% (Mediterranean)');
+  check(Object.values(R).every(v => v[0] === v[1] && v[1] === v[2] && v[3] === 5 && v[4] === 5), 'attrition: cruise missiles and FPVs follow the drone rate; ballistic missiles lose 5% everywhere');
+  check(r.unset.length === 0, 'attrition: every location has a drone/cruise-missile rate ' + JSON.stringify(r.unset));
+  check(JSON.stringify(r.sh) === '[250,37,15,213]' && JSON.stringify(r.mr) === '[10,0,10]' && JSON.stringify(r.cm) === '[20,3,17]',
+        'attrition: Tel Aviv — 250 Shaheds → 213 reach the first layer (212.5 rounded up), 10 MRBMs → 10 (9.5 up), 20 cruise missiles → 17 ' + JSON.stringify([r.sh, r.mr, r.cm]));
+  check(JSON.stringify(r.dubai) === '[12,238]', 'attrition: Dubai — 250 Shaheds → 238 arrive ' + JSON.stringify(r.dubai));
+  check(r.stored === '{"mrbm":5,"srbm":5,"cruise_missile":15,"drone_jet":15,"drone":15,"fpv":15}' && r.stats.totalAttrited === 40 && r.replay,
+        'attrition: the history entry keeps its rates and lost count, and replays identically ' + r.stored);
+  check(r.summaryFirst && r.table.includes('Shahed-136|250|−37|15%|213') && r.table.includes('Khorramshahr|10|0|5%|10') && r.foot === 'Total|280|−40||240',
+        'attrition: the results open with launched → lost → arrive per platform ' + JSON.stringify({ t: r.table, f: r.foot }));
+  check(r.redLine === 'Shahed-136: -500' && r.printHasArrive, 'attrition: Red still loses every platform launched; the PDF shows arrivals ' + r.redLine);
+  const realErrs = errs.filter(e => !/status of 403/.test(e));
+  check(realErrs.length === 0, 'attrition: no page errors ' + JSON.stringify(realErrs));
   await page.close();
 }
 
@@ -1049,6 +1111,7 @@ try {
   if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'water') await checkWaterCoverage(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'replay') await checkOverrideReplay(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'attrition') await checkAttrition(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'patrols') await checkIndependentPatrols(browser, base);

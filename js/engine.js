@@ -344,6 +344,20 @@ function createDrawLog({ log = {}, seed = '', fresh = null } = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Organic attrition
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Platforms of a salvo that arrive after organic attrition (launch failures,
+ * duds, range) of `pct` percent. The number that arrives is rounded up, so a
+ * salvo too small to lose a whole platform loses none.
+ */
+function attritionArrivals(count, pct) {
+  if (!(pct > 0)) return count;
+  return Math.min(count, Math.ceil(count * (100 - pct) / 100 - 1e-9));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Simulation
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -390,7 +404,9 @@ function isExcluded(excludedByThreatType, threatType, platformId, defId) {
  * @param {Object} [excludedByThreatType] { type: [defId] } or { type: { platformId|'*': [defId] } }
  * @param {Object} config                 { pkTable, doctrine, defenseCatalog, platformCatalog,
  *                                        rng = Math.random, models = ENGAGEMENT_MODELS,
- *                                        draws?, overrides? }
+ *                                        draws?, overrides?, attrition? }
+ *   attrition  { type: percent } — share of each platform's salvo lost before
+ *              the first layer (attritionArrivals); a missing type loses none
  *   draws      a createDrawLog() object: each entry draws from its own stream
  *              (recorded or replayed) instead of `rng`
  *   overrides  manual results { type: { platformId: { defId: { incoming?, killed?, survived?, disengaged? } } } }.
@@ -403,9 +419,12 @@ function isExcluded(excludedByThreatType, threatType, platformId, defId) {
  *              (capped at the threats it faces), or for overrides saved
  *              without it, threats − `survived`. Every later layer then
  *              engages the survivors as usual.
- * @returns {{ totalIn, totalOut, totalAdded, initialThreats, finalThreats, byThreatType }}
- *          totalAdded (and addedCount on each type and platform) is the net
- *          number of threats added at layers by `incoming` overrides.
+ * @returns {{ totalIn, totalOut, totalAdded, totalAttrited, initialThreats, finalThreats, byThreatType }}
+ *          totalIn and initialCount are the platforms launched. totalAttrited
+ *          (attritionLost on each type and platform, with attritionPct) were
+ *          lost before the first layer. totalAdded (addedCount on each type
+ *          and platform) is the net number added at layers by `incoming`
+ *          overrides. Threats the defenses faced = launched − attrited + added.
  *
  * Processing order: doctrine.typeOrder → platforms of that type in manifest
  * order → doctrine.engage[type] → every deployed entry of that system.
@@ -418,7 +437,8 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
     rng    = Math.random,
     models = (typeof ENGAGEMENT_MODELS !== 'undefined' ? ENGAGEMENT_MODELS : null),
     draws  = null,
-    overrides = null
+    overrides = null,
+    attrition = null
   } = config;
   if (!pkTable || !doctrine || !defenseCatalog || !platformCatalog) {
     throw new Error('runSimulationCore: config needs pkTable, doctrine, defenseCatalog, platformCatalog');
@@ -437,7 +457,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
   }
 
   const byThreatType = [];
-  let totalIn = 0, totalOut = 0, totalAdded = 0;
+  let totalIn = 0, totalOut = 0, totalAdded = 0, totalAttrited = 0;
 
   for (const threatType of doctrine.typeOrder) {
     const platformGroups = groups[threatType];
@@ -447,14 +467,19 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
     // type per run: give every battery a fresh pass-state object here.
     for (const e of Object.values(deployed)) e.pass = {};
 
-    const typeBlock = { threatType, initialCount: 0, finalCount: 0, addedCount: 0, platforms: [] };
+    const attritionPct = attrition?.[threatType] || 0;
+    const typeBlock = { threatType, initialCount: 0, finalCount: 0, addedCount: 0, attritionLost: 0, attritionPct, platforms: [] };
 
     for (const group of platformGroups) {
       const platform = platformCatalog[group.platformId];
-      let remaining  = group.count;
+      const arrived  = attritionArrivals(group.count, attritionPct);
+      const lost     = group.count - arrived;
+      let remaining  = arrived;
       let added      = 0;
-      typeBlock.initialCount += group.count;
-      totalIn += group.count;
+      typeBlock.initialCount  += group.count;
+      typeBlock.attritionLost += lost;
+      totalIn       += group.count;
+      totalAttrited += lost;
       const engagements = [];
       const platOv  = overrides?.[threatType]?.[group.platformId] || {};
       // Entries still to come that have threats set to reach them: the run
@@ -598,9 +623,11 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
       typeBlock.platforms.push({
         platformId:   group.platformId,
         platformName: platform.name,
-        initialCount: group.count,
-        addedCount:   added,
-        finalCount:   remaining,
+        initialCount:  group.count,
+        attritionLost: lost,
+        attritionPct,
+        addedCount:    added,
+        finalCount:    remaining,
         engagements
       });
     }
@@ -610,7 +637,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
 
   const initialThreats = byThreatType.map(b => ({ type: b.threatType, count: b.initialCount }));
   const finalThreats   = byThreatType.filter(b => b.finalCount > 0).map(b => ({ type: b.threatType, count: b.finalCount }));
-  return { totalIn, totalOut, totalAdded, initialThreats, finalThreats, byThreatType };
+  return { totalIn, totalOut, totalAdded, totalAttrited, initialThreats, finalThreats, byThreatType };
 }
 
 /** Flat list of every engagement record in processing order. */
@@ -633,6 +660,7 @@ if (typeof module !== 'undefined' && module.exports) {
     pkCell,
     rollTier,
     applyEngagement,
+    attritionArrivals,
     createDrawLog,
     groupManifest,
     runSimulationCore,

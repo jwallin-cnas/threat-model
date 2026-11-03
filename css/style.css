@@ -2395,3 +2395,20 @@ select option, select optgroup {
   font-size: 12px;
   text-align: center;
 }
+
+/* ── Results summary: organic attrition before the first defenses ──────────── */
+.summary-attrition {
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(139, 148, 158, 0.06);
+}
+.summary-attrition-title { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+.attrition-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.attrition-table th { font-size: 10px; font-weight: 600; color: var(--text-dim); text-align: left; padding: 2px 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.attrition-table td { padding: 2px 6px; color: var(--text); }
+.attrition-table .att-num { text-align: right; font-family: var(--font-mono); }
+.attrition-table .att-pct { text-align: right; color: var(--text-dim); font-family: var(--font-mono); }
+.attrition-table .att-arrive { color: var(--text-bright); font-weight: 600; }
+.attrition-table tfoot td { border-top: 1px solid var(--border); font-weight: 600; }

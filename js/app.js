@@ -39,6 +39,7 @@ let appDefenseSystems = [];   // defense system specs from data/defenses.json
 let appAttackSystems  = [];   // attack platforms from data/attacks.json
 let appDefaultDefenses = {};  // default defense assignments from data/defaults.json  (targetId → defenses[])
 let appPresets         = [];  // defense group presets from data/presets.json
+let appAttrition       = null; // organic attrition rates from data/attrition.json
 
 let selectedTargetId   = null;
 let attackManifest     = [];   // [{platformId, count}]
@@ -425,7 +426,7 @@ let _minimapMarker = null;        // Leaflet circleMarker instance
 
 async function loadData() {
   // Fetch all data files in parallel
-  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes, presetsRes, pkRes, doctrineRes] = await Promise.allSettled([
+  const [scenarioRes, targetsRes, defensesRes, attacksRes, defaultsRes, presetsRes, pkRes, doctrineRes, attritionRes] = await Promise.allSettled([
     fetch('data/data.json').then(r => r.json()),
     fetch('data/targets.json').then(r => r.json()),
     fetch('data/defenses.json').then(r => r.json()),
@@ -433,8 +434,13 @@ async function loadData() {
     fetch('data/defaults.json').then(r => r.json()),
     fetch('data/presets.json').then(r => r.json()),
     fetch('data/pk-table.json').then(r => r.json()),
-    fetch('data/doctrine.json').then(r => r.json())
+    fetch('data/doctrine.json').then(r => r.json()),
+    fetch('data/attrition.json').then(r => r.json())
   ]);
+
+  // Organic attrition rates (attrition.json); without them no platform is lost
+  if (attritionRes.status === 'fulfilled') appAttrition = attritionRes.value;
+  else console.warn('Could not load data/attrition.json — no organic attrition:', attritionRes.reason);
 
   // Default engagement configuration (pk-table.json, doctrine.json).
   // Normalised later by applyEngagementConfig(), once the catalogs exist.
@@ -861,6 +867,23 @@ function getCrossTargetDefenses(targetId) {
 
   result.sort((a, b) => a._distanceKm - b._distanceKm);
   return result;
+}
+
+/**
+ * Organic attrition for an attack on targetId: { threatType: percent lost
+ * before the first layer }. Ballistic types lose the same share everywhere;
+ * drones and cruise missiles lose a share set by the target (the water
+ * place points) or else its country (data/attrition.json).
+ */
+function _attritionFor(targetId) {
+  const a = appAttrition;
+  const t = getTarget(targetId);
+  if (!a || !t) return {};
+  const out = {};
+  for (const type of a.ballistic?.types || []) out[type] = a.ballistic.pct || 0;
+  const pct = a.distance?.pct_by_target?.[targetId] ?? a.distance?.pct_by_country?.[t.country] ?? 0;
+  for (const type of a.distance?.types || []) out[type] = pct;
+  return out;
 }
 
 /**
@@ -2197,7 +2220,7 @@ async function simulate() {
     // re-run the simulation from the same starting point.
     const preSimSnap = { ...globalMagState };
 
-    const run     = _runNewAttack(attackManifest, allDefenses, globalMagState);
+    const run     = _runNewAttack(attackManifest, allDefenses, globalMagState, _attritionFor(selectedTargetId));
     const results = run.results;
 
     // Merge updated magazine levels back into globalMagState (with the
@@ -2233,7 +2256,8 @@ async function simulate() {
         allDefenses,
         manualOverrides: run.overrides,
         attackManifest,
-        draws:          run.draws
+        draws:          run.draws,
+        attrition:      run.attrition
       }));
       simHistoryCursor = simHistory.length - 1;
       lastSimSnapshotId = simHistory[simHistoryCursor].id;
@@ -2560,6 +2584,7 @@ function _canReplay(snap) {
 function _replayAttack(snap, startMag, overrides = null) {
   const extra = { draws: createDrawLog({ log: JSON.parse(JSON.stringify(snap.draws || {})), seed: snap.id }) };
   if (overrides && Object.keys(overrides).length) extra.overrides = overrides;
+  if (snap.attrition) extra.attrition = snap.attrition;
   return runSimulation(snap.attackManifest, snap.allDefenses, { ...startMag }, {}, extra);
 }
 
@@ -2857,6 +2882,31 @@ function renderResultsSummary(results, target) {
   ).join('');
 
   const systemsEngaged = new Set(allEngagements(results).map(e => e.systemId)).size;
+  const attrited = results.totalAttrited || 0;
+  const arrived  = results.totalIn - attrited;
+
+  // Organic attrition: launched → lost → reaching the first defenses, per platform
+  let attritionHtml = '';
+  const plats = (results.byThreatType || []).flatMap(t => (t.platforms || []).map(p => ({ ...p, type: t.threatType })));
+  if (plats.some(p => p.attritionPct > 0)) {
+    const rows = plats.map(p => `
+      <tr>
+        <td>${p.platformName}</td>
+        <td class="att-num">${p.initialCount}</td>
+        <td class="att-num">${p.attritionLost ? '−' + p.attritionLost : '0'}</td>
+        <td class="att-pct">${p.attritionPct || 0}%</td>
+        <td class="att-num att-arrive">${_arrivedOf(p)}</td>
+      </tr>`).join('');
+    attritionHtml = `
+      <div class="summary-attrition">
+        <div class="summary-attrition-title">Before the first defenses — organic attrition (launch failures, duds, range)</div>
+        <table class="attrition-table">
+          <thead><tr><th>Platform</th><th class="att-num">Launched</th><th class="att-num">Lost</th><th class="att-pct">Rate</th><th class="att-num">Arrive</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td>Total</td><td class="att-num">${results.totalIn}</td><td class="att-num">${attrited ? '−' + attrited : '0'}</td><td></td><td class="att-num att-arrive">${arrived}</td></tr></tfoot>
+        </table>
+      </div>`;
+  }
 
   el.innerHTML = `
     <div class="summary-header">
@@ -2864,9 +2914,10 @@ function renderResultsSummary(results, target) {
         <div class="summary-target">${target?.name || 'Unknown Target'}</div>
         <div class="summary-meta">${target?.country || ''}</div>
       </div>
-      <div class="summary-count">${results.totalIn} platforms inbound</div>
+      <div class="summary-count">${attrited ? `${results.totalIn} launched · ${arrived} arrive` : `${results.totalIn} platforms inbound`}</div>
     </div>
     <div class="summary-threats">${typeHtml}</div>
+    ${attritionHtml}
     <div class="summary-layers-note">${systemsEngaged} defensive system${systemsEngaged !== 1 ? 's' : ''} engaged</div>
   `;
 }
@@ -2899,7 +2950,7 @@ function buildThreatTypeSection(group) {
   hdr.innerHTML = `
     <span class="threat-section-icon">${icon}</span>
     <span class="threat-section-label">${label}</span>
-    <span class="threat-section-count">${initialCount} inbound${_addedNote(group.addedCount)}</span>
+    <span class="threat-section-count">${_launchNote(group)}${_addedNote(group.addedCount)}</span>
   `;
   section.appendChild(hdr);
 
@@ -2913,7 +2964,7 @@ function buildThreatTypeSection(group) {
     block.innerHTML = `
       <div class="platform-section-header">
         <span class="platform-section-name">${plat.platformName}</span>
-        <span class="platform-section-count">${plat.initialCount} inbound${_addedNote(plat.addedCount)} · ${platFtr}</span>
+        <span class="platform-section-count">${_launchNote(plat)}${_addedNote(plat.addedCount)} · ${platFtr}</span>
       </div>`;
 
     if (plat.engagements.length === 0) {
@@ -3027,9 +3078,20 @@ function buildEngagementProse(eng, threatType) {
 }
 
 /** Format a possibly-fractional count for display (1.5 → "1.5", 24 → "24"). */
-/** Threats a type or platform block faced: the manifest count plus any added at layers. */
+/** Threats a type or platform block faced: launched, less organic attrition, plus any added at layers. */
 function _inboundOf(block) {
-  return block.initialCount + (block.addedCount || 0);
+  return block.initialCount - (block.attritionLost || 0) + (block.addedCount || 0);
+}
+
+/** Threats that reached the first layer: launched less organic attrition. */
+function _arrivedOf(block) {
+  return block.initialCount - (block.attritionLost || 0);
+}
+
+/** "250 launched · 238 arrive (5% attrition)" — or "250 inbound" when none was lost. */
+function _launchNote(block) {
+  if (!block.attritionLost) return `${block.initialCount} inbound`;
+  return `${block.initialCount} launched · ${_arrivedOf(block)} arrive (${block.attritionPct}% attrition)`;
 }
 
 /** " (+5 at layers)" / " (−3 at layers)" when an incoming override changed the count, else "". */
@@ -3177,8 +3239,11 @@ function renderResultsFinal(results) {
   const el = document.getElementById('results-final');
 
   const penetrators = results.finalThreats.filter(t => t.count > 0);
-  const faced       = results.totalIn + (results.totalAdded || 0);
-  const addedNote   = results.totalAdded ? `<div class="final-sub">${results.totalIn} launched${_addedNote(results.totalAdded)}.</div>` : '';
+  const attrited    = results.totalAttrited || 0;
+  const faced       = results.totalIn - attrited + (results.totalAdded || 0);
+  const addedNote   = (results.totalAdded || attrited)
+    ? `<div class="final-sub">${results.totalIn} launched${attrited ? `, ${attrited} lost to attrition before the defenses` : ''}${_addedNote(results.totalAdded)}.</div>`
+    : '';
   const allKilled   = results.totalOut === 0;
   const noneKilled  = results.totalOut === faced;
 
@@ -3319,7 +3384,7 @@ async function _confirmTruncate() {
 
 function _createSnapshot({ id, isInitial, type, label, targetId, targetName,
                             magStateBefore, magStateAfter, reloadsState,
-                            results, shown, allDefenses, manualOverrides, attackManifest, draws }) {
+                            results, shown, allDefenses, manualOverrides, attackManifest, draws, attrition }) {
   const snap = {
     id:             id || _newSnapshotId(),
     type:           type || (isInitial ? 'initial' : 'attack'),
@@ -3339,7 +3404,9 @@ function _createSnapshot({ id, isInitial, type, label, targetId, targetName,
     engagementConfig: _engagementConfigRef(),
     // Each entry's random draws ({ "type|platformId|defId": [u, …] }), so the
     // attack can be run again after an override with the same luck.
-    ...(draws ? { draws: JSON.parse(JSON.stringify(draws)) } : {})
+    ...(draws ? { draws: JSON.parse(JSON.stringify(draws)) } : {}),
+    // Organic attrition the attack ran with ({ type: percent }), reused by replays
+    ...(attrition ? { attrition: { ...attrition } } : {})
   };
   return snap;
 }
@@ -3348,29 +3415,30 @@ function _newSnapshotId() {
   return `snap_${Date.now()}_${simHistory.length}`;
 }
 
-/** History-entry totals of a result: threats in (manifest), out, and added at layers. */
+/** History-entry totals of a result: launched (manifest), out, added at layers, lost to attrition. */
 function _statsOf(r) {
-  return { totalIn: r.totalIn, totalOut: r.totalOut, totalAdded: r.totalAdded || 0 };
+  return { totalIn: r.totalIn, totalOut: r.totalOut, totalAdded: r.totalAdded || 0, totalAttrited: r.totalAttrited || 0 };
 }
 
 /**
  * Run a new attack: record its random draws, then apply the threat counts
  * set in advance on its manifest (entry.layers: { defId: incoming }), if any,
  * as incoming overrides with the same draws.
- * @returns {{ id, draws, results, display, overrides }} id is the history
- *          entry id to use (its seed for replays); results have no overrides,
- *          display has the pre-set ones
+ * attrition is the organic attrition for the target (_attritionFor).
+ * @returns {{ id, draws, results, display, overrides, attrition }} id is the
+ *          history entry id to use (its seed for replays); results have no
+ *          overrides, display has the pre-set ones
  */
-function _runNewAttack(manifest, defenses, startMag) {
+function _runNewAttack(manifest, defenses, startMag, attrition = {}) {
   const id      = _newSnapshotId();
   const draws   = createDrawLog({ fresh: () => Math.random() });
-  const results = runSimulation(manifest, defenses, startMag, {}, { draws });
+  const results = runSimulation(manifest, defenses, startMag, {}, { draws, attrition });
   const overrides = _presetOverrides(manifest);
   const display = Object.keys(overrides).length
     ? runSimulation(manifest, defenses, { ...startMag }, {},
-        { draws: createDrawLog({ log: JSON.parse(JSON.stringify(draws.log)), seed: id }), overrides })
+        { draws: createDrawLog({ log: JSON.parse(JSON.stringify(draws.log)), seed: id }), overrides, attrition })
     : results;
-  return { id, draws: draws.log, results, display, overrides };
+  return { id, draws: draws.log, results, display, overrides, attrition };
 }
 
 /** Incoming overrides from a manifest's pre-set layer counts. */
@@ -3487,7 +3555,7 @@ function renderHistoryDialogBody() {
 
     let statsHtml = '';
     if (snap.stats) {
-      const killed = snap.stats.totalIn + (snap.stats.totalAdded || 0) - snap.stats.totalOut;
+      const killed = snap.stats.totalIn - (snap.stats.totalAttrited || 0) + (snap.stats.totalAdded || 0) - snap.stats.totalOut;
       statsHtml = `<div class="history-entry-stats">${killed} killed · ${snap.stats.totalOut} leaked</div>`;
     }
 
@@ -3617,16 +3685,21 @@ function _buildAttackSection(snap, index) {
   const location   = [snap.targetName, target?.country].filter(Boolean).join(', ');
   const totalIn    = snap.stats?.totalIn  ?? 0;
   const totalOut   = snap.stats?.totalOut ?? 0;
-  const totalKilled = totalIn + (snap.stats?.totalAdded || 0) - totalOut;
+  const totalKilled = totalIn - (snap.stats?.totalAttrited || 0) + (snap.stats?.totalAdded || 0) - totalOut;
 
   // ── Inbound platforms table ────────────────────────────────────────────────
+  // Organic attrition per platform, from the results (absent for attacks run before it existed)
+  const attOf = new Map((results.byThreatType || []).flatMap(t => (t.platforms || []).map(p => [p.platformId, p])));
+  const hasAttrition = [...attOf.values()].some(p => p.attritionPct > 0);
   let platformRows = '';
   for (const entry of snap.attackManifest) {
     const cat = PLATFORM_CATALOG[entry.platformId];
+    const p   = attOf.get(entry.platformId);
     platformRows += `<tr>
       <td>${cat?.name || entry.platformId}</td>
       <td>${THREAT_TYPE_LABELS[cat?.type] || cat?.type || '—'}</td>
       <td class="pr-num">${entry.count}</td>
+      ${hasAttrition ? `<td class="pr-num">${p?.attritionLost ? '−' + p.attritionLost : 0} (${p?.attritionPct || 0}%)</td><td class="pr-num">${p ? _arrivedOf(p) : entry.count}</td>` : ''}
     </tr>`;
   }
 
@@ -3638,7 +3711,7 @@ function _buildAttackSection(snap, index) {
 
     let engRows = '';
     for (const plat of group.platforms || []) {
-      engRows += `<tr class="pr-platform-row"><td colspan="7">${plat.platformName} &nbsp;—&nbsp; ${plat.initialCount} inbound${_addedNote(plat.addedCount)}, ${plat.finalCount} leaked</td></tr>`;
+      engRows += `<tr class="pr-platform-row"><td colspan="7">${plat.platformName} &nbsp;—&nbsp; ${_launchNote(plat)}${_addedNote(plat.addedCount)}, ${plat.finalCount} leaked</td></tr>`;
       if (plat.engagements.length === 0) {
         engRows += `<tr class="pr-row-dim"><td colspan="7" class="pr-italic">No system engages this platform</td></tr>`;
       }
@@ -3678,7 +3751,7 @@ function _buildAttackSection(snap, index) {
     }
 
     engagementHtml += `
-      <div class="pr-section-label">${typeLabel} &nbsp;—&nbsp; ${group.initialCount} inbound${_addedNote(group.addedCount)}</div>
+      <div class="pr-section-label">${typeLabel} &nbsp;—&nbsp; ${_launchNote(group)}${_addedNote(group.addedCount)}</div>
       <table class="pr-table">
         <thead><tr>
           <th>System</th><th>Location</th><th>In</th>
@@ -3705,7 +3778,8 @@ function _buildAttackSection(snap, index) {
     .map(g => {
       const lbl     = SHORT_TYPE_LABELS[g.threatType] || g.threatType;
       const leakers = g.finalCount;
-      return `${lbl} ${g.initialCount} incoming${_addedNote(g.addedCount)} → <strong>${leakers} leaker${leakers !== 1 ? 's' : ''}</strong>`;
+      const arrivedNote = g.attritionLost ? ` (${_arrivedOf(g)} arrive)` : '';
+      return `${lbl} ${g.initialCount} incoming${arrivedNote}${_addedNote(g.addedCount)} → <strong>${leakers} leaker${leakers !== 1 ? 's' : ''}</strong>`;
     });
 
   const summaryClass = totalOut > 0 ? 'pr-attack-summary pr-attack-summary--leak' : 'pr-attack-summary';
@@ -3725,7 +3799,7 @@ function _buildAttackSection(snap, index) {
 
       <div class="pr-section-label">Inbound Platforms</div>
       <table class="pr-table">
-        <thead><tr><th>Platform</th><th>Type</th><th>Salvo</th></tr></thead>
+        <thead><tr><th>Platform</th><th>Type</th><th>Salvo</th>${hasAttrition ? '<th>Attrition</th><th>Arrive</th>' : ''}</tr></thead>
         <tbody>${platformRows}</tbody>
       </table>
 
@@ -4916,7 +4990,7 @@ function _runOneQueuedAttack(entry) {
   const allDefenses = _attackDefenses(entry.targetId);
   const preSimSnap  = { ...globalMagState };
 
-  const run     = _runNewAttack(entry.manifest, allDefenses, globalMagState);
+  const run     = _runNewAttack(entry.manifest, allDefenses, globalMagState, _attritionFor(entry.targetId));
   const results = run.results;
 
   // Persist magazine depletion globally (with pre-set layer counts applied)
@@ -4939,7 +5013,8 @@ function _runOneQueuedAttack(entry) {
       allDefenses,
       manualOverrides: run.overrides,
       attackManifest:  entry.manifest,
-      draws:           run.draws
+      draws:           run.draws,
+      attrition:       run.attrition
     }));
     simHistoryCursor = simHistory.length - 1;
   }

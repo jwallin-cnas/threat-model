@@ -101,6 +101,23 @@ for type in doctrine.typeOrder
 Results are grouped `byThreatType[].platforms[].engagements[]`. Manual
 overrides in the tool are keyed by type, platform and battery.
 
+## Organic attrition
+
+Before the first layer, each platform in an attack loses a share of its
+salvo to launch failures, duds and range (`config.attrition`, `{ type:
+percent }`). The number that arrives is rounded up
+(`attritionArrivals`): 250 at 5% → 238 arrive, and a salvo too small to
+lose a whole platform loses none. The tool takes the rates from
+`data/attrition.json`: ballistic missiles lose 5% everywhere; drones (FPV
+included) and cruise missiles lose 5% at Gulf states and Iraq, 10% in
+Saudi Arabia and Oman, 15% in Israel and Jordan, with per-location values
+for the water place points (5% in Gulf waters, 10% Red Sea, 15%
+Mediterranean). Results keep the launched count as `initialCount` and
+report `attritionLost` / `attritionPct` per type and platform and
+`totalAttrited`. Each history entry stores the rates it ran with, so
+replays reuse them. The engine applies no attrition without the config
+(the unit tests and the parity check).
+
 ## Manual overrides and replays
 
 Every attack the tool runs records its random draws (`createDrawLog`): one

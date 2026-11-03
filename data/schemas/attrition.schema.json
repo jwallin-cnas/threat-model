@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data/schemas/attrition.schema.json",
+  "title": "Organic Attrition Schema",
+  "description": "Validates attrition.json: the share of launched platforms lost before the first defensive layer.",
+  "type": "object",
+  "required": ["ballistic", "distance"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema":      { "type": "string" },
+    "version":      { "type": "string" },
+    "_description": { "type": "string" },
+    "ballistic": {
+      "type": "object",
+      "description": "One share for every target.",
+      "required": ["types", "pct"],
+      "additionalProperties": false,
+      "properties": {
+        "types": { "$ref": "#/definitions/ThreatTypes" },
+        "pct":   { "$ref": "#/definitions/Pct" }
+      }
+    },
+    "distance": {
+      "type": "object",
+      "description": "A share by target: pct_by_target first, else pct_by_country for the target's country, else 0.",
+      "required": ["types", "pct_by_country"],
+      "additionalProperties": false,
+      "properties": {
+        "types":          { "$ref": "#/definitions/ThreatTypes" },
+        "pct_by_country": { "type": "object", "additionalProperties": { "$ref": "#/definitions/Pct" } },
+        "pct_by_target":  { "type": "object", "additionalProperties": { "$ref": "#/definitions/Pct" } }
+      }
+    }
+  },
+  "definitions": {
+    "Pct": { "type": "number", "minimum": 0, "maximum": 100, "description": "Percent of launched platforms lost." },
+    "ThreatTypes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["mrbm", "srbm", "cruise_missile", "drone_jet", "drone", "fpv"] }
+    }
+  }
+}

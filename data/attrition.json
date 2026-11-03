@@ -1,0 +1,31 @@
+{
+  "$schema": "schemas/attrition.schema.json",
+  "version": "1.0",
+  "_description": "Organic attrition: the share of launched platforms lost before the first defensive layer (launch failures, duds, range). Applied per platform in an attack; the number that arrives is rounded up. Ballistic missiles lose the same share everywhere. Drones and cruise missiles lose a share that grows with distance from Iran, set per target country, with per-location values for the water place points (their country is the United States).",
+  "ballistic": {
+    "types": ["mrbm", "srbm"],
+    "pct": 5
+  },
+  "distance": {
+    "types": ["cruise_missile", "drone_jet", "drone", "fpv"],
+    "pct_by_country": {
+      "Bahrain": 5,
+      "Iraq": 5,
+      "Kuwait": 5,
+      "Qatar": 5,
+      "United Arab Emirates": 5,
+      "Oman": 10,
+      "Saudi Arabia": 10,
+      "Israel": 15,
+      "Jordan": 15,
+      "Lebanon": 15
+    },
+    "pct_by_target": {
+      "persian_gulf_place_point": 5,
+      "strait_of_hormuz_place_point": 5,
+      "gulf_of_oman_place_point": 5,
+      "red_sea_place_point": 10,
+      "mediterranean_sea_place_point": 15
+    }
+  }
+}

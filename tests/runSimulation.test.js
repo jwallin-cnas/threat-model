@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  runSimulationCore, normalizeDoctrine, normalizePkTable, groupManifest, allEngagements, createDrawLog,
+  runSimulationCore, normalizeDoctrine, normalizePkTable, groupManifest, allEngagements, createDrawLog, attritionArrivals,
   buildMockConfig, MOCK_DOCTRINE, MOCK_PK_TABLE, mkDef, extractMag, seq
 } from './setup.js';
 
@@ -434,6 +434,36 @@ describe('runSimulationCore — incoming overrides', () => {
     expect(allEngagements(r)).toHaveLength(1);
     expect(r.totalAdded).toBe(0);
     expect(calls).toBe(0);
+  });
+});
+
+describe('runSimulationCore — organic attrition', () => {
+  it('rounds arrivals up', () => {
+    expect(attritionArrivals(250, 5)).toBe(238);    // 237.5 → 238, 12 lost
+    expect(attritionArrivals(100, 15)).toBe(85);    // exact
+    expect(attritionArrivals(19, 5)).toBe(19);      // 18.05 → 19, none lost
+    expect(attritionArrivals(20, 5)).toBe(19);
+    expect(attritionArrivals(1, 15)).toBe(1);
+    expect(attritionArrivals(40, 0)).toBe(40);
+  });
+
+  it('removes the lost platforms before the first layer, per platform, and reports them', () => {
+    const config = buildMockConfig({ attrition: { drone: 10, srbm: 5 } });
+    const r = run([{ platformId: 'drone_a', count: 25 }, { platformId: 'drone_b', count: 9 }, { platformId: 'srbm_a', count: 3 }],
+      [mkDef('s1', 'sam', 1)], {}, {}, config);
+    const drones = r.byThreatType.find(t => t.threatType === 'drone');
+    expect(drones.platforms.map(p => [p.initialCount, p.attritionLost, p.engagements[0].threatsIn]))
+      .toEqual([[25, 2, 23], [9, 0, 9]]);                       // 22.5 → 23; 8.1 → 9
+    expect(drones).toMatchObject({ initialCount: 34, attritionLost: 2, attritionPct: 10 });
+    expect(r.byThreatType.find(t => t.threatType === 'srbm').attritionLost).toBe(0);   // 2.85 → 3 arrive
+    expect(r.totalIn).toBe(37);
+    expect(r.totalAttrited).toBe(2);
+  });
+
+  it('applies no attrition without the config', () => {
+    const r = run([{ platformId: 'drone_a', count: 25 }], [mkDef('s1', 'sam')]);
+    expect(r.totalAttrited).toBe(0);
+    expect(allEngagements(r)[0].threatsIn).toBe(25);
   });
 });
 
