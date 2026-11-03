@@ -3492,6 +3492,13 @@ function _printIsWaterPoint(targetId) { return /_place_point$/.test(targetId || 
  * Each entry is listed under the location where it is placed (its own target,
  * or the target it covers from), in targets.json order, countries by first
  * appearance; the water place points close the list under "Maritime".
+ *
+ * A totals block comes first: interceptors expended per system type and
+ * operator group (United States, Israel, Ally/Partner), with the remaining
+ * and starting inventory of that type and group, e.g.
+ * "United States: Patriot: -300 (150/450)". Inventory is loaded interceptors
+ * plus reserve chips × chip size, over every entry of that type and group,
+ * at the initial state and after the last history entry.
  */
 function _buildChipChangesSection(attacks) {
   // Home target of every entry in the current laydown (first listing wins).
@@ -3533,6 +3540,7 @@ function _buildChipChangesSection(attacks) {
   if (byDef.size === 0) {
     body = '<div class="pr-no-change">No interceptors expended in these attacks.</div>';
   } else {
+    body += _buildInterceptorTotals(byDef);
     // country → location → entries, in targets.json order; Maritime last
     const rank = r => (r.country === PRINT_MARITIME_HEADING ? 1e6 : 0) + (r.home ? orderOf.get(r.home.id) ?? 5e5 : 5e5);
     const recs = [...byDef.values()].sort((a, b) => rank(a) - rank(b));
@@ -3563,10 +3571,72 @@ function _buildChipChangesSection(attacks) {
   return `
     <div class="pr-summary pr-attack--break">
       <div class="pr-summary-title">Chip Changes — Blue</div>
-      <div class="pr-summary-note">Interceptors expended across all ${attacks.length} attack${attacks.length !== 1 ? 's' : ''}. One chip is one full load of one system.</div>
+      <div class="pr-summary-note">Interceptors expended across all ${attacks.length} attack${attacks.length !== 1 ? 's' : ''}. One chip is one full load of one system. Totals show (remaining / starting) interceptors, loaded plus reserve chips.</div>
       ${body}
     </div>
   `;
+}
+
+/** Operator groups for the Blue totals, in print order. */
+const PRINT_OPERATOR_GROUPS = ['United States', 'Israel', 'Ally/Partner'];
+function _printOperatorGroup(operator) {
+  const o = String(operator || '').trim().toLowerCase().replace(/\./g, '');
+  if (o === 'united states' || o === 'us' || o === 'usa') return 'United States';
+  if (o === 'israel') return 'Israel';
+  return 'Ally/Partner';
+}
+
+/** Interceptors an entry holds in a snapshot: loaded plus reserve chips × chip size. */
+function _printInventory(def, snap) {
+  const catalog = DEFENSE_CATALOG[def.system];
+  const maxMag  = (catalog?.magazinePerBattery || 0) * (def.quantity || 1);
+  const mag     = snap?.magStateAfter || {};
+  const loaded  = (def.id in mag) ? mag[def.id] : maxMag;
+  const reserve = snap?.reloadsState?.[def.id] ?? def.reloads ?? 0;
+  return loaded + reserve * chipSizeFor(def);
+}
+
+/**
+ * Totals block of the Blue summary: one line per system type and operator
+ * group with losses. byDef is the per-entry map of _buildChipChangesSection.
+ */
+function _buildInterceptorTotals(byDef) {
+  const sysOrder = new Map(appDefenseSystems.map((s, i) => [s.id, i]));
+  const keyOf    = def => `${_printOperatorGroup(def.operator)}|${def.system}`;
+  const totals   = new Map();   // key → { group, system, label, used, start, end }
+  for (const r of byDef.values()) {
+    const key = keyOf(r.def);
+    if (!totals.has(key)) {
+      totals.set(key, { group: _printOperatorGroup(r.def.operator), system: r.def.system,
+                        label: _printSystemLabel(r.catalog), used: 0, start: 0, end: 0 });
+    }
+    totals.get(key).used += r.used;
+  }
+
+  // Inventory of every entry of those types and groups: the current laydown,
+  // plus any entry with losses that has since been removed. Each id once.
+  const initial = simHistory[0];
+  const final   = simHistory[simHistory.length - 1];
+  const defs    = new Map();
+  for (const t of appTargetCatalog) {
+    for (const d of (t.defenses || [])) if (!defs.has(d.id)) defs.set(d.id, d);
+  }
+  for (const r of byDef.values()) if (!defs.has(r.def.id)) defs.set(r.def.id, r.def);
+  for (const def of defs.values()) {
+    const rec = totals.get(keyOf(def));
+    if (!rec || !(chipSizeFor(def) > 0)) continue;
+    rec.start += _printInventory(def, initial);
+    rec.end   += _printInventory(def, final);
+  }
+
+  const rows = [...totals.values()].sort((a, b) =>
+    PRINT_OPERATOR_GROUPS.indexOf(a.group) - PRINT_OPERATOR_GROUPS.indexOf(b.group) ||
+    (sysOrder.get(a.system) ?? 1e6) - (sysOrder.get(b.system) ?? 1e6));
+  let html = '<div class="pr-sum-group"><div class="pr-sum-heading">Totals by Interceptor and Operator</div>';
+  for (const r of rows) {
+    html += `<div class="pr-sum-line">${_printEsc(r.group)}: ${_printEsc(r.label)}: -${fmtNumber(r.used)} (${fmtNumber(Math.max(0, r.end))}/${fmtNumber(r.start)})</div>`;
+  }
+  return html + '</div>';
 }
 
 /** Plural threat-type headings for the Red summary, in engine type order. */
@@ -3580,10 +3650,22 @@ const PRINT_RED_TYPE_HEADINGS = {
   hypersonic:     'Hypersonic Glide Vehicles'
 };
 
+/** Short class names for the Red totals block ("MRBMs: -40"). */
+const PRINT_RED_CLASS_LABELS = {
+  mrbm:           'MRBMs',
+  srbm:           'SRBMs',
+  cruise_missile: 'Cruise Missiles',
+  drone_jet:      'Jet Drones',
+  drone:          'Drones',
+  fpv:            'FPV Drones',
+  hypersonic:     'Hypersonic Glide Vehicles'
+};
+
 /**
  * Red platform losses: every platform launched in the report's attacks is
  * spent, so the loss for a platform is the sum of its salvo sizes across all
- * attacks. Grouped by threat type; platforms keep first-launch order.
+ * attacks. A totals block by class (MRBMs, SRBMs, …) comes first, then the
+ * platforms grouped by threat type; platforms keep first-launch order.
  */
 function _buildRedLossesSection(attacks) {
   const byType = new Map();   // type → Map(platformId → count)
@@ -3599,6 +3681,15 @@ function _buildRedLossesSection(attacks) {
   const typeOrder = [...Object.keys(PRINT_RED_TYPE_HEADINGS), ...[...byType.keys()].filter(t => !(t in PRINT_RED_TYPE_HEADINGS))];
 
   let body = '';
+  const present = typeOrder.filter(t => byType.has(t));
+  if (present.length) {
+    body += '<div class="pr-sum-group"><div class="pr-sum-heading">Totals by Class</div>';
+    for (const type of present) {
+      const total = [...byType.get(type).values()].reduce((a, b) => a + b, 0);
+      body += `<div class="pr-sum-line">${_printEsc(PRINT_RED_CLASS_LABELS[type] || THREAT_TYPE_LABELS[type] || type)}: -${fmtNumber(total)}</div>`;
+    }
+    body += '</div>';
+  }
   for (const type of typeOrder) {
     const plats = byType.get(type);
     if (!plats) continue;

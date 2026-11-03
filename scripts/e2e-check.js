@@ -489,7 +489,22 @@ async function checkReportSummaries(browser, base) {
     const div = document.createElement('div'); div.innerHTML = window._buildPrintDocument();
     const secs = [...div.querySelectorAll('.pr-summary')];
     const lines = sec => [...sec.querySelectorAll('.pr-sum-heading, .pr-sum-location, .pr-sum-line')].map(e => e.textContent);
-    return { titles: secs.map(x => x.querySelector('.pr-summary-title').textContent), blue: lines(secs[0]), red: lines(secs[1]),
+    const groups = sec => [...sec.querySelectorAll('.pr-sum-group')].map(lines);
+    // Expected Blue totals, built from the laydown and history independently of the report code
+    const group = op => op === 'United States' ? 'United States' : op === 'Israel' ? 'Israel' : 'Ally/Partner';
+    const inv = (def, snap) => {
+      const full = DEFENSE_CATALOG[def.system].magazinePerBattery * def.quantity;
+      return (def.id in snap.magStateAfter ? snap.magStateAfter[def.id] : full) + (snap.reloadsState[def.id] ?? 0) * chipSizeFor(def);
+    };
+    const exp = {}, seen = new Set();
+    for (const t of appTargetCatalog) for (const d of t.defenses || []) {
+      if (seen.has(d.id) || !(chipSizeFor(d) > 0)) continue; seen.add(d.id);
+      const k = group(d.operator) + ': ' + _printSystemLabel(DEFENSE_CATALOG[d.system]);
+      exp[k] = exp[k] || { start: 0, end: 0 };
+      exp[k].start += inv(d, simHistory[0]); exp[k].end += inv(d, simHistory[simHistory.length - 1]);
+    }
+    return { titles: secs.map(x => x.querySelector('.pr-summary-title').textContent), blue: groups(secs[0]).slice(1).flat(), red: lines(secs[1]),
+             blueTotals: groups(secs[0])[0], redTotals: groups(secs[1])[0], exp,
              thaadChip: _fmtChips(48 / 48), half: _fmtChips(18 / 36), label: _printSystemLabel(DEFENSE_CATALOG.thaad) };
   });
   check(r.titles.join('|') === 'Chip Changes — Blue|Platform Losses — Red', 'summaries: both sections close the report');
@@ -497,8 +512,23 @@ async function checkReportSummaries(browser, base) {
         'summaries: country, location, then "-1 chip (-36 ints.)" for one Patriot load ' + JSON.stringify(r.blue.slice(0, 3)));
   check(r.blue.includes('Patriot (Qatar): -3 chips (-108 ints.)'), 'summaries: a three-system Patriot entry emptied is three chips');
   check(r.thaadChip === '-1 chip' && r.half === '-0.5 chips' && r.label === 'THAAD', 'summaries: chip wording and THAAD short label');
-  check(JSON.stringify(r.red) === JSON.stringify(['Short-Range Ballistic Missiles', 'Fateh-110: -10', 'Drones', 'Geran-2: -500']),
-        'summaries: Red losses sum salvos by type (Geran-2 200+150+150 = -500) ' + JSON.stringify(r.red));
+  check(JSON.stringify(r.red) === JSON.stringify(['Totals by Class', 'SRBMs: -10', 'Drones: -500',
+                                                   'Short-Range Ballistic Missiles', 'Fateh-110: -10', 'Drones', 'Geran-2: -500']),
+        'summaries: Red class totals, then losses summed by platform (Geran-2 200+150+150 = -500) ' + JSON.stringify(r.red));
+  check(JSON.stringify(r.redTotals) === JSON.stringify(['Totals by Class', 'SRBMs: -10', 'Drones: -500']), 'summaries: Red totals block comes first');
+
+  // Blue totals: "Group: System: -used (remaining/starting)", groups in order, numbers consistent
+  const tl = r.blueTotals.slice(1).map(l => /^(United States|Israel|Ally\/Partner): (.+): -([\d.]+) \(([\d.]+)\/([\d.]+)\)$/.exec(l));
+  check(r.blueTotals[0] === 'Totals by Interceptor and Operator' && tl.length > 0 && tl.every(Boolean),
+        'summaries: Blue totals lines read "Group: System: -n (left/start)" ' + JSON.stringify(r.blueTotals));
+  const order = ['United States', 'Israel', 'Ally/Partner'];
+  check(tl.every((m, i) => i === 0 || order.indexOf(tl[i - 1][1]) <= order.indexOf(m[1])), 'summaries: Blue totals ordered U.S., Israel, Ally/Partner');
+  check(tl.every(m => { const e = r.exp[m[1] + ': ' + m[2]]; return e && +m[5] === e.start && +m[4] === e.end && Math.abs(+m[5] - +m[4] - +m[3]) < 1e-6; }),
+        'summaries: Blue totals match laydown inventory, and starting − expended = remaining');
+  const patUsed = r.blue.filter(l => /^Patriot \((Bahrain|Qatar|Saudi Arabia|United Arab Emirates|Kuwait|Oman)\)/.test(l))
+                        .reduce((n, l) => n + +/\(-([\d.]+) ints\.\)/.exec(l)[1], 0);
+  const patTot  = tl.find(m => m[1] === 'Ally/Partner' && m[2] === 'Patriot');
+  check(patTot && +patTot[3] === patUsed, `summaries: Ally/Partner Patriot total is the sum of the partner Patriot lines (${patUsed})`);
   check(errs.length === 0, 'summaries: no page errors ' + JSON.stringify(errs));
   await page.close();
 }
