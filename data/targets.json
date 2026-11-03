@@ -401,6 +401,13 @@
       "infrastructure": ["base"]
     },
     {
+      "id": "strait_of_hormuz_place_point",
+      "name": "Strait of Hormuz",
+      "country": "United States",
+      "location": [26.6, 56.45],
+      "infrastructure": ["base"]
+    },
+    {
       "id": "red_sea_place_point",
       "name": "Red Sea",
       "country": "United States",

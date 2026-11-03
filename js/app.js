@@ -3474,7 +3474,7 @@ function _fmtChips(n) {
   return `-${r} chip${r === 1 ? '' : 's'}`;
 }
 
-/** Water place points (Persian Gulf, Gulf of Oman, Red Sea, Mediterranean Sea) group as "Maritime", last. */
+/** Water place points (Persian Gulf, Strait of Hormuz, Gulf of Oman, Red Sea, Mediterranean Sea) group as "Maritime", last. */
 const PRINT_MARITIME_HEADING = 'Maritime';
 function _printIsWaterPoint(targetId) { return /_place_point$/.test(targetId || ''); }
 

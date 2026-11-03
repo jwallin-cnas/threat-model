@@ -21,7 +21,7 @@ Document layout (all Times New Roman):
             ("F-15E Patrol (×4) #2") in target-list order, as in the tool.
     A target id that is not in targets.json goes under "Other".
   • Water place points (target ids ending in "_place_point": Persian Gulf,
-    Gulf of Oman, Red Sea, Mediterranean Sea) are not filed under their
+    Strait of Hormuz, Gulf of Oman, Red Sea, Mediterranean Sea) are not filed under their
     targets.json country. They form a final "Maritime" section at the end
     of the document, in file order.
 
