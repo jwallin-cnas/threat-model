@@ -672,10 +672,36 @@ async function checkOverrideReplay(browser, base) {
   check(r7.ov === '{"drone":{"shahed_136":{"tn_ds":{"incoming":6}}}}' && r7.dsIn === 6 && r7.rawDs === null && r7.live === r7.after,
         'preset: the attack runs with 6 reaching David\'s Sling, stored as an override on the result ' + JSON.stringify({ ov: r7.ov, dsIn: r7.dsIn }));
   await page.click('.override-badge--incoming .btn-clear-override');
-  const r7b = await page.evaluate(() => ({ ov: Object.keys(simHistory[simHistory.length - 1].manualOverrides).length, ds: globalMagState.tn_ds ?? 'full', rows: document.querySelectorAll('.engagement-row').length }));
+  const r7b = await page.evaluate(() => ({ ov: Object.keys(simHistory[simHistory.length - 1].manualOverrides).length, ds: globalMagState.tn_ds ?? 'full', rows: document.querySelectorAll('.engagement-row').length,
+                                           layers: attackManifest[0].layers ?? null, btn: document.querySelector('.btn-manifest-layers').textContent.trim() }));
   check(r7b.ov === 0 && (r7b.ds === 'full' || r7b.ds === 36) && r7b.rows === 1, 'preset: clearing it on the result returns the interceptors and the row ' + JSON.stringify(r7b));
+  check(r7b.layers === null && r7b.btn === 'Layers', 'preset: clearing it on the result also clears it in the manifest (no second attack re-applies it) ' + JSON.stringify(r7b));
+
+  // 7c. After simulating, the Layers editor edits the shown attack in place — no second attack
+  const hist0 = await page.evaluate(() => simHistory.length);
+  const head = await page.textContent('.manifest-layers-head');
+  await page.fill('.manifest-layer-input[data-def="tn_ds"]', '9');
+  await page.press('.manifest-layer-input[data-def="tn_ds"]', 'Tab');
+  const r7c = await page.evaluate(() => ({ hist: simHistory.length, dsIn: __eng(_computeDisplayResults(), 'tn_ds')?.threatsIn, snapOv: JSON.stringify(simHistory[simHistory.length - 1].manualOverrides),
+                                           focus: document.activeElement?.className, btn: document.querySelector('.btn-manifest-layers').textContent.trim() }));
+  await page.fill('.manifest-layer-input[data-def="tn_ds"]', '');
+  await page.press('.manifest-layer-input[data-def="tn_ds"]', 'Tab');
+  const r7d = await page.evaluate(() => ({ hist: simHistory.length, ov: Object.keys(manualOverrides).length, rows: document.querySelectorAll('.engagement-row').length, layers: attackManifest[0].layers ?? null }));
+  check(/re-simulate the attack shown below/.test(head) && r7c.hist === hist0 && r7c.dsIn === 9 && r7c.snapOv === '{"drone":{"shahed_136":{"tn_ds":{"incoming":9}}}}' && r7c.btn === 'Layers (1)',
+        'live layers: after simulating, the editor re-simulates the shown attack in place (no new history entry) ' + JSON.stringify(r7c));
+  check(r7d.hist === hist0 && r7d.ov === 0 && r7d.rows === 1 && r7d.layers === null, 'live layers: blanking the box undoes it on the shown attack ' + JSON.stringify(r7d));
+
+  // 7e. Simulating the same manifest again asks first, and Cancel adds nothing
+  await page.click('#btn-simulate');
+  await page.waitForSelector('#modal-overlay:not(.hidden)', { timeout: 3000 });
+  const modal = await page.textContent('#modal-overlay');
+  await page.click('#modal-overlay button:has-text("Cancel")');
+  const hist1 = await page.evaluate(() => simHistory.length);
+  check(/second attack/.test(modal) && /no need to simulate again/.test(modal) && hist1 === hist0, 'live layers: simulating the same manifest again warns that it is a second attack; Cancel adds none');
 
   // 8. Pre-set counts ride along in the queue
+  await page.fill('.manifest-layer-input[data-def="tn_ds"]', '6');
+  await page.press('.manifest-layer-input[data-def="tn_ds"]', 'Tab');
   await page.evaluate(() => { addToQueue(); });
   const qLabel = await page.textContent('#queue-list');
   const r8 = await page.evaluate(() => { window._simulateQueueDirect(); const s = simHistory[simHistory.length - 1]; return { ov: JSON.stringify(s.manualOverrides), pts: JSON.stringify(perTargetState.tel_nof_ab.manualOverrides) }; });

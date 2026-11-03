@@ -1888,11 +1888,39 @@ function _layersFor(targetId, platformId) {
 }
 
 /**
+ * True when the manifest on screen produced the attack whose results are
+ * shown (same target, platforms and counts) and that attack can be re-run.
+ * Its Layers editor then edits that attack in place rather than the next run.
+ */
+function _manifestIsShownAttack() {
+  if (!lastSimResults || !selectedTargetId || lastSimTarget?.id !== selectedTargetId) return false;
+  const i = _shownAttackSnapshotIndex();
+  if (i < 0 || !simHistory[i].draws) return false;
+  const key = m => JSON.stringify((m || []).map(e => [e.platformId, e.count]).sort());
+  return key(simHistory[i].attackManifest) === key(attackManifest);
+}
+
+/** Copy the shown attack's incoming overrides into the manifest's layer counts (they describe the same attack). */
+function _syncLayersFromOverrides() {
+  for (const e of attackManifest) {
+    const type = PLATFORM_CATALOG[e.platformId]?.type;
+    const byDef = manualOverrides[type]?.[e.platformId] || {};
+    const layers = {};
+    for (const [defId, ov] of Object.entries(byDef)) if (ov?.incoming != null) layers[defId] = ov.incoming;
+    if (Object.keys(layers).length) e.layers = layers; else delete e.layers;
+  }
+}
+
+/**
  * Inline editor under a manifest row: for each layer that would engage the
- * platform, an optional count of threats that reach it. Saved on the
- * manifest entry as entry.layers = { defId: count }; a blank box leaves the
- * layer simulated. Applied as incoming overrides when the attack runs, then
- * shown and editable like any override.
+ * platform, an optional count of threats that reach it; a blank box leaves
+ * the layer simulated. Saved on the manifest entry as entry.layers =
+ * { defId: count }.
+ *
+ * Before the attack is simulated the counts are applied when it runs. Once
+ * its results are shown (_manifestIsShownAttack), the editor edits that
+ * attack: a change is an incoming override, re-simulated in place with the
+ * later history, exactly as the Incoming box on a result row.
  */
 function _buildLayerEditor(entry) {
   const box = document.createElement('div');
@@ -1902,10 +1930,13 @@ function _buildLayerEditor(entry) {
     box.innerHTML = '<p class="manifest-layers-empty">No system at this target engages this platform.</p>';
     return box;
   }
-  box.innerHTML = `<div class="manifest-layers-head">Threats reaching each layer — blank = simulated. Earlier layers keep their results.</div>`;
+  const live = _manifestIsShownAttack();
+  const type = PLATFORM_CATALOG[entry.platformId]?.type;
+  box.innerHTML = `<div class="manifest-layers-head">Threats reaching each layer — blank = simulated. Earlier layers keep their results. `
+    + (live ? '<strong>Changes re-simulate the attack shown below</strong> (and later attacks).' : 'Applied when you simulate.') + `</div>`;
   for (const d of layers) {
     const cat = DEFENSE_CATALOG[d.system];
-    const val = entry.layers?.[d.id];
+    const val = live ? manualOverrides[type]?.[entry.platformId]?.[d.id]?.incoming : entry.layers?.[d.id];
     const line = document.createElement('label');
     line.className = 'manifest-layer-line';
     line.innerHTML = `
@@ -1921,10 +1952,17 @@ function _buildLayerEditor(entry) {
         e.target.value = val ?? '';
         return;
       }
-      entry.layers = { ...(entry.layers || {}) };
-      if (n == null) delete entry.layers[d.id]; else entry.layers[d.id] = n;
-      if (Object.keys(entry.layers).length === 0) delete entry.layers;
-      _manifestUnchanged = false;
+      if (_manifestIsShownAttack()) {
+        // Edit the shown attack (the override syncs back into entry.layers)
+        _layerEditorBusy = true;
+        try { applyIncomingOverride(type, entry.platformId, d.id, n); }
+        finally { _layerEditorBusy = false; }
+      } else {
+        entry.layers = { ...(entry.layers || {}) };
+        if (n == null) delete entry.layers[d.id]; else entry.layers[d.id] = n;
+        if (Object.keys(entry.layers).length === 0) delete entry.layers;
+        _manifestUnchanged = false;
+      }
       saveSessionState();
       // Update the row's button in place so focus stays in the editor
       const n2  = Object.keys(entry.layers || {}).length;
@@ -1935,6 +1973,9 @@ function _buildLayerEditor(entry) {
   }
   return box;
 }
+
+/** True while a Layers editor change is being applied (the editor keeps its focus; no manifest re-render). */
+let _layerEditorBusy = false;
 
 function renderAttackManifest() {
   const container     = document.getElementById('attack-manifest');
@@ -2196,10 +2237,10 @@ async function simulate() {
   if (_manifestUnchanged) {
     const proceed = await showModal({
       title:   'Attack Manifest Unchanged',
-      message: 'Attack manifest unchanged since last simulation. Simulate anyways?',
+      message: 'This manifest has already been simulated — its result is shown below. Simulating again runs a second attack, against the interceptors that are left. (Changes made on the results, or in the Layers editor, already re-simulate that attack: there is no need to simulate again.) Run a second attack?',
       buttons: [
-        { label: 'Yes', value: true,  style: 'primary'   },
-        { label: 'No',  value: false, style: 'secondary' }
+        { label: 'Run a second attack', value: true,  style: 'primary'   },
+        { label: 'Cancel',              value: false, style: 'secondary' }
       ]
     });
     if (!proceed) return;
@@ -2266,6 +2307,7 @@ async function simulate() {
     }
 
     renderDefenseLayers(selectedTargetId);
+    renderAttackManifest();   // an open Layers editor now edits this attack
     if (Object.keys(run.overrides).length) rerenderWithOverrides(run.display);
     else renderSimulationResults(results, target);
 
@@ -2536,6 +2578,11 @@ function _changeOverrides(mutate) {
 
   saveHistoryState();
   saveMagStateToStorage();
+  // The manifest that produced this attack keeps its layer counts in step
+  if (_manifestIsShownAttack()) {
+    _syncLayersFromOverrides();
+    if (!_layerEditorBusy) renderAttackManifest();
+  }
   _saveTargetState(selectedTargetId);
   rerenderWithOverrides(display);
 
