@@ -459,7 +459,8 @@ function forcedResult(ov, { remaining, magazine, reserve = 0, P, shotsPerThreat,
  *
  * @param {Array}  attackManifest         [{platformId, count}]
  * @param {Array}  defenses               deployed entries: { id, system, quantity, notes?,
- *                                        locationName?, locationCountry?, restrictToThreatTypes? }
+ *                                        locationName?, locationCountry?, restrictToThreatTypes?,
+ *                                        movedFrom? (a moved CAP's home, copied to its records) }
  * @param {Object} [initialMagazineState] { defId: interceptorsRemaining }; a missing key = full
  * @param {Object} [excludedByThreatType] { type: [defId] } or { type: { platformId|'*': [defId] } }
  * @param {Object} config                 { pkTable, doctrine, defenseCatalog, platformCatalog,
@@ -596,6 +597,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
           notes:           e.def.notes || '',
           locationName:    e.def.locationName    || '',
           locationCountry: e.def.locationCountry || '',
+          ...(e.def.movedFrom ? { movedFrom: e.def.movedFrom } : {}),
           threatType,
           platformId:      group.platformId,
           platformName:    platform.name,

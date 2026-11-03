@@ -66,6 +66,7 @@ let perTargetState   = {};    // targetId → { attackManifest, lastSim*, preSim
 // ── Attack queue ──────────────────────────────────────────────────────────────
 // Ordered list of staged attacks to be executed in sequence.
 let attackQueue      = [];    // [{ id, targetId, targetName, targetCountry, manifest }]
+let pendingCapMoves  = {};    // CAP defId → targetId (or null: home) for the next attack simulated
 
 // ── Minimap state ─────────────────────────────────────────────────────────────
 let _minimapCrossLayers = [];   // Leaflet layers for cross-target coverage circles
@@ -379,7 +380,8 @@ function saveSessionState() {
       selectedTargetId,
       attackManifest,
       attackQueue,
-      perTargetState
+      perTargetState,
+      pendingCapMoves
     }));
   } catch (e) { /* non-critical */ }
 }
@@ -586,6 +588,8 @@ async function loadData() {
       perTargetState = storedSession.perTargetState;
     if (storedSession.selectedTargetId)
       selectedTargetId = storedSession.selectedTargetId;
+    if (storedSession.pendingCapMoves && typeof storedSession.pendingCapMoves === 'object')
+      pendingCapMoves = storedSession.pendingCapMoves;
   }
 }
 
@@ -825,50 +829,308 @@ function haversine(lat1, lon1, lat2, lon2) {
  * given targetId. Each entry is the original defense object annotated with
  * _isCrossTarget, _placedAtTargetId, _placedAtTargetName, _placedAtTargetCountry, and _distanceKm.
  * Sorted nearest-source-target first.
+ *
+ * A CAP moved elsewhere (positions: defId → targetId, default the live
+ * positions) is placed at its new location instead of its laydown listing;
+ * moved to targetId itself, it is listed at distance 0 with _movedHere.
+ * Moved CAPs carry _movedFromName (their laydown location).
  */
-function getCrossTargetDefenses(targetId) {
+function getCrossTargetDefenses(targetId, positions = _livePositions()) {
   const target = getTarget(targetId);
   if (!target || !Array.isArray(target.location) || target.location[0] == null) return [];
   const [tlat, tlon] = target.location;
 
-  const result = [];
+  // Placements: every laydown listing, with a moved CAP at its new location only
+  const placements = [];
   for (const other of appTargetCatalog) {
-    if (other.id === targetId) continue;
+    for (const def of (other.defenses || [])) {
+      if (positions[def.id] === undefined) placements.push({ def, at: other });
+    }
+  }
+  for (const [id, posId] of Object.entries(positions)) {
+    const def = findDefenseEntryById(id), at = getTarget(posId);
+    if (def && at) placements.push({ def, at, movedHere: posId === targetId, movedFrom: _capHomeName(id) });
+  }
+
+  const result = [];
+  for (const { def, at: other, movedHere, movedFrom } of placements) {
+    if (other.id === targetId && !movedHere) continue;
     if (!Array.isArray(other.location) || other.location[0] == null) continue;
     const [olat, olon] = other.location;
-    const dist = haversine(tlat, tlon, olat, olon);
+    const dist = movedHere ? 0 : haversine(tlat, tlon, olat, olon);
 
-    for (const def of (other.defenses || [])) {
-      const catalog = DEFENSE_CATALOG[def.system];
-      if (!catalog || catalog.range_km <= 0) continue;
+    const catalog = DEFENSE_CATALOG[def.system];
+    if (!catalog || catalog.range_km <= 0) continue;
 
-      // Compute which threat types this battery is in range to engage.
-      // Systems with threat_range_overrides (e.g. Patriot: BM 30 km, CM/drone 100 km)
-      // may be in range for some types but not others.
-      const overrides       = catalog.threatRangeOverrides || {};
-      const inRangeForTypes = (catalog.effectiveAgainst || []).filter(tt => {
-        const effectiveRange = overrides[tt] ?? catalog.range_km;
-        return dist <= effectiveRange;
-      });
+    // Compute which threat types this battery is in range to engage.
+    // Systems with threat_range_overrides (e.g. Patriot: BM 30 km, CM/drone 100 km)
+    // may be in range for some types but not others.
+    const overrides       = catalog.threatRangeOverrides || {};
+    const inRangeForTypes = (catalog.effectiveAgainst || []).filter(tt => {
+      const effectiveRange = overrides[tt] ?? catalog.range_km;
+      return dist <= effectiveRange;
+    });
 
-      if (inRangeForTypes.length === 0) continue;
+    if (inRangeForTypes.length === 0) continue;
 
-      // null means "all catalogued threat types are in range" — no restriction needed.
-      const hasRestriction = inRangeForTypes.length < (catalog.effectiveAgainst || []).length;
-      result.push({
-        ...def,
-        _isCrossTarget:         true,
-        _placedAtTargetId:      other.id,
-        _placedAtTargetName:    other.name,
-        _placedAtTargetCountry: other.country || '',
-        _distanceKm:            Math.round(dist),
-        _restrictToThreatTypes: hasRestriction ? inRangeForTypes : null
-      });
-    }
+    // null means "all catalogued threat types are in range" — no restriction needed.
+    const hasRestriction = inRangeForTypes.length < (catalog.effectiveAgainst || []).length;
+    result.push({
+      ...def,
+      _isCrossTarget:         true,
+      _placedAtTargetId:      other.id,
+      _placedAtTargetName:    other.name,
+      _placedAtTargetCountry: other.country || '',
+      _distanceKm:            Math.round(dist),
+      _restrictToThreatTypes: hasRestriction ? inRangeForTypes : null,
+      ...(movedFrom ? { _movedFromName: movedFrom } : {}),
+      ...(movedHere ? { _movedHere: true } : {})
+    });
   }
 
   result.sort((a, b) => a._distanceKm - b._distanceKm);
   return result;
+}
+
+// ── CAP moves ────────────────────────────────────────────────────────────────
+// A CAP (a patrol asset) can be moved to any location from a chosen attack
+// on: attack.capMoves = { defId: targetId, or null to return home }. Its
+// position for an attack is the last move at or before it; with none, it is
+// where the laydown lists it. Moves for the next attack to be simulated wait
+// in pendingCapMoves. A moved CAP covers its new location, and every other
+// location within its range under the usual cross-target rules.
+
+/** True for a deployed entry that can be moved: a patrol asset. */
+function _isCap(def) {
+  return DEFENSE_CATALOG[def?.system]?.engagement?.model === 'patrol';
+}
+
+/** The laydown's CAPs, one per id, in targets.json order. */
+function _laydownCaps() {
+  const seen = new Map();
+  for (const t of appTargetCatalog) {
+    for (const d of t.defenses || []) if (_isCap(d) && !seen.has(d.id)) seen.set(d.id, d);
+  }
+  return [...seen.values()];
+}
+
+/** Where the laydown lists a CAP ("Tel Nof Air Base", or several names joined). */
+function _capHomeName(defId) {
+  return appTargetCatalog.filter(t => (t.defenses || []).some(d => d.id === defId)).map(t => t.name).join(' / ');
+}
+
+/** The ids of the targets where the laydown lists a defense entry. */
+function _capHomeIds(defId) {
+  return appTargetCatalog.filter(t => (t.defenses || []).some(d => d.id === defId)).map(t => t.id);
+}
+
+/** CAP positions for history entry k: { defId: targetId } for the CAPs not at home. */
+function _positionsAt(k) {
+  const pos = {};
+  for (let i = 1; i <= k && i < simHistory.length; i++) {
+    for (const [id, at] of Object.entries(simHistory[i].capMoves || {})) {
+      if (at == null) delete pos[id];
+      else pos[id] = at;
+    }
+  }
+  return pos;
+}
+
+/** CAP positions for the next attack: the history at the cursor, then the pending moves. */
+function _livePositions() {
+  const pos = _positionsAt(simHistoryCursor);
+  for (const [id, at] of Object.entries(pendingCapMoves || {})) {
+    if (at == null) delete pos[id];
+    else pos[id] = at;
+  }
+  return pos;
+}
+
+/** Number of the attack at history index k (1 for the first attack). */
+function _attackNumber(k) {
+  let n = 0;
+  for (let i = 1; i <= k && i < simHistory.length; i++) if (simHistory[i].type === 'attack' && simHistory[i].results) n++;
+  return n;
+}
+
+/** Index of the history entry where a CAP's current position (as of entry k) was set, or -1. */
+function _moveIndexOf(defId, k) {
+  for (let i = Math.min(k, simHistory.length - 1); i >= 1; i--) {
+    if (simHistory[i].capMoves && defId in simHistory[i].capMoves) return i;
+  }
+  return -1;
+}
+
+/** The pending moves, cleared: they go on the attack being recorded. */
+function _takePendingCapMoves() {
+  const moves = pendingCapMoves;
+  pendingCapMoves = {};
+  return Object.keys(moves).length ? moves : null;
+}
+
+/** A move's destination as stored: null when it is where the laydown lists the CAP. */
+function _capDestination(defId, at) {
+  return at != null && !_capHomeIds(defId).includes(at) ? at : null;
+}
+
+/** Put a history attack's entry for a CAP where the CAP is at that attack (at: targetId, null home). */
+function _placeCap(snap, defId, at) {
+  const entry = _attackDefenses(snap.targetId, at ? { [defId]: at } : {}).find(d => d.id === defId);
+  snap.allDefenses = (snap.allDefenses || []).filter(d => d.id !== defId);
+  if (entry) snap.allDefenses.push(entry);
+}
+
+/**
+ * Move a CAP from the shown attack on: at is a targetId, null to return it
+ * home, or undefined to undo the move made on this attack. The shown attack
+ * and every later attack whose position for the CAP changes are run again
+ * with their recorded draws (_changeOverrides).
+ */
+function _setCapMove(defId, at) {
+  const i    = _shownAttackSnapshotIndex();
+  const snap = i >= 0 ? simHistory[i] : null;
+  if (!snap || !_canReplay(snap)) {
+    showToast('This attack cannot be re-simulated (recorded before re-simulation was available, or under another Pk table or doctrine), so a CAP cannot be moved on it.', true);
+    return;
+  }
+  const before = simHistory.map((_, k) => _positionsAt(k)[defId] ?? null);
+  const moves  = { ...(snap.capMoves || {}) };
+  delete moves[defId];
+  if (at !== undefined) {
+    const dest = _capDestination(defId, at);
+    if (dest !== (_positionsAt(i - 1)[defId] ?? null)) moves[defId] = dest;
+  }
+  const old = snap.capMoves;
+  snap.capMoves = moves;
+  const after = simHistory.map((_, k) => _positionsAt(k)[defId] ?? null);
+  snap.capMoves = old;
+
+  const forced = new Set();
+  for (let k = i; k < simHistory.length; k++) {
+    if (simHistory[k].type === 'attack' && simHistory[k].results && before[k] !== after[k]) forced.add(k);
+  }
+  if (!forced.size && JSON.stringify(old || {}) === JSON.stringify(moves)) return;
+
+  _changeOverrides(() => {
+    if (Object.keys(moves).length) snap.capMoves = moves;
+    else delete snap.capMoves;
+    for (const k of forced) if (_canReplay(simHistory[k])) _placeCap(simHistory[k], defId, after[k]);
+  }, { forced, defensesChanged: forced.has(i) });
+  if (selectedTargetId) renderDefenseLayers(selectedTargetId);
+}
+
+/** <option>s of every location, grouped by country, with selectedId chosen. */
+function _locationOptions(selectedId) {
+  const byCountry = new Map();
+  for (const t of appTargetCatalog) {
+    const c = t.country || 'Other';
+    if (!byCountry.has(c)) byCountry.set(c, []);
+    byCountry.get(c).push(t);
+  }
+  return [...byCountry].map(([c, ts]) => `<optgroup label="${c}">${ts.map(t =>
+    `<option value="${t.id}"${t.id === selectedId ? ' selected' : ''}>${t.name}</option>`).join('')}</optgroup>`).join('');
+}
+
+/**
+ * The CAP positions strip on the shown attack's results: where each CAP is
+ * for this attack and whether it engages here, with Move / Return home /
+ * Undo, which re-simulate this attack and the later ones (_setCapMove).
+ */
+function renderCapMoves() {
+  const el = document.getElementById('results-caps');
+  if (!el) return;
+  const i    = _shownAttackSnapshotIndex();
+  const snap = i >= 0 ? simHistory[i] : null;
+  const caps = _laydownCaps();
+  if (!snap?.results || snap.type !== 'attack' || caps.length === 0) { el.innerHTML = ''; return; }
+  const canMove = _canReplay(snap);
+  const pos   = _positionsAt(i);
+  const prior = _positionsAt(i - 1);
+  const rows = caps.map(def => {
+    const at       = pos[def.id] ?? null;
+    const movedNow = !!snap.capMoves && def.id in snap.capMoves;
+    const engages  = (snap.allDefenses || []).some(d => d.id === def.id);
+    const name     = defLabel(def.id, DEFENSE_CATALOG[def.system]?.name || def.system);
+    const where    = at ? (getTarget(at)?.name || at) : `${_capHomeName(def.id)} (home)`;
+    const m        = _moveIndexOf(def.id, i);
+    const since    = m < 0 ? '' : m === i ? ' · moved on this attack' : ` · since attack ${_attackNumber(m)}`;
+    const homeBtn  = at && !(movedNow && prior[def.id] == null);
+    const controls = canMove ? `
+        <select class="cap-dest" data-def="${def.id}" aria-label="Move ${name} to">${_locationOptions(snap.targetId)}</select>
+        <button class="btn btn-secondary btn-sm btn-cap-move" data-def="${def.id}">Move from this attack on</button>
+        ${homeBtn  ? `<button class="btn btn-secondary btn-sm btn-cap-home" data-def="${def.id}">Return home from this attack</button>` : ''}
+        ${movedNow ? `<button class="btn btn-secondary btn-sm btn-cap-undo" data-def="${def.id}">Undo this move</button>` : ''}` : '';
+    return `
+      <div class="cap-move-row">
+        <span class="cap-name">✈ ${name}</span>
+        <span class="cap-where">📍 ${where}${since}</span>
+        <span class="cap-status${engages ? ' cap-status--in' : ''}">${engages ? 'engages in this attack' : 'not engaging (out of range or excluded)'}</span>
+        <div class="cap-move-controls">${controls}</div>
+      </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="cap-moves">
+      <div class="cap-moves-title">CAP positions — attack ${_attackNumber(i)}${canMove ? ' · a move re-simulates this attack and the later ones' : ' · this attack cannot be re-simulated'}</div>
+      ${rows}
+    </div>`;
+  const destOf = id => el.querySelector(`.cap-dest[data-def="${id}"]`).value;
+  el.querySelectorAll('.btn-cap-move').forEach(b => b.addEventListener('click', () => _setCapMove(b.dataset.def, destOf(b.dataset.def))));
+  el.querySelectorAll('.btn-cap-home').forEach(b => b.addEventListener('click', () => _setCapMove(b.dataset.def, null)));
+  el.querySelectorAll('.btn-cap-undo').forEach(b => b.addEventListener('click', () => _setCapMove(b.dataset.def, undefined)));
+}
+
+/**
+ * Where a CAP card in the left panel says the CAP is for the next attack,
+ * with Move / Return home / Cancel for the next attack (_setPendingCapMove).
+ * '' for a system that is not a CAP.
+ */
+function _capCardHtml(def) {
+  if (!_isCap(def)) return '';
+  const at      = _livePositions()[def.id] ?? null;
+  const pending = def.id in (pendingCapMoves || {});
+  const m       = _moveIndexOf(def.id, simHistoryCursor);
+  const when    = pending ? 'from the next attack' : (m >= 0 ? `since attack ${_attackNumber(m)}` : '');
+  const status  = at
+    ? `📍 Moved to ${getTarget(at)?.name || at}${when ? ` (${when})` : ''} — home: ${_capHomeName(def.id)}`
+    : (pending ? `📍 Returns home (${_capHomeName(def.id)}) from the next attack` : `📍 At home: ${_capHomeName(def.id)}`);
+  return `
+    <div class="cap-card-move" data-def="${def.id}">
+      <div class="cap-card-status${at ? ' cap-card-status--away' : ''}">${status}</div>
+      <div class="cap-card-controls">
+        <select class="cap-dest" aria-label="Move this CAP to">${_locationOptions(at || selectedTargetId)}</select>
+        <button class="btn btn-secondary btn-sm btn-cap-move" title="Move this CAP for the next attack you simulate">Move</button>
+        ${at ? '<button class="btn btn-secondary btn-sm btn-cap-home" title="Return this CAP home for the next attack">Return home</button>' : ''}
+        ${pending ? '<button class="btn btn-secondary btn-sm btn-cap-cancel" title="Keep this CAP where the last attack left it">Cancel</button>' : ''}
+      </div>
+    </div>`;
+}
+
+/** Wire the controls _capCardHtml() added to a card. */
+function _wireCapCard(card) {
+  const box = card.querySelector('.cap-card-move');
+  if (!box) return;
+  const id = box.dataset.def;
+  box.querySelector('.btn-cap-move')?.addEventListener('click', () => _setPendingCapMove(id, box.querySelector('.cap-dest').value));
+  box.querySelector('.btn-cap-home')?.addEventListener('click', () => _setPendingCapMove(id, null));
+  box.querySelector('.btn-cap-cancel')?.addEventListener('click', () => {
+    delete pendingCapMoves[id];
+    saveSessionState();
+    if (selectedTargetId) { renderDefenseLayers(selectedTargetId); updateMinimap(getTarget(selectedTargetId)); }
+  });
+}
+
+/**
+ * Move a CAP for the next attack to be simulated (the left-panel card):
+ * at is a targetId or null (home). A move back to where the history leaves
+ * it cancels the pending move.
+ */
+function _setPendingCapMove(defId, at) {
+  const dest = _capDestination(defId, at);
+  if (dest === (_positionsAt(simHistoryCursor)[defId] ?? null)) delete pendingCapMoves[defId];
+  else pendingCapMoves[defId] = dest;
+  saveSessionState();
+  _manifestUnchanged = false;
+  if (selectedTargetId) { renderDefenseLayers(selectedTargetId); updateMinimap(getTarget(selectedTargetId)); }
 }
 
 /**
@@ -891,16 +1153,18 @@ function _attritionFor(targetId) {
 /**
  * The defense entries an attack on targetId runs against: the target's own
  * systems that are switched on, then the cross-target systems in range that
- * are not excluded for it. Every entry carries its source location.
+ * are not excluded for it. Every entry carries its source location. A CAP
+ * moved away (positions, default the live ones) is counted from where it
+ * is now: an entry moved from elsewhere carries movedFrom.
  */
-function _attackDefenses(targetId) {
+function _attackDefenses(targetId, positions = _livePositions()) {
   const target = getTarget(targetId);
   if (!target) return [];
   const own = (target.defenses || [])
-    .filter(d => !d.disabled)
+    .filter(d => !d.disabled && positions[d.id] === undefined)
     .map(d => ({ ...d, locationName: target.name, locationCountry: target.country || '' }));
-  const cross = getCrossTargetDefenses(targetId)
-    .filter(d => !isCrossTargetDefenseDisabled(targetId, d))
+  const cross = getCrossTargetDefenses(targetId, positions)
+    .filter(d => !isCrossTargetDefenseDisabled(targetId, d) && !(d._movedHere && d.disabled))
     .map(d => ({
       id:                    d.id,
       system:                d.system,
@@ -909,7 +1173,8 @@ function _attackDefenses(targetId) {
       operator:              d.operator || '',
       locationName:          d._placedAtTargetName,
       locationCountry:       d._placedAtTargetCountry || '',
-      restrictToThreatTypes: d._restrictToThreatTypes || null
+      restrictToThreatTypes: d._restrictToThreatTypes || null,
+      ...(d._movedFromName ? { movedFrom: d._movedFromName } : {})
     }));
   return [...own, ...cross];
 }
@@ -1162,12 +1427,16 @@ function renderDefenseLayers(targetId) {
   addBtn.disabled = false;
   countBadge.textContent = `${totalCount} system${totalCount !== 1 ? 's' : ''}`;
 
-  if (ownDefenses.length === 0 && crossDefenses.length === 0) {
+  // CAPs that do not reach this location, which can be moved here
+  const elsewhere = _laydownCaps().filter(c => !ownDefenses.some(d => d.id === c.id) && !crossDefenses.some(d => d.id === c.id));
+
+  if (ownDefenses.length === 0 && crossDefenses.length === 0 && elsewhere.length === 0) {
     container.innerHTML = '<p class="empty-state">No defenses assigned. Add one below.</p>';
     return;
   }
 
-  container.innerHTML = '';
+  container.innerHTML = ownDefenses.length === 0 && crossDefenses.length === 0
+    ? '<p class="empty-state">No defenses assigned. Add one below.</p>' : '';
 
   // Shared patrol assets — rendered first, above the fixed laydown
   const sharedDefenses = ownDefenses.filter(d => DEFENSE_CATALOG[d.system]?.isShared);
@@ -1190,6 +1459,29 @@ function renderDefenseLayers(targetId) {
   for (const def of crossDefenses) {
     container.appendChild(buildCrossTargetDefenseCard(def, targetId));
   }
+
+  if (elsewhere.length) container.appendChild(_buildCapsElsewhere(elsewhere, targetId));
+}
+
+/** "CAPs elsewhere": the CAPs that do not reach targetId, each with Move here (for the next attack). */
+function _buildCapsElsewhere(caps, targetId) {
+  const target = getTarget(targetId);
+  const box = document.createElement('div');
+  box.className = 'caps-elsewhere';
+  const rows = caps.map(def => {
+    const atId = _livePositions()[def.id] ?? _capHomeIds(def.id)[0];
+    const at   = getTarget(atId);
+    const km   = at?.location && target?.location ? Math.round(haversine(...target.location, ...at.location)) : null;
+    return `
+      <div class="caps-elsewhere-row">
+        <span class="cap-name">✈ ${defLabel(def.id, DEFENSE_CATALOG[def.system]?.name || def.system)}</span>
+        <span class="cap-where">📍 ${at?.name || atId}${km != null ? ` · ${km.toLocaleString()} km` : ''}</span>
+        <button class="btn btn-secondary btn-sm btn-cap-here" data-def="${def.id}" title="Move this CAP here for the next attack you simulate">Move here</button>
+      </div>`;
+  }).join('');
+  box.innerHTML = `<div class="caps-elsewhere-title">CAPs elsewhere (out of range) — move one here for the next attack</div>${rows}`;
+  box.querySelectorAll('.btn-cap-here').forEach(b => b.addEventListener('click', () => _setPendingCapMove(b.dataset.def, targetId)));
+  return box;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1239,7 +1531,8 @@ function buildSharedDefenseCard(def, targetId) {
     : '';
 
   const card = document.createElement('div');
-  card.className = `defense-card patrol-card${isDisabled ? ' defense-card--disabled' : ''}`;
+  const away = _livePositions()[def.id] != null;   // a CAP moved away from here
+  card.className = `defense-card patrol-card${isDisabled ? ' defense-card--disabled' : ''}${away ? ' patrol-card--away' : ''}`;
 
   card.innerHTML = `
     <div class="defense-card-header">
@@ -1260,7 +1553,9 @@ function buildSharedDefenseCard(def, targetId) {
     ${reloadHtml}
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
     <div class="defense-threats">${effectList}</div>
+    ${_capCardHtml(def)}
   `;
+  _wireCapCard(card);
 
   card.querySelectorAll('.mag-count-editable').forEach(span => {
     span.addEventListener('click', () => activateMagazineEdit(span));
@@ -1376,7 +1671,7 @@ function buildCrossTargetDefenseCard(def, targetId) {
       </div>
     </div>
     <div class="cross-target-location">
-      <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km</span>
+      <span class="cross-target-badge" title="Placed at ${def._placedAtTargetName}, ${def._placedAtTargetCountry}">📍 ${def._movedHere ? 'Moved here' : `${def._placedAtTargetName}, ${def._placedAtTargetCountry} · ${def._distanceKm} km`}${def._movedFromName ? ` · from ${def._movedFromName}` : ''}</span>
     </div>
     <div class="defense-card-body">
       <span class="defense-name">${defLabel(def.id, catalog?.name || def.system)}</span>
@@ -1387,7 +1682,9 @@ function buildCrossTargetDefenseCard(def, targetId) {
     ${def.notes ? `<div class="defense-notes">${def.notes}</div>` : ''}
     <div class="defense-threats">${effectList}</div>
     ${rangeNoteHtml}
+    ${_capCardHtml(def)}
   `;
+  _wireCapCard(card);
 
   card.querySelectorAll('.mag-count-editable').forEach(span => {
     span.addEventListener('click', () => activateMagazineEdit(span));
@@ -1736,7 +2033,8 @@ function toggleOwnDefenseDisabled(targetId, defId) {
  * Priority:
  *   1. Explicit enable  (target.enabledCoverageDefIds)  → always enabled
  *   2. Explicit disable (target.disabledCoverageDefIds) → always disabled
- *   3. Default: enabled if the defense's operator is 'United States', matches
+ *   3. A CAP moved to this location (_movedHere)          → enabled
+ *   4. Default: enabled if the defense's operator is 'United States', matches
  *      the host country of the covered target (same-nation cross-coverage), or
  *      is in the covered target's coverage_operators (targets.json; the water
  *      place points list their littoral states, e.g. Oman and the UAE at the
@@ -1747,6 +2045,7 @@ function isCrossTargetDefenseDisabled(targetId, def) {
   if (!target) return false;
   if ((target.enabledCoverageDefIds  || []).includes(def.id)) return false;
   if ((target.disabledCoverageDefIds || []).includes(def.id)) return true;
+  if (def._movedHere) return false;   // a CAP moved to this location
   const op = def.operator || '';
   if (op === 'United States' || op === (target.country || '')) return false;
   return !(appCoverageOperators.get(targetId) || []).includes(op);
@@ -2300,7 +2599,8 @@ async function simulate() {
         manualOverrides: run.overrides,
         attackManifest,
         draws:          run.draws,
-        attrition:      run.attrition
+        attrition:      run.attrition,
+        capMoves:       _takePendingCapMoves()
       }));
       simHistoryCursor = simHistory.length - 1;
       lastSimSnapshotId = simHistory[simHistoryCursor].id;
@@ -2544,7 +2844,7 @@ function _shownAttackSnapshotIndex() {
  * starting magazines, reloads are redone. The live magazines and reserves
  * then move to match the entry the session is at.
  */
-function _changeOverrides(mutate) {
+function _changeOverrides(mutate, { forced = null, defensesChanged = false } = {}) {
   if (!lastSimResults) { mutate(); return; }
   const snapIdx = _shownAttackSnapshotIndex();
   const snap    = snapIdx >= 0 ? simHistory[snapIdx] : null;
@@ -2567,6 +2867,12 @@ function _changeOverrides(mutate) {
 
   if (!snap.preReloadsState) snap.preReloadsState = { ...(snap.reloadsState || {}) };
   mutate();
+  if (defensesChanged) {
+    // The attack's defenses changed (a CAP move): its own result is run again too
+    snap.results    = _replayAttack(snap, snap.preSimMagState);
+    lastSimResults  = JSON.parse(JSON.stringify(snap.results));
+    lastSimDefenses = JSON.parse(JSON.stringify(snap.allDefenses));
+  }
   const display = _computeDisplayResults();
 
   // Old states of every entry from the shown attack on, before anything moves
@@ -2577,7 +2883,7 @@ function _changeOverrides(mutate) {
   snap.reloadsState    = _reservesAfter(snap.allDefenses, snap.preReloadsState, display);
   snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
   snap.stats           = _statsOf(display);
-  const { replayed, adjusted } = _propagateHistory(snapIdx, oldMag, oldRes);
+  const { replayed, adjusted } = _propagateHistory(snapIdx, oldMag, oldRes, forced);
 
   // The live state belongs to the history entry the session is at; changes
   // made since that entry (a manual magazine edit) are kept.
@@ -2700,8 +3006,9 @@ function _reservesAfter(defs, chips, results) {
  * Per-target result caches pointing at a changed entry are updated.
  * @returns {{ replayed, adjusted }} attacks run again / only moved
  */
-function _propagateHistory(from, oldMag, oldRes) {
+function _propagateHistory(from, oldMag, oldRes, forced = null) {
   let replayed = 0, adjusted = 0;
+  const lastForced = forced?.size ? Math.max(...forced) : -1;
   for (let k = from + 1; k < simHistory.length; k++) {
     const s = simHistory[k];
     const pre    = _carry({ ...s.preSimMagState }, oldMag[k - 1], simHistory[k - 1].magStateAfter, _fullOfId);
@@ -2711,7 +3018,11 @@ function _propagateHistory(from, oldMag, oldRes) {
     const resPre = _carry({ ...resOld }, oldRes[k - 1], simHistory[k - 1].reloadsState || {}, () => 0);
     const preChanged = JSON.stringify(pre) !== JSON.stringify(s.preSimMagState);
     const resChanged = JSON.stringify(resPre) !== JSON.stringify(resOld);
-    if (!preChanged && !resChanged) break;   // nothing differs from here on
+    const isForced = !!forced?.has(k);   // its defenses changed (a CAP move)
+    if (!preChanged && !resChanged && !isForced) {
+      if (k > lastForced) break;   // nothing differs from here on
+      continue;
+    }
 
     if (s.type === 'reload') {
       // Reserves before the reload are those after the entry before it
@@ -2756,8 +3067,9 @@ function _propagateHistory(from, oldMag, oldRes) {
 
     for (const st of Object.values(perTargetState)) {
       if (st.snapshotId !== s.id) continue;
-      st.lastSimResults = JSON.parse(JSON.stringify(s.results));
-      st.preSimMagState = JSON.parse(JSON.stringify(s.preSimMagState));
+      st.lastSimResults  = JSON.parse(JSON.stringify(s.results));
+      st.preSimMagState  = JSON.parse(JSON.stringify(s.preSimMagState));
+      st.lastSimDefenses = JSON.parse(JSON.stringify(s.allDefenses));
     }
   }
   return { replayed, adjusted };
@@ -2864,6 +3176,7 @@ function rerenderWithOverrides(displayResults = null) {
   _renderConfigNotice();
   // Always show original inbound totals in the summary header
   renderResultsSummary(lastSimResults, lastSimTarget);
+  renderCapMoves();
   renderResultsLayers(displayResults.byThreatType);
   renderResultsFinal(displayResults);
   // Refresh defense cards so magazine counters reflect the adjusted state
@@ -3057,6 +3370,7 @@ function _reserveAtEngagement(data) {
 
 function renderSimulationResults(results, target) {
   renderResultsSummary(results, target);
+  renderCapMoves();
   renderResultsLayers(results.byThreatType);
   renderResultsFinal(results);
   // A fresh run always uses the active configuration.
@@ -3313,7 +3627,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
   const row = document.createElement('div');
 
   const locationHtml = eng.locationName
-    ? `<span class="eng-location">📍 ${eng.locationName}${eng.locationCountry ? ', ' + eng.locationCountry : ''}</span>`
+    ? `<span class="eng-location">📍 ${eng.locationName}${eng.locationCountry ? ', ' + eng.locationCountry : ''}${eng.movedFrom ? ` · moved from ${eng.movedFrom}` : ''}</span>`
     : '';
   const keyAttrs = `data-threat="${threatType}" data-platform="${platformId}" data-def="${eng.defId}"`;
 
@@ -3602,7 +3916,7 @@ async function _confirmTruncate() {
 
 function _createSnapshot({ id, isInitial, type, label, targetId, targetName,
                             magStateBefore, magStateAfter, reloadsState,
-                            results, shown, allDefenses, manualOverrides, attackManifest, draws, attrition }) {
+                            results, shown, allDefenses, manualOverrides, attackManifest, draws, attrition, capMoves }) {
   const snap = {
     id:             id || _newSnapshotId(),
     type:           type || (isInitial ? 'initial' : 'attack'),
@@ -3624,7 +3938,9 @@ function _createSnapshot({ id, isInitial, type, label, targetId, targetName,
     // attack can be run again after an override with the same luck.
     ...(draws ? { draws: JSON.parse(JSON.stringify(draws)) } : {}),
     // Organic attrition the attack ran with ({ type: percent }), reused by replays
-    ...(attrition ? { attrition: { ...attrition } } : {})
+    ...(attrition ? { attrition: { ...attrition } } : {}),
+    // CAPs moved from this attack on ({ defId: targetId, or null: home })
+    ...(capMoves ? { capMoves: { ...capMoves } } : {})
   };
   // An attack's reloadsState is the reserves after it; an interceptors-used
   // override can draw on them, so the reserves before it are kept as well.
@@ -3938,7 +4254,8 @@ function _buildAttackSection(snap, index) {
         engRows += `<tr class="pr-row-dim"><td colspan="7" class="pr-italic">No system engages this platform</td></tr>`;
       }
       for (const eng of plat.engagements) {
-        const loc = [eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—';
+        const loc = ([eng.locationName, eng.locationCountry].filter(Boolean).join(', ') || snap.targetName || '—')
+          + (eng.movedFrom ? ` (moved from ${eng.movedFrom})` : '');
         const sysCell = `${defLabel(eng.defId, eng.systemName)}${eng.notes ? ` <span class="pr-notes">(${eng.notes})</span>` : ''}`;
 
         if (eng.note === 'Cannot engage') {
@@ -4019,6 +4336,7 @@ function _buildAttackSection(snap, index) {
         <span class="pr-attack-target">${location}</span>
       </div>
 
+      ${_capMovesNote(snap)}
       <div class="pr-section-label">Inbound Platforms</div>
       <table class="pr-table">
         <thead><tr><th>Platform</th><th>Type</th><th>Salvo</th>${hasAttrition ? '<th>Attrition</th><th>Arrive</th>' : ''}</tr></thead>
@@ -4030,6 +4348,18 @@ function _buildAttackSection(snap, index) {
       ${_buildMagChangesSection(snap)}
     </div>
   `;
+}
+
+/** "CAP moves from this attack on: F-15I Patrol → Amman" for the report, or ''. */
+function _capMovesNote(snap) {
+  const moves = Object.entries(snap.capMoves || {});
+  if (!moves.length) return '';
+  const parts = moves.map(([id, at]) => {
+    const def = findDefenseEntryById(id) || (snap.allDefenses || []).find(d => d.id === id);
+    const name = defLabel(id, DEFENSE_CATALOG[def?.system]?.name || id);
+    return at ? `${name} → ${getTarget(at)?.name || at}` : `${name} → home (${_capHomeName(id)})`;
+  });
+  return `<div class="pr-cap-moves">CAP moves from this attack on: ${parts.join('; ')}</div>`;
 }
 
 /** Build the interceptor expenditure table for one attack. */
@@ -4764,6 +5094,7 @@ async function importAttackQueue(file) {
 function _resetSimulationHistory() {
   simHistory       = [];
   simHistoryCursor = 0;
+  pendingCapMoves  = {};
   simHistory.push(_createSnapshot({
     isInitial:       true,
     label:           'Initial State',
@@ -5240,7 +5571,8 @@ function _runOneQueuedAttack(entry) {
       manualOverrides: run.overrides,
       attackManifest:  entry.manifest,
       draws:           run.draws,
-      attrition:       run.attrition
+      attrition:       run.attrition,
+      capMoves:        _takePendingCapMoves()
     }));
     simHistoryCursor = simHistory.length - 1;
   }

@@ -168,6 +168,26 @@ set outside the history between entries (a manual magazine edit, a reset)
 are kept. Attacks recorded before draws were kept, or under a different Pk
 table or doctrine, only move their magazines by the change.
 
+## CAP moves
+
+A CAP (a patrol asset) can be moved to any location from a chosen attack
+on. The move is stored on that attack (`snapshot.capMoves = { defId:
+targetId }`, or `null` to return home), and the CAP stays there until a
+later move. With no move, it is where the laydown lists it.
+
+| Where | Control | Applies to |
+|---|---|---|
+| Results, "CAP positions" strip | Move from this attack on / Return home from this attack / Undo this move | The shown attack and every later one; they are run again with their recorded draws |
+| Left panel, the CAP's card | Move / Return home / Cancel | The next attack simulated (`pendingCapMoves`, recorded on it) |
+| Left panel, "CAPs elsewhere" | Move here | The next attack simulated |
+
+For each attack the CAP is counted from where it is: it engages at its
+new location, and at any other location within its range under the usual
+cross-target rules (so a CAP moved within 200 km of home still covers
+home). Its magazine is one pool wherever it is. Its engagement records
+carry `movedFrom` (the laydown location), shown on the results row and in
+the report, which also lists the moves made on each attack.
+
 ## Regenerating and checking the defaults
 
 ```bash

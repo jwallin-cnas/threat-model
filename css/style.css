@@ -1753,6 +1753,13 @@ select option, select optgroup {
   .pr-attack-target { font-size: 10pt; font-style: italic; margin-left: auto; }
 
   /* ── Section labels ────────────────────────────────────────────────────── */
+  .pr-cap-moves {
+    font-size: 8pt;
+    color: #333;
+    margin: 6pt 0 0;
+    font-style: italic;
+  }
+
   .pr-section-label {
     font-size: 7.5pt;
     font-weight: bold;
@@ -2429,3 +2436,56 @@ select option, select optgroup {
 .attrition-table .att-pct { text-align: right; color: var(--text-dim); font-family: var(--font-mono); }
 .attrition-table .att-arrive { color: var(--text-bright); font-weight: 600; }
 .attrition-table tfoot td { border-top: 1px solid var(--border); font-weight: 600; }
+
+/* ── CAP moves ─────────────────────────────────────────────────────────────── */
+/* Results: where each CAP is for the shown attack, with Move / Return / Undo */
+.cap-moves {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(88, 166, 255, 0.05);
+}
+.cap-moves-title { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+.cap-move-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+.cap-move-row + .cap-move-row { border-top: 1px solid var(--border-soft); }
+.cap-name   { color: var(--text-bright); font-weight: 600; }
+.cap-where  { color: var(--accent); font-family: var(--font-mono); font-size: 11px; }
+.cap-status { color: var(--text-dim); font-size: 11px; }
+.cap-status--in { color: var(--success); }
+.cap-move-controls { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.cap-moves select.cap-dest,
+.cap-card-move select.cap-dest {
+  max-width: 220px;
+  padding: 2px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 12px;
+}
+
+/* Left panel: a CAP card's position and Move / Return home for the next attack */
+.cap-card-move { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-soft); }
+.cap-card-status { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+.cap-card-status--away { color: var(--warn); }
+.cap-card-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.patrol-card--away { opacity: 0.75; }
+
+/* Left panel: CAPs that do not reach the selected location */
+.caps-elsewhere {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.caps-elsewhere-title { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+.caps-elsewhere-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; padding: 2px 0; }
+.caps-elsewhere-row .btn-cap-here { margin-left: auto; }

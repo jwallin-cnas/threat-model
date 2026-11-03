@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay|used|attrition]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water|replay|used|caps|attrition]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -843,6 +843,110 @@ async function checkInterceptorOverrides(browser, base) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CAP moves: from a chosen attack on, re-simulating it and the later ones
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkCapMoves(browser, base) {
+  console.log('\n── CAP moves ──');
+  const page = await browser.newPage();
+  const errs = collectErrors(page);
+  // The F-15I patrol at Tel Nof (100 shots, 200 km); David's Sling at Tel Nof;
+  // a Patriot at Riyadh, far out of the patrol's range.
+  const LAYDOWN = { version: '1.0', defaults: {
+    tel_nof_ab: [
+      { id: 'shared_f15i_patrol', system: 'f15i_patrol', quantity: 1, notes: '', operator: 'Israel', chips: 1 },
+      { id: 'tn_ds', system: 'davids_sling', quantity: 1, notes: '', operator: 'Israel', chips: 1 } ],
+    riyadh: [ { id: 'ry_pat', system: 'patriot', quantity: 3, notes: '', operator: 'Saudi Arabia', chips: 1 } ] } };
+  const CAP = 'shared_f15i_patrol';
+  const RY = n => ({ targetId: 'riyadh', platforms: [{ platformId: 'shahed_136', quantity: n }] });
+  const TN = n => ({ targetId: 'tel_nof_ab', platforms: [{ platformId: 'shahed_136', quantity: n }] });
+  const fresh = async attacks => {
+    await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+    await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
+    await page.evaluate(([l, a]) => {
+      appAttrition = null; window._setSeed(0); window._importLaydownDirect(l); _resetSimulationHistory();
+      if (a.length) { window._importAttackQueueDirect({ version: '1.0', attacks: a }); window._simulateQueueDirect(); }
+      window.__cap = (s, id = 'shared_f15i_patrol') => (_snapshotShownResults(s) || { byThreatType: [] }).byThreatType
+        .flatMap(t => t.platforms.flatMap(p => p.engagements)).find(e => e.defId === id) || null;
+      window.__show = i => { if (simHistoryCursor === i) navigateToSnapshot(i === 1 ? 2 : 1); navigateToSnapshot(i); };
+    }, [LAYDOWN, attacks]);
+  };
+
+  // 1. Three attacks: Riyadh, Riyadh, Tel Nof. The patrol only reaches Tel Nof.
+  await fresh([RY(30), RY(30), TN(30)]);
+  const r0 = await page.evaluate(() => ({ a1: __cap(simHistory[1]), a2: __cap(simHistory[2]), a3: __cap(simHistory[3]),
+    res1: JSON.stringify(simHistory[1].results), res3: JSON.stringify(simHistory[3].results), mag3: simHistory[3].magStateAfter.shared_f15i_patrol }));
+  check(!r0.a1 && !r0.a2 && r0.a3 && r0.a3.locationName === 'Tel Nof Air Base', 'caps: the patrol at Tel Nof only fights the Tel Nof attack');
+
+  // 2. On attack 1's results, move it to Riyadh from this attack on (the menu defaults to the attacked target)
+  await page.evaluate(() => __show(1));
+  const strip0 = (await page.textContent('#results-caps')).replace(/\s+/g, ' ');
+  const dflt = await page.$eval(`#results-caps .cap-dest[data-def="${CAP}"]`, el => el.value);
+  await page.click(`#results-caps .btn-cap-move[data-def="${CAP}"]`);
+  const r2 = await page.evaluate(() => ({
+    a1: __cap(simHistory[1]), a2: __cap(simHistory[2]), a3: __cap(simHistory[3]), moves: JSON.stringify(simHistory[1].capMoves),
+    strip: document.getElementById('results-caps').textContent.replace(/\s+/g, ' '), hist: simHistory.length,
+    row: [...document.querySelectorAll('.engagement-row')].map(r => r.textContent.replace(/\s+/g, ' ')).find(t => /F-15I/.test(t)) || '',
+    live: _livePositions(), mag1: simHistory[1].magStateAfter.shared_f15i_patrol, pre2: simHistory[2].preSimMagState.shared_f15i_patrol }));
+  check(/Tel Nof Air Base \(home\)/.test(strip0) && /not engaging/.test(strip0) && dflt === 'riyadh', 'caps: the results list the patrol at home, not engaging, the menu on Riyadh ' + strip0);
+  check(r2.a1 && r2.a1.locationName === 'Riyadh' && r2.a1.movedFrom === 'Tel Nof Air Base' && r2.a1.killed > 0 && r2.moves === `{"${CAP}":"riyadh"}` && r2.hist === 4,
+        'caps: moved on attack 1, the patrol fights at Riyadh in that attack (no new attack) ' + JSON.stringify({ k: r2.a1 && r2.a1.killed, moves: r2.moves }));
+  check(/moved from Tel Nof/.test(r2.row) && /Riyadh · moved on this attack/.test(r2.strip) && /Undo this move/.test(r2.strip), 'caps: the row says "moved from Tel Nof"; the strip offers Undo ' + r2.row);
+  check(r2.a2 && r2.pre2 === r2.mag1 && r2.a2.magazineAtStart === r2.mag1, 'caps: attack 2 (Riyadh) is re-simulated with the patrol, from the magazine attack 1 left ' + JSON.stringify({ mag1: r2.mag1 }));
+  check(!r2.a3 && r2.live.shared_f15i_patrol === 'riyadh', 'caps: it stays at Riyadh, so it is out of range for the Tel Nof attack');
+
+  // 3. On attack 3, return it home from this attack on
+  await page.evaluate(() => __show(3));
+  const strip3 = (await page.textContent('#results-caps')).replace(/\s+/g, ' ');
+  await page.click(`#results-caps .btn-cap-home[data-def="${CAP}"]`);
+  const r3 = await page.evaluate(() => ({ a3: __cap(simHistory[3]), moves: JSON.stringify(simHistory[3].capMoves), live: _livePositions(), pre3: simHistory[3].preSimMagState.shared_f15i_patrol, after2: simHistory[2].magStateAfter.shared_f15i_patrol }));
+  check(/Riyadh · since attack 1/.test(strip3), 'caps: attack 3 shows the patrol at Riyadh since attack 1 ' + strip3);
+  check(r3.a3 && r3.a3.locationName === 'Tel Nof Air Base' && !r3.a3.movedFrom && r3.moves === `{"${CAP}":null}` && r3.pre3 === r3.after2 && Object.keys(r3.live).length === 0,
+        'caps: returned home on attack 3, it fights at Tel Nof again with what is left of its magazine ' + JSON.stringify(r3.moves));
+
+  // 4. Undo the move on attack 1: attacks 1 and 2 lose the patrol; attack 3 is back to its first result
+  await page.evaluate(() => __show(1));
+  await page.click(`#results-caps .btn-cap-undo[data-def="${CAP}"]`);
+  const r4 = await page.evaluate(() => ({ a1: __cap(simHistory[1]), a2: __cap(simHistory[2]), res1: JSON.stringify(simHistory[1].results), res3: JSON.stringify(simHistory[3].results),
+    mag3: simHistory[3].magStateAfter.shared_f15i_patrol, moves1: simHistory[1].capMoves ?? null }));
+  check(!r4.a1 && !r4.a2 && r4.moves1 === null && r4.res1 === r0.res1 && r4.res3 === r0.res3 && r4.mag3 === r0.mag3,
+        'caps: undoing the move restores every attack exactly (same draws)');
+
+  // 5. Moved within range of home: at Amman it still covers Tel Nof
+  await page.evaluate(() => { __show(3); });
+  await page.selectOption(`#results-caps .cap-dest[data-def="${CAP}"]`, 'amman');
+  await page.click(`#results-caps .btn-cap-move[data-def="${CAP}"]`);
+  const r5 = await page.evaluate(() => ({ a3: __cap(simHistory[3]), km: Math.round(haversine(...getTarget('tel_nof_ab').location, ...getTarget('amman').location)) }));
+  check(r5.km < 200 && r5.a3 && r5.a3.locationName === 'Amman' && r5.a3.movedFrom === 'Tel Nof Air Base',
+        `caps: moved to Amman (${r5.km} km away), it still covers Tel Nof automatically`);
+
+  // 6. Left panel: from Riyadh's panel, move it here for the next attack; the next attack records the move
+  await fresh([]);
+  await page.selectOption('#target-select', 'riyadh');
+  const elsewhere = (await page.textContent('.caps-elsewhere')).replace(/\s+/g, ' ');
+  await page.click(`.caps-elsewhere .btn-cap-here[data-def="${CAP}"]`);
+  const card = (await page.textContent('.cross-target-card .cap-card-status')).replace(/\s+/g, ' ');
+  const pendingSaved = await page.evaluate(() => JSON.parse(localStorage.getItem(SESSION_KEY)).pendingCapMoves);
+  await page.evaluate(() => addPlatformToManifest('shahed_136', 20));
+  await page.click('#btn-simulate');
+  await page.waitForSelector('#results-caps .cap-move-row');
+  const r6 = await page.evaluate(() => { const s = simHistory[simHistory.length - 1];
+    return { e: __cap(s), moves: JSON.stringify(s.capMoves), pending: JSON.stringify(pendingCapMoves), strip: document.getElementById('results-caps').textContent.replace(/\s+/g, ' '),
+             tnCard: (() => { selectedTargetId = 'tel_nof_ab'; renderDefenseLayers('tel_nof_ab'); return document.querySelector('.patrol-card .cap-card-status')?.textContent || ''; })() }; });
+  check(/F-15I/.test(elsewhere) && /Tel Nof Air Base · 1,\d{3} km/.test(elsewhere), 'caps: Riyadh\'s panel lists the out-of-range patrol with its distance ' + elsewhere);
+  check(/Moved to Riyadh \(from the next attack\)/.test(card) && pendingSaved && pendingSaved[CAP] === 'riyadh', 'caps: the move waits for the next attack, and is saved ' + card);
+  check(r6.e && r6.e.locationName === 'Riyadh' && r6.moves === `{"${CAP}":"riyadh"}` && r6.pending === '{}' && /moved on this attack/.test(r6.strip),
+        'caps: the next attack runs with the patrol at Riyadh and records the move ' + r6.moves);
+  check(/Moved to Riyadh \(since attack 1\)/.test(r6.tnCard), 'caps: its card at Tel Nof says where it is ' + r6.tnCard);
+
+  // 7. The report names the move
+  const pr = await page.evaluate(() => window._buildPrintDocument());
+  check(/CAP moves from this attack on: F-15I Patrol[^<]*→ Riyadh/.test(pr) && /moved from Tel Nof Air Base/.test(pr), 'caps: the report lists the move and where the patrol fought from');
+  const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
+  check(realErrs.length === 0, 'caps: no page errors ' + JSON.stringify(realErrs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Organic attrition before the first defenses
 // ─────────────────────────────────────────────────────────────────────────────
 async function checkAttrition(browser, base) {
@@ -1257,6 +1361,7 @@ try {
   if (!ONLY || ONLY === 'tool' || ONLY === 'water') await checkWaterCoverage(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'replay') await checkOverrideReplay(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'used') await checkInterceptorOverrides(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'caps') await checkCapMoves(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'attrition') await checkAttrition(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);
