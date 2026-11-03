@@ -117,6 +117,15 @@ survivors, including layers that did not fire the first time. A battery
 with no recorded draw gets a hashed draw from the entry id, the same on
 every replay.
 
+An override can also set how many threats reach a battery (`incoming`).
+Earlier layers keep their results; the difference is added or removed at
+that layer (`addedCount` on the type and platform, `totalAdded` on the
+result) and every later layer engages the new count. The run goes on to
+such a battery even when the layers before it left nothing. Incoming
+counts can be set before an attack runs, per platform in the attack
+manifest (`entry.layers = { defId: count }`); they are applied as incoming
+overrides when the attack runs and stored on its result like any other.
+
 The change then runs through the later history: each later attack is run
 again from its new starting magazines with its own draws and overrides,
 and each reload is redone from the new magazines and reserve chips. Values

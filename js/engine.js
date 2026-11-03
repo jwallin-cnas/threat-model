@@ -393,13 +393,19 @@ function isExcluded(excludedByThreatType, threatType, platformId, defId) {
  *                                        draws?, overrides? }
  *   draws      a createDrawLog() object: each entry draws from its own stream
  *              (recorded or replayed) instead of `rng`
- *   overrides  manual results { type: { platformId: { defId: { killed?, survived, disengaged } } } }.
- *              A disengaged entry does not fire. Otherwise the entry fires as
- *              usual (interceptors are spent on the threats it engages) but
- *              its kills are forced: `killed` (capped at the threats it
- *              faces), or for overrides saved without it, threats − `survived`.
- *              Every later layer then engages the survivors as usual.
- * @returns {{ totalIn, totalOut, initialThreats, finalThreats, byThreatType }}
+ *   overrides  manual results { type: { platformId: { defId: { incoming?, killed?, survived?, disengaged? } } } }.
+ *              `incoming` sets how many threats reach the entry, whatever
+ *              the layers before it left: the difference is added (or
+ *              removed) at that layer, and earlier layers keep their results.
+ *              A disengaged entry does not fire. With `killed` or `survived`
+ *              the entry fires as usual (interceptors are spent on the
+ *              threats it engages) but its kills are forced: `killed`
+ *              (capped at the threats it faces), or for overrides saved
+ *              without it, threats − `survived`. Every later layer then
+ *              engages the survivors as usual.
+ * @returns {{ totalIn, totalOut, totalAdded, initialThreats, finalThreats, byThreatType }}
+ *          totalAdded (and addedCount on each type and platform) is the net
+ *          number of threats added at layers by `incoming` overrides.
  *
  * Processing order: doctrine.typeOrder → platforms of that type in manifest
  * order → doctrine.engage[type] → every deployed entry of that system.
@@ -431,7 +437,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
   }
 
   const byThreatType = [];
-  let totalIn = 0, totalOut = 0;
+  let totalIn = 0, totalOut = 0, totalAdded = 0;
 
   for (const threatType of doctrine.typeOrder) {
     const platformGroups = groups[threatType];
@@ -441,17 +447,31 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
     // type per run: give every battery a fresh pass-state object here.
     for (const e of Object.values(deployed)) e.pass = {};
 
-    const typeBlock = { threatType, initialCount: 0, finalCount: 0, platforms: [] };
+    const typeBlock = { threatType, initialCount: 0, finalCount: 0, addedCount: 0, platforms: [] };
 
     for (const group of platformGroups) {
       const platform = platformCatalog[group.platformId];
       let remaining  = group.count;
+      let added      = 0;
       typeBlock.initialCount += group.count;
       totalIn += group.count;
       const engagements = [];
+      const platOv  = overrides?.[threatType]?.[group.platformId] || {};
+      // Entries still to come that have threats set to reach them: the run
+      // goes on to them even when the layers before leave nothing.
+      const pending = new Set(Object.keys(platOv).filter(id => platOv[id]?.incoming != null && deployed[id]));
+      const takeIncoming = id => {
+        pending.delete(id);
+        const n = platOv[id]?.incoming;
+        if (n == null) return null;
+        const from = remaining;
+        remaining = Math.max(0, Math.round(n));
+        added += remaining - from;
+        return from;
+      };
 
       for (const systemId of doctrine.engage[threatType] || []) {
-        if (remaining <= 0) break;
+        if (remaining <= 0 && pending.size === 0) break;
         const catalog = defenseCatalog[systemId];
         if (!catalog) continue;
 
@@ -461,6 +481,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
           (!e.def.restrictToThreatTypes || e.def.restrictToThreatTypes.includes(threatType))
         );
         if (entries.length === 0) continue;
+        if (remaining <= 0 && !entries.some(e => pending.has(e.def.id))) continue;
 
         const cell   = pkCell(pkTable, systemId, group.platformId);
         const model  = models[catalog.engagement?.model || 'kinetic'];
@@ -484,8 +505,11 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
         // A cell with pk 0 means the system cannot engage this platform.
         if (!model || cell.pk <= 0) {
           for (const e of entries) {
+            const from = takeIncoming(e.def.id);
+            if (remaining <= 0 && from == null) continue;
             engagements.push({
               ...baseRecord(e),
+              ...(from != null ? { incomingFrom: from } : {}),
               threatsIn: remaining, killed: 0, survived: remaining,
               pkShot: 0, pkTier: null, tierMultiplier: 1, pk: 0,
               shotsPerEngagement: 0, shotsPerEngagementTier: null,
@@ -509,8 +533,12 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
         });
 
         for (const r0 of resolved) {
-          if (remaining <= 0) break;
           const { e, tier, mult, pkShot, shotsTier } = r0;
+          const incomingFrom = takeIncoming(e.def.id);
+          if (remaining <= 0 && incomingFrom == null) {
+            if (pending.size) continue;
+            break;
+          }
           // Models whose P depends on how many threats are left (patrol cap,
           // laser kill cap, gun bursts) are re-resolved with the threats this
           // entry actually faces — a second patrol of the same type sees the
@@ -522,15 +550,16 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
             ({ P, shotsPerThreat } = model.resolve(ctx));
           }
           const magazineBefore = e.magazineRemaining;
-          const ov = overrides?.[threatType]?.[group.platformId]?.[e.def.id];
+          const ov = platOv[e.def.id];
+          const forced = ov && (ov.disengaged || ov.killed != null || ov.survived != null);
           let result;
           if (ov?.disengaged) {
             result = { killed: 0, survived: remaining, engaged: 0, interceptorsUsed: 0,
                        magazineRemaining: magazineBefore, note: 'Disengaged (manual)', partial: null };
           } else {
-            result = applyEngagement(remaining, ov ? 0 : P, magazineBefore, shotsPerThreat,
-              (shotsLeft, engagedFull) => ov ? 0 : model.partialProbability(ctx, shotsLeft, engagedFull));
-            if (ov) {
+            result = applyEngagement(remaining, forced ? 0 : P, magazineBefore, shotsPerThreat,
+              (shotsLeft, engagedFull) => forced ? 0 : model.partialProbability(ctx, shotsLeft, engagedFull));
+            if (forced) {
               const killed = Math.max(0, Math.min(remaining, ov.killed ?? (remaining - (ov.survived ?? remaining))));
               result = { ...result, killed, survived: remaining - killed, note: 'Manual override' };
             }
@@ -540,6 +569,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
 
           engagements.push({
             ...baseRecord(e),
+            ...(incomingFrom != null ? { incomingFrom } : {}),
             threatsIn:              remaining,
             killed:                 result.killed,
             survived:               result.survived,
@@ -555,18 +585,21 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
             partialShots:           result.partial ? result.partial.shots : 0,
             partialP:               result.partial ? result.partial.P     : null,
             note:                   result.note,
-            ...(ov ? { isManualOverride: true } : {})
+            ...(forced ? { isManualOverride: true } : {})
           });
           remaining = result.survived;
         }
       }
 
       typeBlock.finalCount += remaining;
-      totalOut += remaining;
+      typeBlock.addedCount += added;
+      totalOut   += remaining;
+      totalAdded += added;
       typeBlock.platforms.push({
         platformId:   group.platformId,
         platformName: platform.name,
         initialCount: group.count,
+        addedCount:   added,
         finalCount:   remaining,
         engagements
       });
@@ -577,7 +610,7 @@ function runSimulationCore(attackManifest, defenses, initialMagazineState = {}, 
 
   const initialThreats = byThreatType.map(b => ({ type: b.threatType, count: b.initialCount }));
   const finalThreats   = byThreatType.filter(b => b.finalCount > 0).map(b => ({ type: b.threatType, count: b.finalCount }));
-  return { totalIn, totalOut, initialThreats, finalThreats, byThreatType };
+  return { totalIn, totalOut, totalAdded, initialThreats, finalThreats, byThreatType };
 }
 
 /** Flat list of every engagement record in processing order. */

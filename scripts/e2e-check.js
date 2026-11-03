@@ -616,6 +616,69 @@ async function checkOverrideReplay(browser, base) {
   check(r3.a3Pre === 36 && r3.a3Same, 'replay: the attack after the reload starts full again, so its result is unchanged');
   check(r3.cursor === 3 && r3.live === 0, 'replay: the live reserve chips follow the redone reload');
 
+  // 5. Incoming count changed after simulating: added at that layer, earlier layers unchanged
+  await fresh(); await queue([TN(10)]); await page.evaluate(helpers);
+  const r5 = await page.evaluate(() => {
+    selectedTargetId = 'tel_nof_ab'; _loadTargetState('tel_nof_ab');
+    applyIncomingOverride('drone', 'shahed_136', 'tn_ds', 6);   // the CAP killed all 10; 6 more reach David's Sling
+    const d = _computeDisplayResults();
+    const headline = document.querySelector('.final-headline')?.textContent || '';
+    const badge = document.querySelector('.override-badge--incoming')?.textContent.replace(/\s+/g, ' ').trim() || '';
+    return { cap: __eng(d, 'tn_cap'), ds: __eng(d, 'tn_ds'), added: d.totalAdded, out: d.totalOut, headline, badge,
+             live: globalMagState.tn_ds, stats: simHistory[1].stats, ov: JSON.stringify(manualOverrides) };
+  });
+  check(r5.cap.threatsIn === 10 && r5.cap.killed === 10 && r5.ds && r5.ds.threatsIn === 6 && r5.ds.incomingFrom === 0 && r5.added === 6,
+        'incoming: 6 set to reach a layer the first run never reached; the layer before keeps its result ' + JSON.stringify(r5.ds && { in: r5.ds.threatsIn, from: r5.ds.incomingFrom }));
+  check(r5.live === r5.ds.magazineRemaining && r5.stats.totalAdded === 6 && r5.headline.includes(`of 16`) === (r5.out > 0),
+        'incoming: interceptors come off, the history entry and headline count the 6 added ' + JSON.stringify({ headline: r5.headline, stats: r5.stats }));
+  check(/6 in \(was 0\)/.test(r5.badge) && r5.ov === '{"drone":{"shahed_136":{"tn_ds":{"incoming":6}}}}', 'incoming: the row shows "6 in (was 0)" and only the incoming count is stored ' + r5.badge);
+
+  // 6. Incoming change on an older attack re-simulates the later ones
+  await fresh(); await queue([TN(30), TN(60)]); await page.evaluate(helpers);
+  const r6 = await page.evaluate(() => {
+    const origA2 = JSON.stringify(simHistory[2].results);
+    const dsUsedA2 = __eng(simHistory[2].results, 'tn_ds').interceptorsUsed;
+    __show(1);
+    applyIncomingOverride('drone', 'shahed_136', 'tn_ds', 0);   // none of the 5 leakers reach David's Sling
+    const ds1 = __eng(_snapshotShownResults(simHistory[1]), 'tn_ds'), ds2 = __eng(simHistory[2].results, 'tn_ds');
+    const out = { ds1In: ds1?.threatsIn ?? null, ds1Used: ds1?.interceptorsUsed ?? null, a2Pre: simHistory[2].preSimMagState.tn_ds ?? 'full', a2Start: ds2.magazineAtStart, a2Used: ds2.interceptorsUsed, dsUsedA2 };
+    clearLayerOverride('drone', 'shahed_136', 'tn_ds', 'incoming');
+    out.restored = JSON.stringify(simHistory[2].results) === origA2 && Object.keys(manualOverrides).length === 0;
+    return out;
+  });
+  check(r6.ds1In === 0 && r6.ds1Used === 0 && (r6.a2Pre === 'full' || r6.a2Pre === 36) && r6.a2Start === 36 && r6.a2Used !== r6.dsUsedA2,
+        'incoming: removing the leakers at a layer leaves it full, and the next attack is re-simulated from that ' + JSON.stringify(r6));
+  check(r6.restored, 'incoming: clearing the incoming count restores the later attack exactly');
+
+  // 7. Set before simulating, in the manifest: applied when the attack runs, then editable like any override
+  await fresh(); await page.evaluate(helpers);
+  await page.selectOption('#target-select', 'tel_nof_ab');
+  await page.evaluate(() => addPlatformToManifest('shahed_136', 10));
+  await page.click('.btn-manifest-layers[data-pid="shahed_136"]');
+  const editorRows = await page.locator('.manifest-layer-input').count();
+  await page.fill('.manifest-layer-input[data-def="tn_ds"]', '6');
+  await page.press('.manifest-layer-input[data-def="tn_ds"]', 'Tab');
+  const btnText = (await page.textContent('.btn-manifest-layers[data-pid="shahed_136"]')).trim();
+  await page.click('#btn-simulate');
+  await page.waitForSelector('.override-badge--incoming', { timeout: 5000 });
+  const r7 = await page.evaluate(() => {
+    const s = simHistory[simHistory.length - 1];
+    return { ov: JSON.stringify(s.manualOverrides), dsIn: __eng(_snapshotShownResults(s), 'tn_ds')?.threatsIn, rawDs: __eng(s.results, 'tn_ds'),
+             live: globalMagState.tn_ds, after: s.magStateAfter.tn_ds };
+  });
+  check(editorRows === 2 && btnText === 'Layers (1)', 'preset: the manifest editor lists the CAP and David\'s Sling, and counts the one set (' + btnText + ')');
+  check(r7.ov === '{"drone":{"shahed_136":{"tn_ds":{"incoming":6}}}}' && r7.dsIn === 6 && r7.rawDs === null && r7.live === r7.after,
+        'preset: the attack runs with 6 reaching David\'s Sling, stored as an override on the result ' + JSON.stringify({ ov: r7.ov, dsIn: r7.dsIn }));
+  await page.click('.override-badge--incoming .btn-clear-override');
+  const r7b = await page.evaluate(() => ({ ov: Object.keys(simHistory[simHistory.length - 1].manualOverrides).length, ds: globalMagState.tn_ds ?? 'full', rows: document.querySelectorAll('.engagement-row').length }));
+  check(r7b.ov === 0 && (r7b.ds === 'full' || r7b.ds === 36) && r7b.rows === 1, 'preset: clearing it on the result returns the interceptors and the row ' + JSON.stringify(r7b));
+
+  // 8. Pre-set counts ride along in the queue
+  await page.evaluate(() => { addToQueue(); });
+  const qLabel = await page.textContent('#queue-list');
+  const r8 = await page.evaluate(() => { window._simulateQueueDirect(); const s = simHistory[simHistory.length - 1]; return { ov: JSON.stringify(s.manualOverrides), pts: JSON.stringify(perTargetState.tel_nof_ab.manualOverrides) }; });
+  check(/1 layer count set/.test(qLabel) && r8.ov === '{"drone":{"shahed_136":{"tn_ds":{"incoming":6}}}}' && r8.pts === r8.ov, 'preset: a queued attack keeps and applies its layer counts');
+
   // 4. A replay with no change reproduces the recorded result, THAAD shot rolls included
   await page.goto(base + '/index.html'); await page.waitForFunction(() => window._appReady === true);
   await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForFunction(() => window._appReady === true);
@@ -627,7 +690,8 @@ async function checkOverrideReplay(browser, base) {
     return { keys: Object.keys(s.draws || {}).length, same: JSON.stringify(_replayAttack(s, s.preSimMagState)) === JSON.stringify(s.results) };
   });
   check(r4.keys > 0 && r4.same, 'replay: an attack with THAAD shot rolls records its draws and replays identically ' + JSON.stringify(r4));
-  check(errs.length === 0, 'replay: no page errors ' + JSON.stringify(errs));
+  const realErrs = errs.filter(e => !/status of 403/.test(e));   // map tiles refused for 127.0.0.1
+  check(realErrs.length === 0, 'replay: no page errors ' + JSON.stringify(realErrs));
   await page.close();
 }
 

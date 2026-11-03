@@ -863,6 +863,32 @@ function getCrossTargetDefenses(targetId) {
   return result;
 }
 
+/**
+ * The defense entries an attack on targetId runs against: the target's own
+ * systems that are switched on, then the cross-target systems in range that
+ * are not excluded for it. Every entry carries its source location.
+ */
+function _attackDefenses(targetId) {
+  const target = getTarget(targetId);
+  if (!target) return [];
+  const own = (target.defenses || [])
+    .filter(d => !d.disabled)
+    .map(d => ({ ...d, locationName: target.name, locationCountry: target.country || '' }));
+  const cross = getCrossTargetDefenses(targetId)
+    .filter(d => !isCrossTargetDefenseDisabled(targetId, d))
+    .map(d => ({
+      id:                    d.id,
+      system:                d.system,
+      quantity:              d.quantity,
+      notes:                 d.notes || '',
+      operator:              d.operator || '',
+      locationName:          d._placedAtTargetName,
+      locationCountry:       d._placedAtTargetCountry || '',
+      restrictToThreatTypes: d._restrictToThreatTypes || null
+    }));
+  return [...own, ...cross];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Target helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1814,6 +1840,79 @@ function clearManifest() {
   saveSessionState();
 }
 
+/** Platform id whose layer editor is open under its manifest row, or null. */
+let _openLayerEditor = null;
+
+/**
+ * The defense entries that would engage this platform in an attack on
+ * targetId, in engagement order: the attack's defenses whose system is on
+ * the doctrine list for the platform's type, in range for it, with Pk > 0.
+ */
+function _layersFor(targetId, platformId) {
+  const type = PLATFORM_CATALOG[platformId]?.type;
+  if (!type || !activeDoctrine) return [];
+  const defs = _attackDefenses(targetId);
+  const out = [];
+  for (const systemId of activeDoctrine.engage[type] || []) {
+    if (!(pkCell(activePkTable, systemId, platformId).pk > 0)) continue;
+    for (const d of defs) {
+      if (d.system !== systemId) continue;
+      if (d.restrictToThreatTypes && !d.restrictToThreatTypes.includes(type)) continue;
+      if (!out.some(o => o.id === d.id)) out.push(d);
+    }
+  }
+  return out;
+}
+
+/**
+ * Inline editor under a manifest row: for each layer that would engage the
+ * platform, an optional count of threats that reach it. Saved on the
+ * manifest entry as entry.layers = { defId: count }; a blank box leaves the
+ * layer simulated. Applied as incoming overrides when the attack runs, then
+ * shown and editable like any override.
+ */
+function _buildLayerEditor(entry) {
+  const box = document.createElement('div');
+  box.className = 'manifest-layers';
+  const layers = _layersFor(selectedTargetId, entry.platformId);
+  if (layers.length === 0) {
+    box.innerHTML = '<p class="manifest-layers-empty">No system at this target engages this platform.</p>';
+    return box;
+  }
+  box.innerHTML = `<div class="manifest-layers-head">Threats reaching each layer — blank = simulated. Earlier layers keep their results.</div>`;
+  for (const d of layers) {
+    const cat = DEFENSE_CATALOG[d.system];
+    const val = entry.layers?.[d.id];
+    const line = document.createElement('label');
+    line.className = 'manifest-layer-line';
+    line.innerHTML = `
+      <span class="manifest-layer-name">${_printEsc(defLabel(d.id, cat?.name || d.system))}</span>
+      <span class="manifest-layer-loc">${_printEsc(d.locationName || '')}</span>
+      <input type="number" class="manifest-layer-input" min="0" step="1" placeholder="sim" value="${val ?? ''}" data-def="${d.id}">
+    `;
+    line.querySelector('input').addEventListener('change', e => {
+      const raw = e.target.value.trim();
+      const n   = raw === '' ? null : Number(raw);
+      if (n != null && !(Number.isInteger(n) && n >= 0)) {
+        showToast('Enter a whole number of 0 or more, or leave it blank.', true);
+        e.target.value = val ?? '';
+        return;
+      }
+      entry.layers = { ...(entry.layers || {}) };
+      if (n == null) delete entry.layers[d.id]; else entry.layers[d.id] = n;
+      if (Object.keys(entry.layers).length === 0) delete entry.layers;
+      _manifestUnchanged = false;
+      saveSessionState();
+      // Update the row's button in place so focus stays in the editor
+      const n2  = Object.keys(entry.layers || {}).length;
+      const btn = document.querySelector(`.btn-manifest-layers[data-pid="${entry.platformId}"]`);
+      if (btn) { btn.textContent = `Layers${n2 ? ` (${n2})` : ''}`; btn.classList.toggle('has-layers', n2 > 0); }
+    });
+    box.appendChild(line);
+  }
+  return box;
+}
+
 function renderAttackManifest() {
   const container     = document.getElementById('attack-manifest');
   const simBtn        = document.getElementById('btn-simulate');
@@ -1830,6 +1929,7 @@ function renderAttackManifest() {
   simBtn.disabled = !selectedTargetId;
   if (addToQueueBtn) addToQueueBtn.disabled = !selectedTargetId;
 
+  const nLayers = entry => Object.keys(entry.layers || {}).length;
   const THREAT_ORDER = { mrbm: 0, srbm: 1, cruise_missile: 2, drone: 3, fpv: 4 };
   const sortedManifest = [...attackManifest].sort((a, b) => {
     const ta = PLATFORM_CATALOG[a.platformId]?.type ?? '';
@@ -1853,14 +1953,24 @@ function renderAttackManifest() {
       </div>
       ${platform.country ? `<span class="manifest-country">(${platform.country})</span>` : ''}
       <span class="manifest-count">Qty: ${entry.count}</span>
+      <button class="btn btn-secondary btn-sm btn-manifest-layers${nLayers(entry) ? ' has-layers' : ''}" data-pid="${entry.platformId}"
+              ${selectedTargetId ? '' : 'disabled'} title="Set how many of these reach a layer, before simulating">
+        Layers${nLayers(entry) ? ` (${nLayers(entry)})` : ''}
+      </button>
       <button class="btn-icon btn-remove-platform" data-pid="${entry.platformId}" title="Remove">✕</button>
     `;
 
     row.querySelector('.btn-remove-platform').addEventListener('click', (e) => {
       removePlatformFromManifest(e.currentTarget.dataset.pid);
     });
+    row.querySelector('.btn-manifest-layers').addEventListener('click', (e) => {
+      const pid = e.currentTarget.dataset.pid;
+      _openLayerEditor = _openLayerEditor === pid ? null : pid;
+      renderAttackManifest();
+    });
 
     container.appendChild(row);
+    if (_openLayerEditor === entry.platformId && selectedTargetId) container.appendChild(_buildLayerEditor(entry));
   }
 
   // Total row
@@ -2080,42 +2190,20 @@ async function simulate() {
   document.getElementById('override-notice')?.classList.add('hidden');
 
   try {
-    const target            = getTarget(selectedTargetId);
-
-    // Own defenses — exclude any the user has marked as disabled pre-simulation.
-    // Stamp locationName/locationCountry so engagement records always carry a
-    // source location, just like cross-target defenses do.
-    const perTargetDefenses = (target?.defenses || [])
-      .filter(d => !d.disabled)
-      .map(d => ({ ...d, locationName: target.name, locationCountry: target.country || '' }));
-
-    // Cross-target defenses — exclude any disabled for this covered target
-    const crossDefs = getCrossTargetDefenses(selectedTargetId)
-      .filter(d => !isCrossTargetDefenseDisabled(selectedTargetId, d))
-      .map(d => ({
-        id:                   d.id,
-        system:               d.system,
-        quantity:             d.quantity,
-        notes:                d.notes || '',
-        operator:             d.operator || '',
-        locationName:         d._placedAtTargetName,
-        locationCountry:      d._placedAtTargetCountry || '',
-        restrictToThreatTypes: d._restrictToThreatTypes || null
-      }));
-
-    const allDefenses = [...perTargetDefenses, ...crossDefs];
+    const target      = getTarget(selectedTargetId);
+    const allDefenses = _attackDefenses(selectedTargetId);
 
     // Snapshot magazine state before depletion so disengage overrides can
     // re-run the simulation from the same starting point.
     const preSimSnap = { ...globalMagState };
 
-    const draws   = createDrawLog({ fresh: () => Math.random() });
-    const results = runSimulation(attackManifest, allDefenses, globalMagState, {}, { draws });
+    const run     = _runNewAttack(attackManifest, allDefenses, globalMagState);
+    const results = run.results;
 
-    // Merge updated magazine levels back into globalMagState.
+    // Merge updated magazine levels back into globalMagState (with the
+    // manifest's pre-set layer counts applied).
     // Cross-target def.id entries are automatically shared with their source targets.
-    const newMagState = extractMagazineState(results);
-    Object.assign(globalMagState, newMagState);
+    Object.assign(globalMagState, extractMagazineState(run.display));
     saveMagStateToStorage();
 
     _manifestUnchanged = true;
@@ -2123,9 +2211,7 @@ async function simulate() {
     lastSimTarget   = target;
     lastSimDefenses = allDefenses;
     preSimMagState  = preSimSnap;
-    renderDefenseLayers(selectedTargetId);
-
-    renderSimulationResults(results, target);
+    manualOverrides = JSON.parse(JSON.stringify(run.overrides));
 
     // Snapshot current target state so it can be restored after a page reload
     // even when the user never switched away from this target.
@@ -2134,6 +2220,7 @@ async function simulate() {
     // Record this attack in the simulation history
     if (simHistoryCursor >= 0) {
       simHistory.push(_createSnapshot({
+        id:             run.id,
         isInitial:      false,
         label:          _buildHistoryLabel(attackManifest, target),
         targetId:       selectedTargetId,
@@ -2142,16 +2229,21 @@ async function simulate() {
         magStateAfter:  globalMagState,
         reloadsState:   _captureReloadsState(),
         results,
+        shown:          run.display,
         allDefenses,
-        manualOverrides: {},
+        manualOverrides: run.overrides,
         attackManifest,
-        draws:          draws.log
+        draws:          run.draws
       }));
       simHistoryCursor = simHistory.length - 1;
       lastSimSnapshotId = simHistory[simHistoryCursor].id;
       _saveTargetState(selectedTargetId);
       saveHistoryState();
     }
+
+    renderDefenseLayers(selectedTargetId);
+    if (Object.keys(run.overrides).length) rerenderWithOverrides(run.display);
+    else renderSimulationResults(results, target);
 
     saveSeedState();
     saveSessionState();
@@ -2285,23 +2377,54 @@ function computeAdjustedResults(originalResults, overrides) {
  * at the time (overrides saved before `killed` existed use it instead).
  */
 function applyLayerOverride(threatType, platformId, defId, survived, disengaged = false, killed = null) {
-  _changeOverrides(() => {
-    const t = manualOverrides[threatType] || (manualOverrides[threatType] = {});
-    const p = t[platformId] || (t[platformId] = {});
-    p[defId] = killed != null && !disengaged ? { survived, killed, disengaged } : { survived, disengaged };
-  });
+  _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => ({
+    ...(prev?.incoming != null ? { incoming: prev.incoming } : {}),
+    ...(killed != null && !disengaged ? { survived, killed, disengaged } : { survived, disengaged })
+  })));
 }
 
-/** Remove the override for one layer, adjust magazines, and re-render. */
-function clearLayerOverride(threatType, platformId, defId) {
-  _changeOverrides(() => {
-    const t = manualOverrides[threatType];
-    if (t && t[platformId]) {
-      delete t[platformId][defId];
-      if (Object.keys(t[platformId]).length === 0) delete t[platformId];
-      if (Object.keys(t).length === 0) delete manualOverrides[threatType];
-    }
-  });
+/**
+ * Set how many threats reach one layer (null clears it), keeping any kill
+ * override on the layer. Earlier layers keep their results; the layer and
+ * everything after it is run again.
+ */
+function applyIncomingOverride(threatType, platformId, defId, incoming) {
+  _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => {
+    const { incoming: _old, ...rest } = prev || {};
+    return incoming == null ? rest : { ...rest, incoming };
+  }));
+}
+
+/**
+ * Remove the override for one layer, adjust magazines, and re-render.
+ * part: 'incoming' or 'kills' clears only that part; omitted clears both.
+ */
+function clearLayerOverride(threatType, platformId, defId, part = null) {
+  _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => {
+    if (!part) return null;
+    if (part === 'incoming') { const { incoming, ...rest } = prev || {}; return rest; }
+    return prev?.incoming != null ? { incoming: prev.incoming } : null;
+  }));
+}
+
+/**
+ * Replace one layer's entry in manualOverrides with fn(previous entry).
+ * An empty or null result removes it (and any containers left empty).
+ */
+function _editOverride(threatType, platformId, defId, fn) {
+  const t = manualOverrides[threatType] || (manualOverrides[threatType] = {});
+  const p = t[platformId] || (t[platformId] = {});
+  const next = fn(p[defId] || null);
+  if (next && Object.keys(next).length) p[defId] = next;
+  else delete p[defId];
+  if (Object.keys(p).length === 0) delete t[platformId];
+  if (Object.keys(t).length === 0) delete manualOverrides[threatType];
+}
+
+/** True when the shown attack can be run again with its recorded draws (incoming edits need it). */
+function _shownAttackReplayable() {
+  const i = _shownAttackSnapshotIndex();
+  return i >= 0 && !!simHistory[i].draws;
 }
 
 /** Full magazine of a defense entry from the shown attack (0 when it has none). */
@@ -2373,7 +2496,7 @@ function _changeOverrides(mutate) {
 
   snap.magStateAfter   = { ...snap.preSimMagState, ...extractMagazineState(display) };
   snap.manualOverrides = JSON.parse(JSON.stringify(manualOverrides));
-  snap.stats           = { totalIn: display.totalIn, totalOut: display.totalOut };
+  snap.stats           = _statsOf(display);
   const { replayed, adjusted } = _propagateHistory(snapIdx, oldMag, oldRes);
 
   // The live state belongs to the history entry the session is at; changes
@@ -2480,7 +2603,7 @@ function _propagateHistory(from, oldMag, oldRes) {
       const ov      = s.manualOverrides || {};
       const display = Object.keys(ov).length ? _replayAttack(s, pre, ov) : raw;
       s.results       = raw;
-      s.stats         = { totalIn: display.totalIn, totalOut: display.totalOut };
+      s.stats         = _statsOf(display);
       s.magStateAfter = { ...pre, ...extractMagazineState(display) };
       replayed++;
     } else {
@@ -2561,6 +2684,7 @@ function _computeDisplayResults() {
     for (const [tt, byPlat] of Object.entries(manualOverrides)) {
       for (const [pid, byDef] of Object.entries(byPlat)) {
         for (const [defId, ov] of Object.entries(byDef)) {
+          if (ov.survived == null && !ov.disengaged) continue;   // incoming counts need a replay
           if (ov.disengaged) {
             const t = disengagedByThreatType[tt] || (disengagedByThreatType[tt] = {});
             (t[pid] || (t[pid] = [])).push(defId);
@@ -2643,44 +2767,74 @@ function activateOverrideEdit(triggerBtn) {
   const defId      = triggerBtn.dataset.def;
   const threatsIn  = parseInt(triggerBtn.dataset.threatsIn, 10);
   const killedNow  = parseInt(triggerBtn.dataset.killed,    10);
+  const canIncoming = _shownAttackReplayable();
 
   const form = document.createElement('div');
   form.className = 'override-edit-form';
   form.innerHTML = `
+    ${canIncoming ? `
+    <span class="override-edit-label">Incoming:</span>
+    <input type="number" class="override-incoming-input" value="${threatsIn}" min="0" title="Threats that reach this layer; earlier layers keep their results">` : ''}
     <span class="override-edit-label">Killed:</span>
     <input type="number" class="override-killed-input" value="${killedNow}" min="0" max="${threatsIn}">
-    <span class="override-edit-label">of ${threatsIn}</span>
+    ${canIncoming ? '' : `<span class="override-edit-label">of ${threatsIn}</span>`}
     <button class="btn btn-primary btn-sm btn-ov-apply">Apply</button>
     <button class="btn btn-warning btn-sm btn-ov-disengage" title="System does not fire; no interceptors expended">Disengage</button>
     <button class="btn btn-secondary btn-sm btn-ov-cancel">Cancel</button>
   `;
 
   triggerBtn.closest('.engagement-row').after(form);
-  const input = form.querySelector('.override-killed-input');
-  input.focus();
-  input.select();
+  const input    = form.querySelector('.override-killed-input');
+  const incInput = form.querySelector('.override-incoming-input');
+  (incInput || input).focus();
+  (incInput || input).select();
+
+  // Read the form: { incoming, killed, incChanged, killChanged } or null (invalid, toast shown)
+  const read = () => {
+    const incoming = incInput ? (incInput.value.trim() === '' ? NaN : Number(incInput.value)) : threatsIn;
+    if (!Number.isInteger(incoming) || incoming < 0) {
+      showToast('Incoming must be a whole number of 0 or more.', true);
+      return null;
+    }
+    const killed = parseInt(input.value, 10);
+    if (isNaN(killed) || killed < 0 || killed > incoming) {
+      showToast(`Enter a whole number of kills between 0 and ${incoming}.`, true);
+      return null;
+    }
+    return { incoming, killed, incChanged: incoming !== threatsIn, killChanged: killed !== killedNow };
+  };
 
   form.querySelector('.btn-ov-apply').addEventListener('click', () => {
-    const val = parseInt(input.value, 10);
-    if (isNaN(val) || val < 0 || val > threatsIn) {
-      showToast(`Enter a whole number between 0 and ${threatsIn}.`, true);
-      return;
-    }
+    const v = read();
+    if (!v) return;
     form.remove();
-    applyLayerOverride(threatType, platformId, defId, threatsIn - val, false, val);
+    if (!v.incChanged && !v.killChanged) return;
+    _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => ({
+      ...(prev || {}),
+      ...(v.incChanged  ? { incoming: v.incoming } : {}),
+      ...(v.killChanged ? { killed: v.killed, survived: v.incoming - v.killed, disengaged: false } : {})
+    })));
   });
 
   form.querySelector('.btn-ov-disengage').addEventListener('click', () => {
+    const v = read();
+    if (!v) return;
     form.remove();
-    applyLayerOverride(threatType, platformId, defId, threatsIn, true);
+    _changeOverrides(() => _editOverride(threatType, platformId, defId, prev => ({
+      ...(prev?.incoming != null ? { incoming: prev.incoming } : {}),
+      ...(v.incChanged ? { incoming: v.incoming } : {}),
+      survived: v.incoming, disengaged: true
+    })));
   });
 
   form.querySelector('.btn-ov-cancel').addEventListener('click', () => form.remove());
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter')  { e.preventDefault(); form.querySelector('.btn-ov-apply').click(); }
-    if (e.key === 'Escape') { e.preventDefault(); form.querySelector('.btn-ov-cancel').click(); }
-  });
+  for (const el of [input, incInput].filter(Boolean)) {
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter')  { e.preventDefault(); form.querySelector('.btn-ov-apply').click(); }
+      if (e.key === 'Escape') { e.preventDefault(); form.querySelector('.btn-ov-cancel').click(); }
+    });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2745,7 +2899,7 @@ function buildThreatTypeSection(group) {
   hdr.innerHTML = `
     <span class="threat-section-icon">${icon}</span>
     <span class="threat-section-label">${label}</span>
-    <span class="threat-section-count">${initialCount} inbound</span>
+    <span class="threat-section-count">${initialCount} inbound${_addedNote(group.addedCount)}</span>
   `;
   section.appendChild(hdr);
 
@@ -2754,12 +2908,12 @@ function buildThreatTypeSection(group) {
     const block = document.createElement('div');
     block.className = 'platform-section';
     const platFtr = plat.finalCount === 0
-      ? `all ${plat.initialCount} intercepted`
-      : `${plat.finalCount} of ${plat.initialCount} penetrate`;
+      ? `all ${_inboundOf(plat)} intercepted`
+      : `${plat.finalCount} of ${_inboundOf(plat)} penetrate`;
     block.innerHTML = `
       <div class="platform-section-header">
         <span class="platform-section-name">${plat.platformName}</span>
-        <span class="platform-section-count">${plat.initialCount} inbound · ${platFtr}</span>
+        <span class="platform-section-count">${plat.initialCount} inbound${_addedNote(plat.addedCount)} · ${platFtr}</span>
       </div>`;
 
     if (plat.engagements.length === 0) {
@@ -2774,12 +2928,13 @@ function buildThreatTypeSection(group) {
   }
 
   // ── Footer ───────────────────────────────────────────────────────────────
+  const faced      = _inboundOf(group);
   const allKilled  = finalCount === 0;
-  const noneKilled = finalCount === initialCount;
+  const noneKilled = finalCount === faced;
   const ftrClass   = allKilled ? 'ftr-all' : noneKilled ? 'ftr-none' : 'ftr-partial';
   const ftrText    = allKilled
-    ? `All ${initialCount} intercepted`
-    : `${finalCount} of ${initialCount} penetrate`;
+    ? `All ${faced} intercepted`
+    : `${finalCount} of ${faced} penetrate`;
 
   const ftr = document.createElement('div');
   ftr.className = `threat-section-footer ${ftrClass}`;
@@ -2812,10 +2967,14 @@ function buildEngagementProse(eng, threatType) {
   const pkShot  = (eng.pkShot ?? 0).toFixed(2);
   const isDE    = eng.model === 'directed_energy';
 
+  const incomingNote = eng.incomingFrom != null
+    ? `The number of ${tPlural} reaching ${name} was set manually to <strong>${total}</strong> (the layers before left ${eng.incomingFrom}). `
+    : '';
+
   // ── Manual override ───────────────────────────────────────────────────────
   if (eng.isManualOverride) {
     const killWord = isDE ? 'neutralised' : 'destroyed';
-    return `This engagement result was manually adjusted. ${name} was recorded as having ${killWord} <strong>${killed}</strong> of <strong>${total}</strong> ${tPlural}.`;
+    return `${incomingNote}This engagement result was manually adjusted. ${name} was recorded as having ${killWord} <strong>${killed}</strong> of <strong>${total}</strong> ${tPlural}.`;
   }
 
   // ── Pk sentence ───────────────────────────────────────────────────────────
@@ -2864,10 +3023,21 @@ function buildEngagementProse(eng, threatType) {
     }
   }
 
-  return `${pkSentence} ${killSentence} ${intSentence}`;
+  return `${incomingNote}${pkSentence} ${killSentence} ${intSentence}`;
 }
 
 /** Format a possibly-fractional count for display (1.5 → "1.5", 24 → "24"). */
+/** Threats a type or platform block faced: the manifest count plus any added at layers. */
+function _inboundOf(block) {
+  return block.initialCount + (block.addedCount || 0);
+}
+
+/** " (+5 at layers)" / " (−3 at layers)" when an incoming override changed the count, else "". */
+function _addedNote(added) {
+  if (!added) return '';
+  return ` (${added > 0 ? '+' : '−'}${Math.abs(added)} at layers)`;
+}
+
 function fmtNumber(n) {
   return Number.isInteger(n) ? String(n) : (Math.round(n * 100) / 100).toString();
 }
@@ -2880,14 +3050,30 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
     : '';
   const keyAttrs = `data-threat="${threatType}" data-platform="${platformId}" data-def="${eng.defId}"`;
 
+  // A manually set number of threats reaching this layer
+  const incomingBadge = eng.incomingFrom != null
+    ? `<span class="override-badge override-badge--incoming" title="Threats reaching this layer set manually; the layers before left ${eng.incomingFrom}">⚡ ${eng.threatsIn} in (was ${eng.incomingFrom})
+         <button class="btn-icon btn-clear-override" ${keyAttrs} data-part="incoming" title="Clear the incoming count">✕</button>
+       </span>`
+    : '';
+  const wireClears = () => {
+    row.querySelectorAll('.btn-clear-override').forEach(btn => btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const d = e.currentTarget.dataset;
+      clearLayerOverride(d.threat, d.platform, d.def, d.part || null);
+    }));
+    return row;
+  };
+
   if (eng.note === 'Cannot engage') {
     row.className = 'engagement-row eng-no-capability';
     row.innerHTML = `
       <span class="eng-name">${defLabel(eng.defId, eng.systemName)}</span>
       ${locationHtml}
+      ${incomingBadge}
       <span class="eng-note-text">Cannot engage this platform (Pk 0) — passes through</span>
     `;
-    return row;
+    return wireClears();
   }
 
   if (eng.note === 'Magazine exhausted') {
@@ -2895,9 +3081,10 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
     row.innerHTML = `
       <span class="eng-name">${defLabel(eng.defId, eng.systemName)}</span>
       ${locationHtml}
+      ${incomingBadge}
       <span class="eng-note-text">Magazine exhausted — ${eng.threatsIn} pass through</span>
     `;
-    return row;
+    return wireClears();
   }
 
   // ── Disengaged (manual override with zero kills) ─────────────────────────
@@ -2909,6 +3096,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
         <span class="eng-qty">${eng.quantity} batt.</span>
         ${eng.notes ? `<span class="eng-notes">${eng.notes}</span>` : ''}
         ${locationHtml}
+        ${incomingBadge}
         <span class="override-badge">⚡ Disengaged</span>
       </div>
       <div class="eng-stats">
@@ -2916,11 +3104,9 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
         <span class="eng-sep">/</span>
         <span class="eng-in">${eng.threatsIn} in</span>
       </div>
-      <button class="btn-icon btn-clear-override" ${keyAttrs} title="Clear override">✕</button>
+      <button class="btn-icon btn-clear-override" ${keyAttrs} data-part="kills" title="Clear override">✕</button>
     `;
-    row.querySelector('.btn-clear-override')
-      .addEventListener('click', e => clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.platform, e.currentTarget.dataset.def));
-    return row;
+    return wireClears();
   }
 
   // ── Normal / manually-overridden engagement ──────────────────────────────
@@ -2938,11 +3124,11 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
 
   const intUsed = eng.interceptorsUsed ?? 0;
 
-  const overrideBadge = isOverride
+  const overrideBadge = incomingBadge + (isOverride
     ? `<span class="override-badge">⚡ Override
-         <button class="btn-icon btn-clear-override" ${keyAttrs} title="Clear override">✕</button>
+         <button class="btn-icon btn-clear-override" ${keyAttrs} data-part="kills" title="Clear override">✕</button>
        </span>`
-    : '';
+    : '');
 
   // Edit button only appears on un-overridden rows when a simulation is stored
   const editBtn = (!isOverride && threatType && lastSimResults)
@@ -2972,11 +3158,7 @@ function buildEngagementRow(eng, threatType = '', platformId = '') {
   row.querySelector('.btn-override-eng')
     ?.addEventListener('click', e => activateOverrideEdit(e.currentTarget));
 
-  row.querySelectorAll('.btn-clear-override')
-    .forEach(btn => btn.addEventListener('click', e => {
-      e.stopPropagation();
-      clearLayerOverride(e.currentTarget.dataset.threat, e.currentTarget.dataset.platform, e.currentTarget.dataset.def);
-    }));
+  wireClears();
 
   // ── Toggleable prose detail block ────────────────────────────────────────
   const details = document.createElement('details');
@@ -2995,18 +3177,20 @@ function renderResultsFinal(results) {
   const el = document.getElementById('results-final');
 
   const penetrators = results.finalThreats.filter(t => t.count > 0);
+  const faced       = results.totalIn + (results.totalAdded || 0);
+  const addedNote   = results.totalAdded ? `<div class="final-sub">${results.totalIn} launched${_addedNote(results.totalAdded)}.</div>` : '';
   const allKilled   = results.totalOut === 0;
-  const noneKilled  = results.totalOut === results.totalIn;
+  const noneKilled  = results.totalOut === faced;
 
   let html = `<div class="final-result ${allKilled ? 'final-all-killed' : noneKilled ? 'final-none-killed' : 'final-partial'}">`;
 
   if (allKilled) {
     html += `
-      <div class="final-headline">All ${results.totalIn} platforms intercepted</div>
-      <div class="final-sub">No penetrators reached the target.</div>`;
+      <div class="final-headline">All ${faced} platforms intercepted</div>
+      <div class="final-sub">No penetrators reached the target.</div>${addedNote}`;
   } else {
     html += `
-      <div class="final-headline">${results.totalOut} of ${results.totalIn} platforms penetrate defenses</div>`;
+      <div class="final-headline">${results.totalOut} of ${faced} platforms penetrate defenses</div>${addedNote}`;
 
     if (penetrators.length > 0) {
       const chips = penetrators.map(t =>
@@ -3133,11 +3317,11 @@ async function _confirmTruncate() {
   return !!proceed;
 }
 
-function _createSnapshot({ isInitial, type, label, targetId, targetName,
+function _createSnapshot({ id, isInitial, type, label, targetId, targetName,
                             magStateBefore, magStateAfter, reloadsState,
-                            results, allDefenses, manualOverrides, attackManifest, draws }) {
+                            results, shown, allDefenses, manualOverrides, attackManifest, draws }) {
   const snap = {
-    id:             `snap_${Date.now()}_${simHistory.length}`,
+    id:             id || _newSnapshotId(),
     type:           type || (isInitial ? 'initial' : 'attack'),
     label,
     timestamp:      Date.now(),
@@ -3151,13 +3335,57 @@ function _createSnapshot({ isInitial, type, label, targetId, targetName,
     results:        results    ? JSON.parse(JSON.stringify(results))        : null,
     allDefenses:    JSON.parse(JSON.stringify(allDefenses     || [])),
     manualOverrides:JSON.parse(JSON.stringify(manualOverrides || {})),
-    stats:          results    ? { totalIn: results.totalIn, totalOut: results.totalOut } : null,
+    stats:          results    ? _statsOf(shown || results) : null,
     engagementConfig: _engagementConfigRef(),
     // Each entry's random draws ({ "type|platformId|defId": [u, …] }), so the
     // attack can be run again after an override with the same luck.
     ...(draws ? { draws: JSON.parse(JSON.stringify(draws)) } : {})
   };
   return snap;
+}
+
+function _newSnapshotId() {
+  return `snap_${Date.now()}_${simHistory.length}`;
+}
+
+/** History-entry totals of a result: threats in (manifest), out, and added at layers. */
+function _statsOf(r) {
+  return { totalIn: r.totalIn, totalOut: r.totalOut, totalAdded: r.totalAdded || 0 };
+}
+
+/**
+ * Run a new attack: record its random draws, then apply the threat counts
+ * set in advance on its manifest (entry.layers: { defId: incoming }), if any,
+ * as incoming overrides with the same draws.
+ * @returns {{ id, draws, results, display, overrides }} id is the history
+ *          entry id to use (its seed for replays); results have no overrides,
+ *          display has the pre-set ones
+ */
+function _runNewAttack(manifest, defenses, startMag) {
+  const id      = _newSnapshotId();
+  const draws   = createDrawLog({ fresh: () => Math.random() });
+  const results = runSimulation(manifest, defenses, startMag, {}, { draws });
+  const overrides = _presetOverrides(manifest);
+  const display = Object.keys(overrides).length
+    ? runSimulation(manifest, defenses, { ...startMag }, {},
+        { draws: createDrawLog({ log: JSON.parse(JSON.stringify(draws.log)), seed: id }), overrides })
+    : results;
+  return { id, draws: draws.log, results, display, overrides };
+}
+
+/** Incoming overrides from a manifest's pre-set layer counts. */
+function _presetOverrides(manifest) {
+  const ov = {};
+  for (const e of manifest || []) {
+    const type = PLATFORM_CATALOG[e.platformId]?.type;
+    if (!type || !e.layers) continue;
+    for (const [defId, n] of Object.entries(e.layers)) {
+      if (!(Number.isInteger(n) && n >= 0)) continue;
+      const t = ov[type] || (ov[type] = {});
+      (t[e.platformId] || (t[e.platformId] = {}))[defId] = { incoming: n };
+    }
+  }
+  return ov;
 }
 
 /** Build a human-readable label for a simulation history entry. */
@@ -3259,7 +3487,7 @@ function renderHistoryDialogBody() {
 
     let statsHtml = '';
     if (snap.stats) {
-      const killed = snap.stats.totalIn - snap.stats.totalOut;
+      const killed = snap.stats.totalIn + (snap.stats.totalAdded || 0) - snap.stats.totalOut;
       statsHtml = `<div class="history-entry-stats">${killed} killed · ${snap.stats.totalOut} leaked</div>`;
     }
 
@@ -3389,7 +3617,7 @@ function _buildAttackSection(snap, index) {
   const location   = [snap.targetName, target?.country].filter(Boolean).join(', ');
   const totalIn    = snap.stats?.totalIn  ?? 0;
   const totalOut   = snap.stats?.totalOut ?? 0;
-  const totalKilled = totalIn - totalOut;
+  const totalKilled = totalIn + (snap.stats?.totalAdded || 0) - totalOut;
 
   // ── Inbound platforms table ────────────────────────────────────────────────
   let platformRows = '';
@@ -3406,11 +3634,11 @@ function _buildAttackSection(snap, index) {
   let engagementHtml = '';
   for (const group of results.byThreatType) {
     const typeLabel = THREAT_TYPE_LABELS[group.threatType] || group.threatType;
-    const killed    = group.initialCount - group.finalCount;
+    const killed    = _inboundOf(group) - group.finalCount;
 
     let engRows = '';
     for (const plat of group.platforms || []) {
-      engRows += `<tr class="pr-platform-row"><td colspan="7">${plat.platformName} &nbsp;—&nbsp; ${plat.initialCount} inbound, ${plat.finalCount} leaked</td></tr>`;
+      engRows += `<tr class="pr-platform-row"><td colspan="7">${plat.platformName} &nbsp;—&nbsp; ${plat.initialCount} inbound${_addedNote(plat.addedCount)}, ${plat.finalCount} leaked</td></tr>`;
       if (plat.engagements.length === 0) {
         engRows += `<tr class="pr-row-dim"><td colspan="7" class="pr-italic">No system engages this platform</td></tr>`;
       }
@@ -3450,7 +3678,7 @@ function _buildAttackSection(snap, index) {
     }
 
     engagementHtml += `
-      <div class="pr-section-label">${typeLabel} &nbsp;—&nbsp; ${group.initialCount} inbound</div>
+      <div class="pr-section-label">${typeLabel} &nbsp;—&nbsp; ${group.initialCount} inbound${_addedNote(group.addedCount)}</div>
       <table class="pr-table">
         <thead><tr>
           <th>System</th><th>Location</th><th>In</th>
@@ -3477,7 +3705,7 @@ function _buildAttackSection(snap, index) {
     .map(g => {
       const lbl     = SHORT_TYPE_LABELS[g.threatType] || g.threatType;
       const leakers = g.finalCount;
-      return `${lbl} ${g.initialCount} incoming → <strong>${leakers} leaker${leakers !== 1 ? 's' : ''}</strong>`;
+      return `${lbl} ${g.initialCount} incoming${_addedNote(g.addedCount)} → <strong>${leakers} leaker${leakers !== 1 ? 's' : ''}</strong>`;
     });
 
   const summaryClass = totalOut > 0 ? 'pr-attack-summary pr-attack-summary--leak' : 'pr-attack-summary';
@@ -4577,7 +4805,8 @@ function renderQueuePanel() {
       const cat = PLATFORM_CATALOG[p.platformId];
       return `${p.count}× ${cat?.name || p.platformId}`;
     });
-    const manifestLabel = parts.join(', ');
+    const nSet = entry.manifest.reduce((n, p) => n + Object.keys(p.layers || {}).length, 0);
+    const manifestLabel = parts.join(', ') + (nSet ? ` · ${nSet} layer count${nSet !== 1 ? 's' : ''} set` : '');
 
     const item = document.createElement('div');
     item.className = 'queue-entry';
@@ -4684,37 +4913,20 @@ function _runOneQueuedAttack(entry) {
   const target = getTarget(entry.targetId);
   if (!target) return;
 
-  const perTargetDefenses = (target.defenses || [])
-    .filter(d => !d.disabled)
-    .map(d => ({ ...d, locationName: target.name, locationCountry: target.country || '' }));
-
-  const crossDefs = getCrossTargetDefenses(entry.targetId)
-    .filter(d => !isCrossTargetDefenseDisabled(entry.targetId, d))
-    .map(d => ({
-      id:                    d.id,
-      system:                d.system,
-      quantity:              d.quantity,
-      notes:                 d.notes || '',
-      operator:              d.operator || '',
-      locationName:          d._placedAtTargetName,
-      locationCountry:       d._placedAtTargetCountry || '',
-      restrictToThreatTypes: d._restrictToThreatTypes || null
-    }));
-
-  const allDefenses = [...perTargetDefenses, ...crossDefs];
+  const allDefenses = _attackDefenses(entry.targetId);
   const preSimSnap  = { ...globalMagState };
 
-  const draws   = createDrawLog({ fresh: () => Math.random() });
-  const results = runSimulation(entry.manifest, allDefenses, globalMagState, {}, { draws });
+  const run     = _runNewAttack(entry.manifest, allDefenses, globalMagState);
+  const results = run.results;
 
-  // Persist magazine depletion globally
-  const newMagState = extractMagazineState(results);
-  Object.assign(globalMagState, newMagState);
+  // Persist magazine depletion globally (with pre-set layer counts applied)
+  Object.assign(globalMagState, extractMagazineState(run.display));
   saveMagStateToStorage();
 
   // Push to history
   if (simHistoryCursor >= 0) {
     simHistory.push(_createSnapshot({
+      id:             run.id,
       isInitial:      false,
       label:          _buildHistoryLabel(entry.manifest, target),
       targetId:       entry.targetId,
@@ -4723,10 +4935,11 @@ function _runOneQueuedAttack(entry) {
       magStateAfter:  { ...globalMagState },
       reloadsState:   _captureReloadsState(),
       results,
+      shown:           run.display,
       allDefenses,
-      manualOverrides: {},
+      manualOverrides: run.overrides,
       attackManifest:  entry.manifest,
-      draws:           draws.log
+      draws:           run.draws
     }));
     simHistoryCursor = simHistory.length - 1;
   }
@@ -4739,7 +4952,7 @@ function _runOneQueuedAttack(entry) {
     lastSimTarget:      target,
     lastSimDefenses:    JSON.parse(JSON.stringify(allDefenses)),
     preSimMagState:     JSON.parse(JSON.stringify(preSimSnap)),
-    manualOverrides:    {},
+    manualOverrides:    JSON.parse(JSON.stringify(run.overrides)),
     _manifestUnchanged: true,
     snapshotId
   };

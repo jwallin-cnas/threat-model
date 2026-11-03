@@ -1296,6 +1296,13 @@ select option, select optgroup {
   vertical-align: middle;
 }
 
+/* "⚡ 30 in (was 25)": the threats reaching a layer were set manually */
+.override-badge--incoming {
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.12);
+  border-color: rgba(88, 166, 255, 0.35);
+}
+
 /* ⚙ edit-override icon — sits at the right edge of a normal engagement row */
 .btn-override-eng {
   margin-left: auto;
@@ -1360,7 +1367,8 @@ select option, select optgroup {
   white-space: nowrap;
 }
 
-.override-killed-input {
+.override-edit-form .override-killed-input,
+.override-edit-form .override-incoming-input {
   width: 56px;
   padding: 2px 6px;
   background: var(--bg-input);
@@ -2358,3 +2366,32 @@ select option, select optgroup {
 .threat-dot-mrbm      { background-color: #ffa657; }
 .threat-dot-drone_jet,
 .threat-dot-fpv       { background-color: #79c0ff; }
+
+/* ── Manifest: threats set to reach a layer before simulating ──────────────── */
+.btn-manifest-layers { padding: 1px 8px; font-size: 11px; }
+.btn-manifest-layers.has-layers { color: var(--accent); border-color: rgba(88, 166, 255, 0.5); }
+.manifest-layers {
+  margin: 2px 0 8px 18px;
+  padding: 8px 10px;
+  border-left: 2px solid rgba(88, 166, 255, 0.35);
+  background: rgba(88, 166, 255, 0.05);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+.manifest-layers-head,
+.manifest-layers-empty { color: var(--text-dim); margin: 0 0 6px; font-size: 11px; }
+.manifest-layer-line { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.manifest-layer-name { flex: 1 1 auto; min-width: 0; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manifest-layer-loc  { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+.manifest-layer-line .manifest-layer-input {
+  flex: 0 0 64px;
+  width: 64px;
+  padding: 2px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+}

@@ -397,6 +397,46 @@ describe('runSimulationCore — manual overrides', () => {
   });
 });
 
+describe('runSimulationCore — incoming overrides', () => {
+  const drones = [{ platformId: 'drone_a', count: 10 }];
+  const defs   = [mkDef('shared_cap', 'cap'), mkDef('s1', 'sam')];
+  const ov = o => buildMockConfig({ overrides: { drone: { drone_a: o } } });
+
+  it('adds threats at a layer even after earlier layers killed everything', () => {
+    const r = run(drones, defs, {}, {}, ov({ s1: { incoming: 6 } }));   // the CAP kills all 10, then 6 reach the SAM
+    const [cap, sam] = allEngagements(r);
+    expect(cap).toMatchObject({ threatsIn: 10, killed: 10 });
+    expect(sam).toMatchObject({ defId: 's1', threatsIn: 6, incomingFrom: 0, killed: 6, interceptorsUsed: 12 });
+    expect(r.byThreatType[0].platforms[0]).toMatchObject({ initialCount: 10, addedCount: 6, finalCount: 0 });
+    expect(r.totalAdded).toBe(6);
+  });
+
+  it('removes threats at a layer: earlier layers keep their results', () => {
+    const r = run([{ platformId: 'drone_a', count: 30 }], defs, {}, {}, ov({ s1: { incoming: 4 } }));
+    const [cap, sam] = allEngagements(r);
+    expect(cap).toMatchObject({ threatsIn: 30, killed: 25 });            // 20 at full Pk, the other 10 at 0.5
+    expect(sam).toMatchObject({ threatsIn: 4, incomingFrom: cap.survived, killed: 4 });
+    expect(r.totalAdded).toBe(4 - cap.survived);
+  });
+
+  it('combines with a kill override on the same layer and leaves other platforms alone', () => {
+    const r = run([{ platformId: 'drone_a', count: 10 }, { platformId: 'drone_b', count: 3 }], defs, {}, {},
+      ov({ shared_cap: { incoming: 15, killed: 5 } }));
+    const [cap, sam] = allEngagements(r);
+    expect(cap).toMatchObject({ threatsIn: 15, incomingFrom: 10, killed: 5, interceptorsUsed: 15, isManualOverride: true });
+    expect(sam).toMatchObject({ threatsIn: 10, killed: 10 });
+    expect(r.byThreatType[0].platforms[1]).toMatchObject({ platformId: 'drone_b', addedCount: 0, finalCount: 0 });
+  });
+
+  it('records no extra rows and draws nothing for layers it passes with no threats', () => {
+    let calls = 0;
+    const r = run(drones, defs, {}, {}, buildMockConfig({ rng: () => { calls++; return 0.5; } }));
+    expect(allEngagements(r)).toHaveLength(1);
+    expect(r.totalAdded).toBe(0);
+    expect(calls).toBe(0);
+  });
+});
+
 // ── Normalisers ───────────────────────────────────────────────────────────────
 
 describe('normalizeDoctrine / normalizePkTable', () => {
