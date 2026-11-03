@@ -82,6 +82,12 @@
             "enum": ["base", "data center", "city", "oil infrastructure"]
           }
         },
+        "coverage_operators": {
+          "type": "array",
+          "description": "Operators (besides the United States and the host country) whose systems at OTHER locations are enabled by default when in range of this target. Used for the water place points, e.g. Oman and the UAE at the Strait of Hormuz. The per-system toggle still overrides it.",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "damage": {
           "type": "array",
           "description": "Log of damage events against this target. May be empty.",

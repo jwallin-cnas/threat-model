@@ -34,6 +34,7 @@ const CARTO_API_KEY = 'cb1_4bua_1_4f879cb3d8b58a26049a60a9';
 
 let appTargets        = [];   // scenario targets from data/data.json (baseline + localStorage overrides)
 let appTargetCatalog  = [];   // target catalog from data/targets.json
+let appCoverageOperators = new Map();   // targetId → operators enabled by default when covering it (targets.json coverage_operators)
 let appDefenseSystems = [];   // defense system specs from data/defenses.json
 let appAttackSystems  = [];   // attack platforms from data/attacks.json
 let appDefaultDefenses = {};  // default defense assignments from data/defaults.json  (targetId → defenses[])
@@ -453,6 +454,9 @@ async function loadData() {
   // Target catalog (targets.json)
   if (targetsRes.status === 'fulfilled') {
     appTargetCatalog = targetsRes.value.targets || [];
+    // Kept apart from the target objects: a stored (localStorage) target replaces
+    // the whole object, so it may predate this field.
+    appCoverageOperators = new Map(appTargetCatalog.map(t => [t.id, t.coverage_operators || []]));
   } else {
     console.error('Could not load data/targets.json:', targetsRes.reason);
   }
@@ -1681,9 +1685,11 @@ function toggleOwnDefenseDisabled(targetId, defId) {
  * Priority:
  *   1. Explicit enable  (target.enabledCoverageDefIds)  → always enabled
  *   2. Explicit disable (target.disabledCoverageDefIds) → always disabled
- *   3. Default: enabled if the defense's operator is 'United States' OR matches
- *      the host country of the covered target (same-nation cross-coverage);
- *      disabled otherwise.
+ *   3. Default: enabled if the defense's operator is 'United States', matches
+ *      the host country of the covered target (same-nation cross-coverage), or
+ *      is in the covered target's coverage_operators (targets.json; the water
+ *      place points list their littoral states, e.g. Oman and the UAE at the
+ *      Strait of Hormuz); disabled otherwise.
  */
 function isCrossTargetDefenseDisabled(targetId, def) {
   const target = getTarget(targetId);
@@ -1691,7 +1697,8 @@ function isCrossTargetDefenseDisabled(targetId, def) {
   if ((target.enabledCoverageDefIds  || []).includes(def.id)) return false;
   if ((target.disabledCoverageDefIds || []).includes(def.id)) return true;
   const op = def.operator || '';
-  return op !== 'United States' && op !== (target.country || '');
+  if (op === 'United States' || op === (target.country || '')) return false;
+  return !(appCoverageOperators.get(targetId) || []).includes(op);
 }
 
 function toggleCrossTargetDefenseDisabled(targetId, def) {

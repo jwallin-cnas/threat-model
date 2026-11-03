@@ -391,35 +391,40 @@
       "name": "Mediterranean Sea",
       "country": "United States",
       "location": [32.42095, 34.70485],
-      "infrastructure": ["base"]
+      "infrastructure": ["base"],
+      "coverage_operators": ["Israel"]
     },
     {
       "id": "persian_gulf_place_point",
       "name": "Persian Gulf",
       "country": "United States",
       "location": [27.46872, 50.83899],
-      "infrastructure": ["base"]
+      "infrastructure": ["base"],
+      "coverage_operators": ["Bahrain", "Qatar", "Kuwait", "Saudi Arabia", "United Arab Emirates"]
     },
     {
       "id": "strait_of_hormuz_place_point",
       "name": "Strait of Hormuz",
       "country": "United States",
       "location": [26.6, 56.45],
-      "infrastructure": ["base"]
+      "infrastructure": ["base"],
+      "coverage_operators": ["Oman", "United Arab Emirates"]
     },
     {
       "id": "red_sea_place_point",
       "name": "Red Sea",
       "country": "United States",
       "location": [20.93354, 39.08745],
-      "infrastructure": ["base"]
+      "infrastructure": ["base"],
+      "coverage_operators": ["Saudi Arabia"]
     },
     {
       "id": "gulf_of_oman_place_point",
       "name": "Gulf of Oman",
       "country": "United States",
       "location": [23.69908, 61.49567],
-      "infrastructure": ["base"]
+      "infrastructure": ["base"],
+      "coverage_operators": ["Oman", "United Arab Emirates"]
     }
   ]
 }

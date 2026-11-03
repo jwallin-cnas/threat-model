@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run e2e
- *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols]
+ *   node scripts/e2e-check.js [--only tool|pk|doctrine|blue|red|reload|export|patrols|water]
  *
  * Prerequisites: npm install && npx playwright install chromium
  */
@@ -534,6 +534,49 @@ async function checkReportSummaries(browser, base) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Water place points: littoral partners' systems enabled by default
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkWaterCoverage(browser, base) {
+  console.log('\n── water coverage ──');
+  const page = await browser.newPage();
+  const errs = collectErrors(page);
+  await page.goto(base + '/index.html');
+  await page.waitForFunction(() => window._appReady === true, { timeout: 20000 });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload(); await page.waitForFunction(() => window._appReady === true);
+  const r = await page.evaluate(() => {
+    const off = (tid, operator) => isCrossTargetDefenseDisabled(tid, { id: 'probe_' + operator, operator });
+    const rule = {
+      hormuzOman: off('strait_of_hormuz_place_point', 'Oman'), hormuzUae: off('strait_of_hormuz_place_point', 'United Arab Emirates'),
+      hormuzIsrael: off('strait_of_hormuz_place_point', 'Israel'), hormuzUs: off('strait_of_hormuz_place_point', 'United States'),
+      gulfOman: off('persian_gulf_place_point', 'Oman'), gulfQatar: off('persian_gulf_place_point', 'Qatar'),
+      medIsrael: off('mediterranean_sea_place_point', 'Israel'), dohaUae: off('doha', 'United Arab Emirates')
+    };
+    // Red Sea: Saudi THAAD at Jeddah (62 km) is in range and now on by default; Israel's Arrow stays off
+    const cover = getCrossTargetDefenses('red_sea_place_point');
+    const thaad = cover.find(d => d.system === 'thaad' && d.operator === 'Saudi Arabia');
+    const arrow = cover.find(d => d.system === 'arrow');
+    const before = { thaad: thaad && isCrossTargetDefenseDisabled('red_sea_place_point', thaad), arrow: arrow && isCrossTargetDefenseDisabled('red_sea_place_point', arrow) };
+    toggleCrossTargetDefenseDisabled('red_sea_place_point', thaad);
+    const toggled = isCrossTargetDefenseDisabled('red_sea_place_point', thaad);
+    toggleCrossTargetDefenseDisabled('red_sea_place_point', thaad);
+    // A stored target object without the field still gets its littoral operators
+    const t = getTarget('strait_of_hormuz_place_point'); delete t.coverage_operators;
+    const stored = off('strait_of_hormuz_place_point', 'Oman');
+    return { rule, hasThaad: !!thaad, before, toggled, stored };
+  });
+  const x = r.rule;
+  check(!x.hormuzOman && !x.hormuzUae && x.hormuzIsrael && !x.hormuzUs, 'water: Strait of Hormuz enables Oman, UAE, U.S. by default, not Israel ' + JSON.stringify(x));
+  check(x.gulfOman && !x.gulfQatar && !x.medIsrael, 'water: each point uses its own littoral list (Persian Gulf, Mediterranean)');
+  check(x.dohaUae, 'water: land targets keep the old rule (UAE system off at Doha)');
+  check(r.hasThaad && r.before.thaad === false && r.before.arrow === true, 'water: Saudi THAAD at Jeddah covers the Red Sea by default; Arrow stays excluded ' + JSON.stringify(r.before));
+  check(r.toggled === true, 'water: the per-system toggle still overrides the default');
+  check(r.stored === false, 'water: the list comes from targets.json, not the stored target object');
+  check(errs.length === 0, 'water: no page errors ' + JSON.stringify(errs));
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Pk builder
 // ─────────────────────────────────────────────────────────────────────────────
 async function checkPkBuilder(browser, base) {
@@ -842,6 +885,7 @@ const browser = await chromium.launch();
 try {
   if (!ONLY || ONLY === 'tool')     await checkTool(browser, base);
   if (!ONLY || ONLY === 'tool')     await checkReportSummaries(browser, base);
+  if (!ONLY || ONLY === 'tool' || ONLY === 'water') await checkWaterCoverage(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'reload') await checkReloadAndSwitching(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'export') await checkLaydownExport(browser, base);
   if (!ONLY || ONLY === 'tool' || ONLY === 'patrols') await checkIndependentPatrols(browser, base);
